@@ -22,8 +22,8 @@ pub const BINDING: Binding = Binding {
 };
 
 /// What to do when the driver has not received the tuning menu from the base.
-pub const TUNING_UNREAD: &str = "The base has not sent its tuning menu to the driver yet: \
-     unplug the base's USB cable and plug it in again.";
+pub const TUNING_UNREAD: &str = "The base has not sent its settings to the driver yet: open \
+     the tuning menu on the wheel and change any value (then set it back).";
 
 /// The pedals plugged into a base: throttle ABS_Z, brake ABS_RZ, clutch ABS_Y, at the top of
 /// their travel when released (checked on a CSL DD; the same table as Oversteer's).
@@ -73,9 +73,10 @@ impl FanatecDevice {
         path.exists().then_some(path)
     }
 
-    /// The base has a tuning menu that the driver has not received yet: the base sends it when
-    /// it starts up with the driver bound, and until then the driver refuses every write to it
-    /// (the rotation included, which goes through the menu's SEN entry).
+    /// The base has a tuning menu that the driver has not received yet: the base sends it only
+    /// when the menu is used on the wheel (hid-fanatecff has no way to ask for it), and until
+    /// then the driver refuses every write to it (the rotation included, which goes through
+    /// the menu's SEN entry).
     pub fn tuning_unread(&self) -> Option<Unsupported> {
         let slot = sysfs::read_int(&self.tuning("SLOT")?)?;
         (slot == 0).then(|| Unsupported::new(Reason::Unavailable).with_detail(TUNING_UNREAD))

@@ -15,12 +15,19 @@ use crate::components::{Base, Wheel};
 use crate::device::{FanatecDevice, Shared};
 use crate::models::{self, Kind};
 
-/// What a device showed last, to notice changes (a rim swap, the driver bound, pedals mapped).
+/// What a device showed last, to notice changes (a rim swap, the driver bound, pedals mapped,
+/// the tuning menu received).
 #[derive(Clone, Debug, PartialEq)]
 struct Shape {
     bound: bool,
     rim: Option<u16>,
     pedals: Vec<PedalRole>,
+    /// The tuning menu arrived: settings, the rotation included, become available.
+    tuning: bool,
+    /// The inputs can be read (the event node is given to the user a moment after binding).
+    inputs: bool,
+    /// Which of the driver's attributes exist (it creates them while it binds).
+    exposed: Vec<bool>,
 }
 
 pub struct FanatecAdapter {
@@ -47,6 +54,11 @@ impl FanatecAdapter {
             bound: d.hid.hid.is_some(),
             rim: d.wheel_id(),
             pedals: d.hid.pedal_map.roles(),
+            tuning: d.tuning_unread().is_none(),
+            inputs: d.hid.inputs_ready(),
+            exposed: d
+                .hid
+                .exposed(&["range", "wheel_id", "fw_version", "display", "ftec_tuning"]),
         }
     }
 

@@ -20,6 +20,8 @@ struct Shape {
     driver: Option<String>,
     settings: bool,
     pedals: Vec<PedalRole>,
+    /// The inputs can be read (the event node is given to the user a moment after binding).
+    inputs: bool,
 }
 
 pub struct MozaAdapter {
@@ -45,6 +47,7 @@ impl MozaAdapter {
             driver: d.hid.driver(),
             settings: d.no_settings().is_none(),
             pedals: d.hid.pedal_map.roles(),
+            inputs: d.hid.inputs_ready(),
         }
     }
 

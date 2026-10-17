@@ -37,6 +37,8 @@ impl Env {
             return;
         }
         self.env.bind(&self.hid, "fanatec");
+        // Like the real driver: the HID device with the settings has the input device.
+        fs::create_dir_all(self.hid.join("input")).unwrap();
         // Like a real CSL DD: a second HID device bound to the driver, with raw HID only,
         // listed before the one with the settings.
         let raw = self.env.root.join("usb/1-2/1-2:1.0/0003:0EB7:0020.0000");
@@ -281,11 +283,11 @@ fn manifest_matches_the_driver() {
     assert_eq!(modelled, from_driver);
 }
 
-/// Right after the driver binds to a base, before the base sends its tuning menu, the driver
-/// shows it as zeros and refuses writes, the rotation included: SimRig says to replug, and
-/// reports no invalid values.
+/// Until the base sends its tuning menu (it does when the menu is used on the wheel), the driver
+/// shows it as zeros and refuses writes, the rotation included: SimRig says what to do, reports
+/// no invalid values, and offers the settings as soon as the menu arrives.
 #[test]
-fn a_tuning_menu_not_received_yet_says_to_replug() {
+fn a_tuning_menu_not_received_yet_says_what_to_do() {
     let env = Env::new("unread");
     env.plug(true);
     for attr in ["SLOT", "ACP", "FF"] {
@@ -305,7 +307,7 @@ fn a_tuning_menu_not_received_yet_says_to_replug() {
         (&wheel, "analog_paddle_mode"),
     ] {
         assert!(
-            reason(&mut host, address, item).contains("plug it in again"),
+            reason(&mut host, address, item).contains("tuning menu on the wheel"),
             "{item}"
         );
     }
@@ -317,8 +319,60 @@ fn a_tuning_menu_not_received_yet_says_to_replug() {
         .unwrap()
         .clone();
     match slot.availability {
-        simrig_model::Support::Unsupported(u) => assert!(u.explain().contains("plug it in again")),
+        simrig_model::Support::Unsupported(u) => {
+            assert!(u.explain().contains("tuning menu on the wheel"))
+        }
         other => panic!("{other:?}"),
     }
     assert!(host.problems().is_empty(), "{:?}", host.problems());
+
+    // The menu used on the wheel: the base sends it, and the settings show up by themselves.
+    for (attr, value) in [("SLOT", "2"), ("ACP", "1"), ("FF", "100")] {
+        fs::write(
+            env.hid(&format!("ftec_tuning/0003:0EB7:0020.0001/{attr}")),
+            format!("{value}\n"),
+        )
+        .unwrap();
+    }
+    until(&mut host, "settings available", |h| {
+        h.find("base").is_ok_and(|c| {
+            matches!(
+                c.description.item("rotation").map(|i| &i.support),
+                Some(simrig_model::Support::Supported(_))
+            )
+        })
+    });
+}
+
+/// A driver just bound creates its attributes, and udev gives the user its event node, a moment
+/// after the device shows up: what comes later shows up too, without restarting the app.
+#[test]
+fn what_the_driver_creates_later_shows_up() {
+    let env = Env::new("later");
+    env.plug(true);
+    fs::remove_file(env.hid("range")).unwrap();
+    fs::remove_file(env.hid("simrig-fake-input")).unwrap();
+    let mut host = env.start();
+    until(&mut host, "components", |h| h.components().len() == 3);
+    let base = host.find("base").unwrap().address.clone();
+    assert!(!reason(&mut host, &base, "rotation").is_empty());
+
+    fs::write(env.hid("range"), "900\n").unwrap();
+    env.input(
+        "abs 0 49151 0 65535\nabs 1 65535 0 65535\nabs 2 65535 0 65535\nabs 5 65535 0 65535\n",
+    );
+    until(&mut host, "rotation and inputs", |h| {
+        h.find("base").is_ok_and(|c| {
+            matches!(
+                c.description.item("rotation").map(|i| &i.support),
+                Some(simrig_model::Support::Supported(_))
+            )
+        })
+    });
+    let base = host.find("base").unwrap().address.clone();
+    let inputs = host.read_inputs(&base).unwrap();
+    assert!(
+        matches!(inputs.get("angle"), Some(Value::Float(a)) if (a - 225.0).abs() < 0.1),
+        "{inputs:?}"
+    );
 }

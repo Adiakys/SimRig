@@ -580,8 +580,8 @@ own tests use too).
 version, an older one of SimRig's, one installed by other means, the kernel's, none), SimRig's
 DKMS build of the bundled sources with upgrade, reload and Secure Boot key enrollment, removal,
 making devices already plugged in start again as if replugged (USB re-enumeration: devices
-send what they send at start-up, like a Fanatec base's tuning menu or a Thrustmaster wheel's
-switch to its own id), and checking which USB devices are present. `dkms.sh`
+do what they do at start-up, like a Thrustmaster wheel's switch to its own id), and checking
+which USB devices are present. `dkms.sh`
 takes upstream packages as they are: their fixed name and version are rewritten to SimRig's,
 and their `dkms.conf` may live in a subdirectory.
 
@@ -800,7 +800,7 @@ Driver recipes (dkms, udev, hid-bpf, systemd) come with the first real driver (M
 | Piece | What it does |
 |---|---|
 | `hid-fanatecff/` | upstream sources, a git submodule pinned to a tested commit; its DKMS version in `hid-fanatecff.version` |
-| `hooks/install` | refuses nothing it does not own: with a `hid-fanatec` installed by other means (another DKMS version, a package, a module built by hand) it does nothing. Otherwise checks the prerequisites (dkms, make, gcc, kernel headers; names the packages per distribution when missing), removes an older version SimRig installed, builds and installs the module with the `dkms` recipe for every kernel with headers, installs SimRig's udev rules and loads the module. Devices already plugged in start again as if replugged, so the base sends the driver its tuning menu (until it has, the driver refuses to change it, the rotation included, and the adapter says to replug the base). When Secure Boot refuses the module, asks the firmware to enroll DKMS's signing key with a one-time password the user types at the next boot |
+| `hooks/install` | refuses nothing it does not own: with a `hid-fanatec` installed by other means (another DKMS version, a package, a module built by hand) it does nothing. Otherwise checks the prerequisites (dkms, make, gcc, kernel headers; names the packages per distribution when missing), removes an older version SimRig installed, builds and installs the module with the `dkms` recipe for every kernel with headers, installs SimRig's udev rules and loads the module. Devices already plugged in start again as if replugged. When Secure Boot refuses the module, asks the firmware to enroll DKMS's signing key with a one-time password the user types at the next boot |
 | `hooks/status` | ours (version, loaded, waiting for the key to be enrolled, an update available), someone else's (*provided by the system*, with its version), or not installed |
 | `hooks/uninstall` | removes only SimRig's DKMS version and udev rules |
 | `udev/71-simrig-fanatec.rules` | raw HID with `uaccess` (Fanatec SDK games under Proton), and the driver's settings (rotation, display, tuning menu, LEDs) writable by local users, re-applied at every `bind`: no password for live settings. A test checks that every tuning attribute of the bundled driver is covered |
@@ -823,7 +823,11 @@ uploads force feedback effects for the test. Components:
 Which axis is which pedal is not in the driver: the plugin knows it for pedals on a base, and
 USB pedal sets are mapped while they are added, by pressing each pedal; a mapping made by hand
 is kept in the user's configuration (`fanatec.toml`). The
-tuning menu lives in the base's memory; the rotation is saved as the driver's `init_range`
+tuning menu lives in the base's memory, and the base sends it to the driver only when it is used
+on the wheel: hid-fanatecff cannot ask for it ([#75](https://github.com/gotzl/hid-fanatecff/discussions/75)),
+and refuses to change it, the rotation included, until then. The adapter shows those settings
+as unavailable meanwhile, saying to open the tuning menu on the wheel and change a value, and
+updates them as soon as the menu arrives; the rotation is saved as the driver's `init_range`
 option (`save-range`, a privileged operation writing `/etc/modprobe.d/simrig-fanatec.conf`).
 What the driver does not expose (a tuning entry an older driver lacks, centering, pedal dead
 zones and curves) stays visible, unsupported, with the reason. Tested end to end on a fake

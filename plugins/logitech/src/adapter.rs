@@ -19,6 +19,10 @@ use crate::models;
 struct Shape {
     driver: Option<String>,
     pedals: Vec<PedalRole>,
+    /// The inputs can be read (the event node is given to the user a moment after binding).
+    inputs: bool,
+    /// Which of the driver's attributes exist (it creates them while it binds).
+    exposed: Vec<bool>,
 }
 
 pub struct LogitechAdapter {
@@ -43,6 +47,13 @@ impl LogitechAdapter {
         Shape {
             driver: d.hid.driver(),
             pedals: d.hid.pedal_map.roles(),
+            inputs: d.hid.inputs_ready(),
+            exposed: d.hid.exposed(
+                &crate::settings::of(d.model.family)
+                    .map(|s| s.attr)
+                    .chain(["wheel_firmware", "wheel_calibrate_here"])
+                    .collect::<Vec<_>>(),
+            ),
         }
     }
 

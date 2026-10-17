@@ -119,6 +119,9 @@ fn run(cli: Cli) -> Result<()> {
     };
 
     let window = AppWindow::new().context("cannot create the window")?;
+    // Matches simrig.desktop, so docks and task bars show the app's icon and group its window
+    // (Wayland app id, X11 window class). Nothing to match in screenshots.
+    let _ = slint::set_xdg_app_id("simrig");
     let config_dir = options.config_dir.clone();
     let backend = Backend::start(options, app::deliver);
     // Slint's software renderer (no OpenGL, or screenshots) cannot rotate images.

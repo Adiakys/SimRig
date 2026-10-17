@@ -76,16 +76,31 @@ impl HidDevice {
         self
     }
 
-    /// Looks for the driver again (installed or bound later); true when that changed.
+    /// Looks for the driver again (installed or bound later), and opens the inputs if they
+    /// could not be opened yet (a driver just bound creates its event node, and udev gives it
+    /// to the user, a moment later); true when either changed.
     pub fn refresh(&mut self) -> bool {
         let b = self.binding;
         let hid = sysfs::find_hid(&self.usb, b.vendor, b.drivers, b.rich);
-        if hid == self.hid {
+        if hid == self.hid && self.inputs.error().is_none() {
             return false;
         }
-        self.inputs = Inputs::open(hid.as_deref().and_then(sysfs::event_node));
+        let inputs = Inputs::open(hid.as_deref().and_then(sysfs::event_node));
+        let changed = hid != self.hid || inputs.error().is_none();
+        self.inputs = inputs;
         self.hid = hid;
-        true
+        changed
+    }
+
+    /// Which of these attributes the driver exposes now: drivers create them while they bind,
+    /// so they can show up after the device did. For adapters to notice when they do.
+    pub fn exposed(&self, attrs: &[&str]) -> Vec<bool> {
+        attrs.iter().map(|a| self.attr(a).is_some()).collect()
+    }
+
+    /// The inputs can be read.
+    pub fn inputs_ready(&self) -> bool {
+        self.hid.is_some() && self.inputs.error().is_none()
     }
 
     /// Why nothing works, when the driver does not handle the device.
