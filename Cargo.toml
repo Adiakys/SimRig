@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "plugins/*"]
+# Until its adapter exists: for now the Fanatec plugin is only its driver.
+exclude = ["plugins/fanatec"]
 
 [workspace.package]
 version = "0.1.0"

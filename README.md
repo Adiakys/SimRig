@@ -30,6 +30,13 @@ Read more in [docs/requirements.md](docs/requirements.md) and
 
 ## Try it
 
+Clone with the bundled third-party drivers (git submodules):
+
+```sh
+git clone --recursive https://github.com/Adiakys/SimRig.git
+# or, in an existing clone: git submodule update --init
+```
+
 Requires a recent stable Rust toolchain (1.92+ for the app, 1.86+ for the rest) and, to build
 the app, the fontconfig and xkbcommon development files (`libfontconfig1-dev libxkbcommon-dev`
 on Debian and Ubuntu, `fontconfig-devel libxkbcommon-devel` on Fedora).
@@ -107,13 +114,14 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `crates/simrig-model` | Domain model: component interfaces, parameters, unsupported reasons, custom parameters |
 | `crates/simrig-protocol` | App ↔ plugin protocol (JSON-RPC 2.0 over stdio) |
 | `crates/simrig-plugin-sdk` | SDK to write plugin adapters in Rust |
-| `crates/simrig-driver` | Driver contract (`driver.toml`), hooks, installation registry |
+| `crates/simrig-driver` | Driver contract (`driver.toml`), hooks, installation registry, recipes for drivers (`recipes/`: DKMS, Secure Boot, udev) |
 | `crates/simrig-helper` | Privileged helper, run through `pkexec` only for driver operations |
 | `crates/simrig-host` | The app core: plugins, rig, events, drivers, presets, catalog, system check |
 | `crates/simrig-cli` | Command-line interface |
 | `crates/simrig-gui` | The desktop app (`simrig`, Slint) |
 | `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
 | `plugins/generic-usb` | Generic USB plugin: any USB device as a shifter or a handbrake, with its driver service |
+| `plugins/fanatec` | Fanatec plugin (in progress): bundles [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) as a submodule, built with DKMS |
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
 | `docs/design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
 | `scripts` | Development helpers |
@@ -131,4 +139,10 @@ Set `SIMRIG_PLUGIN_LOG=1` to see plugins' stderr.
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+GPL-3.0-or-later. See [LICENSE](LICENSE). Bundled third-party components (the
+[hid-fanatecff](https://github.com/gotzl/hid-fanatecff) driver, fonts) keep their own licenses:
+see [THIRD-PARTY.md](THIRD-PARTY.md).
+
+Product and brand names (Fanatec, Moza, Simagic, Logitech…) belong to their owners and are used
+only to say which hardware SimRig works with. SimRig is not affiliated with, endorsed by or
+sponsored by any of them.

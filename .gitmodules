@@ -1,0 +1,3 @@
+[submodule "plugins/fanatec/driver/hid-fanatecff"]
+	path = plugins/fanatec/driver/hid-fanatecff
+	url = https://github.com/gotzl/hid-fanatecff

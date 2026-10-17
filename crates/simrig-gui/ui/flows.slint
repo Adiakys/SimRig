@@ -650,6 +650,16 @@ export component SettingsScreen inherits Rectangle {
                 }
 
                 SettingsSection {
+                    title: @tr("About");
+                    Small {
+                        text: @tr("SimRig {}, free software under the GPL-3.0-or-later license. Bundled drivers and fonts keep their own licenses (THIRD-PARTY.md).", Rig.app-version);
+                    }
+                    Small {
+                        text: @tr("Product and brand names belong to their owners and only say which hardware SimRig works with. SimRig is not affiliated with, endorsed by or sponsored by any manufacturer.");
+                    }
+                }
+
+                SettingsSection {
                     title: @tr("Uninstall");
                     Small {
                         text: @tr("SimRig is removed with the system's software tool. Its drivers can be removed with it, or kept so the devices keep working; drivers can also be removed one by one from Plugins.");

@@ -116,6 +116,7 @@ impl App {
         rig.set_bottom(models.bottom.clone().into());
         rig.set_side(models.side.clone().into());
         rig.set_toasts(models.toasts.clone().into());
+        rig.set_app_version(env!("CARGO_PKG_VERSION").into());
         if let Some(preset) = &settings.preset {
             rig.set_preset(preset.into());
         }

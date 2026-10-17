@@ -568,6 +568,21 @@ So that drivers do not reinvent the same things, the SDK offers ready-made hooks
 | `systemd-device-unit` | installs a service started when the device is plugged in and stopped when unplugged |
 | `udev-attr-settings` | persists sysfs attributes via a generated udev rule (`ATTR{range}="900"`) |
 
+Recipes are POSIX shell libraries in `crates/simrig-driver/recipes` (`dkms.sh`, `secureboot.sh`,
+`udev.sh`, `prereq.sh`, `status.sh`). A driver keeps copies of the ones it uses in its own
+`recipes/` directory and sources them from its hooks, so it keeps working, and can be removed,
+after the app is gone; a test checks that the copies match the originals. The recipes run for
+real in tests against stub system commands.
+
+**Third-party drivers ship with SimRig.** A plugin that builds an existing open-source driver
+bundles its sources as a git submodule pinned to an upstream commit (the Fanatec plugin bundles
+`hid-fanatecff`), so installing works offline and always installs the version tested with the
+adapter. Driver updates come with SimRig releases (the app offers the upgrade); SimRig never
+fetches newer upstream versions by itself. A driver the user installed by other means (distro
+package, by hand, a newer version) is reported as provided by the system and never touched; the
+adapter checks what the installed driver actually exposes and shows anything missing as
+unsupported, with the reason.
+
 Guideline for **official drivers** (not a constraint): use the lightest solution that works, in
 the order stock kernel → HID-BPF → kernel module → service. Fewer processes, less to maintain,
 works on distros without systemd.
