@@ -327,7 +327,8 @@ fn a_tuning_menu_not_received_yet_says_what_to_do() {
     assert!(host.problems().is_empty(), "{:?}", host.problems());
 
     // The menu used on the wheel: the base sends it, and the settings show up by themselves.
-    for (attr, value) in [("SLOT", "2"), ("ACP", "1"), ("FF", "100")] {
+    // On automatic rotation, which the driver reports as 2530.
+    for (attr, value) in [("SLOT", "2"), ("ACP", "1"), ("FF", "100"), ("SEN", "2530")] {
         fs::write(
             env.hid(&format!("ftec_tuning/0003:0EB7:0020.0001/{attr}")),
             format!("{value}\n"),
@@ -342,6 +343,7 @@ fn a_tuning_menu_not_received_yet_says_what_to_do() {
             )
         })
     });
+    assert!(host.problems().is_empty(), "{:?}", host.problems());
 }
 
 /// A driver just bound creates its attributes, and udev gives the user its event node, a moment

@@ -30,6 +30,9 @@ fn tuning_spec(device: &Shared, entry: &Entry) -> Support<ParamSpec> {
     } else {
         entry.max
     };
+    // Within its range: the driver reports the base's automatic rotation as its maximum plus
+    // ten (2530 on a CSL DD), and a newer firmware may go beyond the table.
+    let value = value.clamp(entry.min, max);
     // The base stores its tuning menu in its own memory, slot by slot.
     Support::Supported(if entry.unit == "%" {
         ParamSpec::float(value as f64, entry.min as f64, max as f64, 1.0).persistent()

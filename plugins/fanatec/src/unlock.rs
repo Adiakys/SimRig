@@ -17,6 +17,8 @@ use simrig_plugin_kit::sysfs;
 /// How long to wait before switching back, and between attempts.
 const PAUSE: Duration = Duration::from_millis(1500);
 const ATTEMPTS: u8 = 5;
+/// How many times to ask: a base that just started may not answer the first time.
+const ASKS: u8 = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unlock {
@@ -71,7 +73,7 @@ impl Unlock {
                     }
                 } else if now.duration_since(at) < PAUSE * 2 {
                     self
-                } else if tries < 2 {
+                } else if tries < ASKS {
                     menu.write("advanced_mode", 1);
                     Unlock::Asked {
                         at: now,
