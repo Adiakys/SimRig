@@ -4673,6 +4673,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "simrig-plugin-thrustmaster"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "simrig-driver",
+ "simrig-host",
+ "simrig-model",
+ "simrig-plugin-kit",
+ "simrig-plugin-sdk",
+]
+
+[[package]]
 name = "simrig-protocol"
 version = "0.1.0"
 dependencies = [

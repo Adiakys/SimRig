@@ -1,0 +1,11 @@
+# Installed by the SimRig Thrustmaster driver: access to Thrustmaster wheels without a password.
+# Bound to "bind" too, so the rules apply again whenever the driver binds to a wheel.
+ACTION!="add|change|bind", GOTO="simrig_thrustmaster_end"
+
+# hid-tmff2's settings, writable by local users: rotation, gain, effect levels, modes.
+SUBSYSTEM=="hid", DRIVER=="tmff2", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w range gain spring_level damper_level friction_level alternate_modes || true'"
+
+# Raw HID, which some games need through Proton: the user at the seat only.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="044f", TAG+="uaccess"
+
+LABEL="simrig_thrustmaster_end"

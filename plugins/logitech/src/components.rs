@@ -2,54 +2,22 @@
 //! event node.
 
 use simrig_plugin_kit::pedals::{self, PedalNotes, PedalSet};
+use simrig_plugin_kit::settings::Setting;
 use simrig_plugin_kit::sysfs;
 use simrig_plugin_sdk::model::{Appearance, RimShape, StdItem};
 use simrig_plugin_sdk::prelude::*;
 
 use crate::device::{LogitechDevice, Shared};
 use crate::models::Family;
-use crate::settings::{self, Place, Setting};
-
-fn max(device: &LogitechDevice, setting: &Setting) -> f64 {
-    setting.max.unwrap_or(f64::from(device.model.max_range))
-}
+use crate::settings;
 
 fn spec(device: &Shared, setting: &Setting) -> Support<ParamSpec> {
     let d = device.borrow();
-    if let Some(u) = d.hid.unbound() {
-        return Support::Unsupported(u);
-    }
-    let Some(raw) = d.hid.read_int(setting.attr) else {
-        return Support::Unsupported(Unsupported::not_in_driver().with_detail(setting.missing));
-    };
-    let max = max(&d, setting);
-    // Kept by the driver until the wheel is unplugged; saved as a udev rule.
-    Support::Supported(
-        if setting.switch {
-            ParamSpec::bool(raw != 0)
-        } else {
-            let value = (raw as f64 / setting.scale).round().clamp(setting.min, max);
-            ParamSpec::float(value, setting.min, max, setting.step)
-        }
-        .persistent(),
-    )
-}
-
-fn raw(setting: &Setting, value: &Value) -> Result<i64> {
-    match value {
-        Value::Bool(on) => Ok(i64::from(*on)),
-        v => {
-            let v = v
-                .as_f64()
-                .ok_or_else(|| Error::InvalidValue("expected a number".into()))?;
-            Ok((v * setting.scale).round().max(0.0) as i64)
-        }
-    }
+    setting.spec(&d.hid, f64::from(d.model.max_range))
 }
 
 fn write(device: &Shared, setting: &Setting, value: &Value) -> Result<()> {
-    let raw = raw(setting, value)?;
-    device.borrow().hid.write(setting.attr, &raw.to_string())
+    setting.write(&device.borrow().hid, value)
 }
 
 pub struct Base {
@@ -84,47 +52,12 @@ impl Component for Base {
     }
 
     fn custom_params(&mut self) -> Vec<CustomParam> {
-        let family = self.family();
-        let mut params = Vec::new();
-        for (order, setting) in settings::SETTINGS.iter().enumerate() {
-            let Place::Custom { group, advanced } = setting.place else {
-                continue;
-            };
-            if setting.family != family {
-                continue;
-            }
-            let support = spec(&self.device, setting);
-            let (ty, value) = match &support {
-                Support::Supported(s) => (s.ty.clone(), s.value.clone()),
-                Support::Unsupported(_) if setting.switch => (ParamType::Bool, Value::Bool(false)),
-                Support::Unsupported(_) => (
-                    ParamType::Float {
-                        min: setting.min,
-                        max: max(&self.device.borrow(), setting),
-                        step: setting.step,
-                    },
-                    Value::Float(setting.min),
-                ),
-            };
-            let mut p = CustomParam::new(&settings::custom_id(setting), setting.label, ty, value)
-                .group(group)
-                .order(order as i32)
-                .persistent();
-            if !setting.unit.is_empty() {
-                p = p.unit(setting.unit);
-            }
-            if !setting.help.is_empty() {
-                p = p.help(setting.help);
-            }
-            if advanced {
-                p = p.advanced();
-            }
-            if let Support::Unsupported(u) = support {
-                p = p.availability(Support::Unsupported(u));
-            }
-            params.push(p);
-        }
-        params
+        let d = self.device.borrow();
+        let max_range = f64::from(d.model.max_range);
+        settings::of(d.model.family)
+            .enumerate()
+            .filter_map(|(order, s)| s.custom_param(&d.hid, max_range, order as i32))
+            .collect()
     }
 
     fn set_custom(&mut self, id: &str, value: &Value) -> Result<()> {
@@ -137,7 +70,7 @@ impl Component for Base {
         let setting = self
             .setting(item)
             .ok_or_else(|| Error::NotFound(format!("no setting '{item}'")))?;
-        let raw = raw(setting, value)?;
+        let raw = setting.raw(value)?;
         let pid = format!("{:04x}", self.device.borrow().model.pid);
         // A udev rule sets it again whenever the driver binds to the wheel.
         host.privileged(

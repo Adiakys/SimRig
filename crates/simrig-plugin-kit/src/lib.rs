@@ -1,14 +1,16 @@
 //! Shared pieces for plugins of wheels and pedals that talk to a kernel driver like a game:
 //!
-//! - [`input`]: the event node, read on request (axes, buttons), and the force feedback test,
-//!   gain and autocenter of the Linux force feedback API;
+//! - [`device`]: one device a kernel driver handles, with its inputs and pedal mapping;
+//! - [`input`]: the event node, read on request (axes, buttons), and the force feedback test;
 //! - [`sysfs`]: the HID device a driver is bound to, and its attributes;
+//! - [`settings`]: settings that are sysfs attributes, as parameters;
 //! - [`pedals`]: which axis is which pedal, learned by a guided procedure, and pedals as a
 //!   standard component.
 
 pub mod device;
 pub mod input;
 pub mod pedals;
+pub mod settings;
 pub mod sysfs;
 
 use simrig_plugin_sdk::prelude::PedalRole;

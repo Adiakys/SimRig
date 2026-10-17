@@ -10,3 +10,6 @@
 [submodule "plugins/logitech/driver/logitech-trueforce"]
 	path = plugins/logitech/driver/logitech-trueforce
 	url = https://github.com/mescon/logitech-trueforce-linux-driver
+[submodule "plugins/thrustmaster/driver/hid-tmff2"]
+	path = plugins/thrustmaster/driver/hid-tmff2
+	url = https://github.com/Kimplul/hid-tmff2

@@ -71,6 +71,7 @@ jobs:
           test -f /usr/lib/simrig/plugins/logitech/driver/new-lg4ff/Kbuild
           test -f /usr/lib/simrig/plugins/logitech/driver/logitech-trueforce/mainline/dkms.conf
           test ! -e /usr/lib/simrig/plugins/logitech/driver/logitech-trueforce/tools
+          test -f /usr/lib/simrig/plugins/thrustmaster/driver/hid-tmff2/deps/hid-tminit/hid-tminit.c
           simrig-cli --version
           simrig-cli plugins
           sudo apt-get remove -y simrig

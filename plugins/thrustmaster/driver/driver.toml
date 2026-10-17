@@ -1,0 +1,21 @@
+# The Thrustmaster driver: hid-tmff2 (bundled as a git submodule with its hid-tminit, pinned to
+# a version tested with the adapter), built for the running kernel and kept rebuilt on kernel
+# upgrades by DKMS, plus SimRig's udev rules. The kernel's own hid-thrustmaster only starts the
+# wheels up; hid-tmff2 brings an improved one, so the kernel's is blacklisted while SimRig's is
+# installed, as upstream recommends. A hid-tmff2 installed by other means is used as it is.
+id = "thrustmaster"
+version = "0.83-13-gd890a93"
+summary = "hid-tmff2 kernel driver, built with DKMS, and udev rules for access without a password"
+license = "GPL-2.0-or-later (hid-tmff2, hid-tminit), GPL-3.0-or-later (SimRig's hooks)"
+
+install = "hooks/install"
+uninstall = "hooks/uninstall"
+status = "hooks/status"
+
+requires = ["dkms", "kernel-headers", "build-tools"]
+
+# Saves a setting as an option of the hid-tmff2 module, applied when it starts a wheel.
+[[privileged]]
+name = "save-setting"
+exec = "hooks/save-setting"
+args = { attr = "range|gain|spring_level|damper_level|friction_level", value = "[0-9]{1,5}" }

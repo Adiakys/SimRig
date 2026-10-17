@@ -897,6 +897,25 @@ plugged into it. What a family's driver lacks stays visible with the reason (new
 settings on the kernel's driver say it is needed). Tested end to end on a fake G29 (with and
 without new-lg4ff) and a fake G PRO.
 
+### 11.3 Thrustmaster
+
+The kernel's `hid-thrustmaster` only starts Thrustmaster wheels up (they appear with a generic
+id, then switch to their own); force feedback needs [hid-tmff2](https://github.com/Kimplul/hid-tmff2).
+
+**The driver** builds hid-tmff2 with DKMS: its `dkms.conf` lives in `dkms/` and its version is
+fixed upstream, both handled by the `dkms` recipe, and it bundles
+[hid-tminit](https://github.com/scarburato/hid-tminit) as a nested submodule, which starts the
+wheels in place of the kernel's module; that one is blacklisted while SimRig's hid-tmff2 is
+installed, as upstream recommends (`/etc/modprobe.d/simrig-thrustmaster.conf`), and restored on
+removal. A hid-tmff2 installed by other means is kept, and the user's modprobe configuration
+with it. Settings are saved as options of the module (`save-setting`): hid-tmff2 applies them
+to every wheel it starts.
+
+**The adapter** gives each wheel a wheel base (rotation within the wheel's limits, gain, spring,
+damper and friction levels, force feedback test), its rim (buttons) and, once mapped, the pedals
+plugged into it. A wheel still starting up (hid-tminit's ids) is claimed without components, so
+adding it installs the driver. Tested end to end on a fake T300 RS.
+
 ## 12. Decisions
 
 | # | Decision | Rationale |

@@ -46,6 +46,7 @@ run)
         --plugin-dir "$root/plugins/fanatec" \
         --plugin-dir "$root/plugins/moza" \
         --plugin-dir "$root/plugins/logitech" \
+        --plugin-dir "$root/plugins/thrustmaster" \
         --no-default-dirs \
         --config-dir "$dev/config" \
         --state-dir "$dev/state" \

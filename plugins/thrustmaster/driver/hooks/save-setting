@@ -1,0 +1,17 @@
+#!/bin/sh
+# Saves a setting as an option of the hid-tmff2 module: applied to every wheel it starts, the
+# next time one is plugged in.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA"
+{
+    grep -v "^$SIMRIG_ARG_ATTR=" "$DATA/settings" 2>/dev/null || true
+    echo "$SIMRIG_ARG_ATTR=$SIMRIG_ARG_VALUE"
+} > "$DATA/settings.new"
+mv "$DATA/settings.new" "$DATA/settings"
+if [ "$(id -u)" = 0 ]; then
+    write_conf
+else
+    echo "development install: kept in $DATA"
+fi
+echo "$SIMRIG_ARG_ATTR $SIMRIG_ARG_VALUE saved"

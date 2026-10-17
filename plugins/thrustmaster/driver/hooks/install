@@ -1,0 +1,41 @@
+#!/bin/sh
+# Builds and installs hid-tmff2 with DKMS, then SimRig's udev rules. Upgrades a version SimRig
+# installed before; leaves a hid-tmff2 installed by other means alone.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA"
+
+if [ "$(id -u)" != 0 ]; then
+    echo "$VERSION" > "$DATA/dev-installed"
+    echo "development install: hid-tmff2 is not built (needs root)"
+    exit 0
+fi
+
+udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
+
+# A hid-tmff2 installed by other means is used as it is: only SimRig's rules are added.
+if other=$(mod_foreign "$PACKAGE" "$MODULE"); then
+    echo "$other" > "$DATA/integration"
+    udev_apply hid hidraw
+    echo "hid-tmff2 $other is installed, not by SimRig: it is used as it is, with SimRig's access rules"
+    exit 0
+fi
+
+mod_prerequisites
+rc=0
+mod_build "$PACKAGE" "$VERSION" "$SOURCE" dkms/dkms.conf $INIT_MODULES "$MODULE" || rc=$?
+# hid-tminit's modules start the wheels from now on.
+write_conf
+modprobe -r hid_thrustmaster 2>/dev/null || true
+case $rc in
+0)
+    hid_rebind 044F tmff2 $WHEELS
+    udev_apply hid hidraw
+    echo "hid-tmff2 $VERSION installed"
+    ;;
+3)
+    udev_apply hidraw
+    echo "hid-tmff2 $VERSION installed: $(mod_key_message)"
+    ;;
+*) exit 1 ;;
+esac

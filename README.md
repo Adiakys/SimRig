@@ -29,10 +29,10 @@ Your devices keep working in every game with SimRig closed.
 | **Any USB device** | Shifters (H-pattern, sequential) and handbrakes without a brand, or whose descriptor is useless: mapped by moving them | SimRig's generic USB driver | **Untested** on real hardware (works on simulated devices) |
 | **Moza** | Wheel bases R3 to R21 (rotation, force feedback, base settings), pedals on the base, SR-P and CRP pedals, HBP handbrake. Shifters and wheels' own settings not yet | [hid-universal-pidff](https://github.com/JacKeTUs/universal-pidff), in the kernel from 6.15 (built by SimRig on older kernels); settings over the serial port, with the protocol worked out by [Boxflat](https://github.com/Lawstorant/boxflat) | **Untested** on real hardware (works on simulated devices) |
 | **Logitech** | G29, G27, G25, Driving Force GT/Pro, MOMO, G923 (PlayStation and Xbox), G920, G PRO, RS50: rotation, force feedback settings, pedals on the wheel | in the kernel; SimRig adds [new-lg4ff](https://github.com/berarma/new-lg4ff) for the G29 family and the [TrueForce driver](https://github.com/mescon/logitech-trueforce-linux-driver) for the G PRO and RS50, only when one of them is plugged in | **Untested** on real hardware (works on simulated devices) |
-| **Thrustmaster** | T300RS, T248, TX, T-GT II, T818 and others | hid-tmff2 | Planned |
+| **Thrustmaster** | T300 RS (and T-GT II), T248, T128, TX, TS-PC Racer, TS-XW: rotation, force feedback strength, effect levels, pedals on the base. Not the T818 | [hid-tmff2](https://github.com/Kimplul/hid-tmff2), installed by SimRig (or yours, if you have it) | **Untested** on real hardware (works on simulated devices) |
 
 **Full**: tested on the hardware · **Partial**: tested on some models or some features ·
-**Untested**: works in tests, not tried on real hardware yet · **Planned**: not supported yet
+**Untested**: works in tests, not tried on real hardware yet
 
 Features depend on the device and its driver: SimRig shows, for every setting, whether your
 hardware supports it.
@@ -90,6 +90,7 @@ credited with their licenses in [THIRD-PARTY.md](THIRD-PARTY.md).
 | Fanatec | hid-fanatecff, kernel module (force feedback, tuning menu, LEDs, display), built with DKMS | [github.com/gotzl/hid-fanatecff](https://github.com/gotzl/hid-fanatecff) | GPL-2.0 |
 | Moza | hid-universal-pidff, kernel module (force feedback): the kernel's from Linux 6.15, built with DKMS on older kernels. udev rules for the devices' serial port (settings) | [github.com/JacKeTUs/universal-pidff](https://github.com/JacKeTUs/universal-pidff); serial protocol from [github.com/Lawstorant/boxflat](https://github.com/Lawstorant/boxflat) | GPL-2.0; GPL-3.0 |
 | Logitech | the kernel's drivers (G920, G923 for Xbox); new-lg4ff, kernel module for the G29 family (more effects, gain, autocenter, effect levels, LEDs); the TrueForce driver, kernel module for the G PRO and RS50. Both built with DKMS only for the wheels plugged in | [github.com/berarma/new-lg4ff](https://github.com/berarma/new-lg4ff); [github.com/mescon/logitech-trueforce-linux-driver](https://github.com/mescon/logitech-trueforce-linux-driver) | GPL-2.0 |
+| Thrustmaster | hid-tmff2, kernel module (force feedback, rotation, gain, effect levels), with hid-tminit, which starts the wheels up in place of the kernel's hid-thrustmaster; built with DKMS | [github.com/Kimplul/hid-tmff2](https://github.com/Kimplul/hid-tmff2) | GPL-2.0-or-later |
 | Generic USB | SimRig's own userspace service (hidraw in, uinput out) | this repository | GPL-3.0-or-later |
 
 A driver you installed yourself (a distribution package, a newer version built by hand) is
