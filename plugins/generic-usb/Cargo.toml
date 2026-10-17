@@ -1,0 +1,28 @@
+[package]
+name = "simrig-plugin-generic-usb"
+description = "simrig plugin for unbranded USB devices: set up and mapped from the app, made into a standard joystick by its driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "simrig-plugin-generic-usb"
+path = "src/bin/adapter.rs"
+
+[[bin]]
+name = "simrig-generic-usb-service"
+path = "src/bin/service.rs"
+
+[dependencies]
+serde.workspace = true
+simrig-plugin-sdk.workspace = true
+toml.workspace = true
+evdev = "0.13"
+
+[dev-dependencies]
+simrig-host.workspace = true
+simrig-model.workspace = true
+
+[lints]
+workspace = true

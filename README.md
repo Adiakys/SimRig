@@ -7,7 +7,8 @@ handbrake — whatever the brand, from one polished app.
 > hotplug, drivers with a privileged helper, saved settings, rig composition, presets, catalog,
 > guided procedures defined by plugins, generic plugins for unbranded devices. The desktop app
 > (M1, Slint) runs on it: live rig, settings, guided procedures, adding a device, plugins and
-> drivers, presets, first run. Next: the generic USB plugin, then the first real hardware.
+> drivers, presets, first run. The generic USB plugin (M2) sets up any USB device as a shifter
+> or a handbrake; next comes the first branded hardware.
 
 ## How it works
 
@@ -38,7 +39,8 @@ on Debian and Ubuntu, `fontconfig-devel libxkbcommon-devel` on Fedora).
 ```sh
 scripts/dev-gui.sh              # the app on the simulated rig, in throwaway directories
 scripts/dev-gui.sh plug         # while it runs: plug a fake USB device, then "Add device"
-scripts/dev-gui.sh reset        # forget the rig, the presets and the first run
+scripts/dev-gui.sh report 00 01 # move it (its raw report, in hex) while setting it up
+scripts/dev-gui.sh reset        # forget the rig, the presets, the drivers and the first run
 ```
 
 Everything lives under `target/dev`: your real configuration is not touched. Without a display
@@ -51,6 +53,19 @@ Everything lives under `target/dev`: your real configuration is not touched. Wit
 
 `--screen` takes `home`, `component:<component>`, `procedure:<component>/<id>`, `plugins`,
 `settings`, `add`, `first:<step>`, and can chain actions with `;` (see `src/main.rs`).
+
+### Real hardware (generic USB plugin)
+
+Until packages exist, `scripts/install-system.sh` stands in for them: it installs `simrig-helper`,
+its polkit action and the generic USB plugin system-wide (root-owned), so the app can install
+the plugin's driver with your password like it will from a package. The driver itself is
+installed by the app when a device is set up.
+
+```sh
+cargo build --release
+sudo scripts/install-system.sh          # sudo scripts/install-system.sh remove to undo
+./target/release/simrig                 # Add device → Set up as generic
+```
 
 ### The command line
 
@@ -98,6 +113,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `crates/simrig-cli` | Command-line interface |
 | `crates/simrig-gui` | The desktop app (`simrig`, Slint) |
 | `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
+| `plugins/generic-usb` | Generic USB plugin: any USB device as a shifter or a handbrake, with its driver service |
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
 | `docs/design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
 | `scripts` | Development helpers |

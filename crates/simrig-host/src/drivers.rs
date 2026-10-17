@@ -19,6 +19,8 @@ use crate::error::HostError;
 use crate::manifest::{Manifest, PluginLocation};
 
 const STATUS_TIMEOUT: Duration = Duration::from_secs(10);
+/// The helper run through pkexec for system plugins.
+pub(crate) const SYSTEM_HELPER: &str = "/usr/libexec/simrig/simrig-helper";
 /// pkexec: the user dismissed the dialog or is not authorized.
 const PKEXEC_DENIED: [i32; 2] = [126, 127];
 
@@ -105,7 +107,17 @@ impl DriverManager {
             .clone()
             .ok_or_else(|| HostError::Driver("simrig-helper not found".into()))?;
         let (program, mut prefix) = match location {
-            PluginLocation::System => (PathBuf::from("pkexec"), vec![helper.into_os_string()]),
+            // As root, only the helper installed with the system (root-owned, the one the polkit
+            // action names): never a development build the user could have replaced.
+            PluginLocation::System => {
+                let system = PathBuf::from(SYSTEM_HELPER);
+                if !system.is_file() {
+                    return Err(HostError::Driver(format!(
+                        "{SYSTEM_HELPER} is not installed: system plugins cannot install drivers"
+                    )));
+                }
+                (PathBuf::from("pkexec"), vec![system.into_os_string()])
+            }
             PluginLocation::Explicit => (helper, Vec::new()),
             PluginLocation::User => {
                 return Err(HostError::Denied(format!(
@@ -227,6 +239,6 @@ pub(crate) fn find_helper() -> Option<PathBuf> {
         }
         candidates.push(dir.join("simrig-helper"));
     }
-    candidates.push(PathBuf::from("/usr/libexec/simrig/simrig-helper"));
+    candidates.push(PathBuf::from(SYSTEM_HELPER));
     candidates.into_iter().find(|p| p.is_file())
 }

@@ -40,6 +40,8 @@ pub struct Flows {
     error: String,
     /// What the plugin said when the setup finished.
     pub done_message: String,
+    /// Drivers installed in this session: the result can arrive before the rig is sent again.
+    installed: BTreeSet<String>,
     /// The first run: 0 welcome, 1 devices, 2 your rig.
     pub first_step: i32,
     first_installing: BTreeSet<String>,
@@ -315,7 +317,8 @@ impl App {
             .iter()
             .find(|p| p.id == adding.plugin)
             .cloned();
-        if plugin.as_ref().is_some_and(needs_driver) {
+        let installed = self.flows.installed.contains(&adding.plugin);
+        if plugin.as_ref().is_some_and(needs_driver) && !installed {
             self.flows.step = DRIVER;
         } else if !has_components(&self.snapshot, &adding.plugin, &adding.device) {
             self.flows.step = SETUP;
@@ -410,6 +413,11 @@ impl App {
             .as_ref()
             .is_some_and(|a| a.plugin == plugin)
             && self.flows.step == DRIVER;
+        if ok {
+            self.flows.installed.insert(plugin.clone());
+        } else {
+            self.flows.installed.remove(&plugin);
+        }
         if in_flow {
             self.flows.busy = false;
             if ok {

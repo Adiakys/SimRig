@@ -297,7 +297,7 @@ impl Adapter for SimAdapter {
             if current == attached {
                 continue;
             }
-            for kind in ["shifter", "handbrake"] {
+            for kind in ["shifter", "handbrake", "pedals"] {
                 changes.push(Change::ComponentRemoved {
                     component: format!("{device}/{kind}"),
                 });

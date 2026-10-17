@@ -1,0 +1,12 @@
+#!/bin/sh
+# Saves a device's setup (given as base64 TOML) and starts serving it.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA/devices"
+tmp="$DATA/devices/.$SIMRIG_ARG_FILE.toml"
+printf '%s' "$SIMRIG_ARG_CONFIG" | base64 -d > "$tmp"
+mv "$tmp" "$DATA/devices/$SIMRIG_ARG_FILE.toml"
+printf '%s %s %s\n' "$SIMRIG_ARG_VID" "$SIMRIG_ARG_PID" "$SIMRIG_ARG_FILE" > "$DATA/devices/$SIMRIG_ARG_FILE.ids"
+rm -f "$DATA/allowed/$SIMRIG_ARG_FILE.ids"
+write_rules
+echo "saved $SIMRIG_ARG_VID:$SIMRIG_ARG_PID"

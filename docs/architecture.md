@@ -1,6 +1,6 @@
 # simrig — Architecture
 
-> Draft 0.8 (2026-10-17). Core implemented (M0). Companion to [requirements.md](requirements.md).
+> Draft 0.9 (2026-10-17). Core (M0) and app (M1) implemented; generic USB plugin (M2) in progress. Companion to [requirements.md](requirements.md).
 
 ## 1. Principles
 
@@ -484,6 +484,23 @@ user assigns to it (`choose_plugin`, applied at once). This is how a plugin for 
 works: the user picks any connected device, then the plugin's own setup procedure asks what it is
 and maps its inputs. Hubs are never offered.
 
+**The official generic USB plugin** (`plugins/generic-usb`, M2) makes any USB HID device a
+shifter (H-pattern or sequential) or a handbrake, whatever its HID descriptor says:
+
+| Part | What it does |
+|---|---|
+| Setup procedure (adapter) | asks what the device becomes, learns its rest position (bits that move by themselves are noise and never count), then detects each gear, or the handbrake's travel, while the user moves it: a position is taken once it holds still. A gear is a *signature* (bytes and bits that differ from rest); a handbrake is a little-endian 8/16-bit axis, or a switch. |
+| Setup file | one TOML per device in the driver's data directory (`devices/<vid>-<pid>[-serial].toml`), written by the privileged `save-device` operation; read by both the adapter and the service, so the app and the games always agree. |
+| Driver | a small service (`simrig-generic-usb-service`), started by udev with each set-up device (`systemd` template unit `simrig-generic-usb@hidrawN`) and stopped when it is unplugged. It reads `hidraw` and drives a virtual joystick through `uinput`: one button per gear (and reverse), up/down, or the handbrake as an axis (`ABS_RX`) plus a button. The raw device is hidden from games (udev clears `ID_INPUT_JOYSTICK`), so they see only the joystick. |
+| udev rules | generated from the setups: read access (`uaccess`) to the device's `hidraw` while it is being set up and once set up, the service, and the raw device hidden. |
+| Components | the adapter decodes the same raw reports with the same setup, so the gear and the handbrake move live in the app; calibration, dead zone, curve and mode change at once in the app and reach games when saved. |
+
+The driver needs systemd to start the service with the device; without it, `status` says so.
+Two identical devices (same vendor and product) without a serial number share one setup. In
+development (no root) the driver keeps setups in its data directory but installs no rules or
+service. The adapter reads a fake device in tests: a USB directory outside `/sys` holding a
+`simrig-fake-report` file.
+
 ## 6. Drivers
 
 ### 6.1 Contract
@@ -785,6 +802,7 @@ Whether the tuning menu really persists in the base's memory must be **verified 
 | D15 | No privileges at runtime: live settings, tests and presets go through the drivers' interfaces; authorization only for system changes, through pkexec + `simrig-helper` | the app is always started as a normal user; the password is asked only when it is really needed |
 | D16 | Guided procedures (calibration, mapping, setup) are defined by plugins; the core only renders generic steps | new procedures without touching the core, like custom parameters |
 | D17 | The core ships generic layered drawings per component type; plugins give appearance hints (rim shape) or their own pictures | every device looks right without a single brand asset; brand-agnostic by construction |
+| D18 | The generic USB plugin's driver is a userspace service started by udev with each set-up device (hidraw in, uinput out), not HID-BPF or a kernel module | works on any kernel with free-form mappings; nothing runs while no set-up device is connected; HID-BPF stays an option for later |
 
 ## 13. Risks
 

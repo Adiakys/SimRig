@@ -1,0 +1,15 @@
+#!/bin/sh
+# Removes everything the Generic USB driver installed; works on partial installs.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+if system_mode; then
+    systemctl stop 'simrig-generic-usb@*.service' 2>/dev/null || true
+    rm -f "$UNIT" "$RULES"
+    systemctl daemon-reload 2>/dev/null || true
+    udevadm control --reload 2>/dev/null || true
+    udevadm trigger --action=change --subsystem-match=hidraw 2>/dev/null || true
+    udevadm trigger --action=change --subsystem-match=input 2>/dev/null || true
+fi
+rm -rf "$DATA/devices" "$DATA/allowed" "$DATA/bin"
+rm -f "$DATA/installed"
+echo "Generic USB driver removed"

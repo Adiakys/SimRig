@@ -1,0 +1,10 @@
+id = "generic-usb"
+name = "Generic USB"
+version = "0.1.0"
+api = 1
+exec = "simrig-plugin-generic-usb"
+driver = "driver/driver.toml"
+description = "Sets up any USB device as a shifter or a handbrake: its inputs are mapped by moving it, and its driver turns it into a standard joystick for every game."
+
+[match]
+on_request = true

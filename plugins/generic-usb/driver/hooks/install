@@ -1,0 +1,46 @@
+#!/bin/sh
+# Installs the Generic USB driver: the service binary, its systemd unit and (empty) udev rules.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA/devices" "$DATA/allowed" "$DATA/bin"
+
+if ! system_mode; then
+    touch "$DATA/installed"
+    echo "development install: setups are kept in $DATA; no udev rules or service (needs root)"
+    exit 0
+fi
+
+# The service ships with the driver, or next to the adapter in the plugin directory.
+for candidate in "$SIMRIG_DRIVER_DIR/bin/simrig-generic-usb-service" \
+                 "$SIMRIG_DRIVER_DIR/../simrig-generic-usb-service"; do
+    if [ -x "$candidate" ]; then
+        install -m 0755 "$candidate" "$SERVICE"
+        break
+    fi
+done
+if [ ! -x "$SERVICE" ]; then
+    echo "simrig-generic-usb-service not found next to the driver" >&2
+    exit 1
+fi
+command -v systemctl >/dev/null || { echo "systemd is required to start the service with the device" >&2; exit 1; }
+
+cat > "$UNIT" <<UNIT
+# Installed by the SimRig Generic USB driver. Started by udev for a set-up device.
+[Unit]
+Description=SimRig Generic USB device %I
+BindsTo=dev-%i.device
+After=dev-%i.device
+
+[Service]
+ExecStart=$SERVICE %I $DATA/devices
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+UNIT
+systemctl daemon-reload
+write_rules
+touch "$DATA/installed"
+echo "Generic USB driver installed"

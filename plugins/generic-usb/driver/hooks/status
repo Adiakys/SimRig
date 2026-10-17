@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs as the user: prints the driver's state as JSON.
+set -eu
+DATA="$SIMRIG_DRIVER_DATA"
+if [ ! -f "$DATA/installed" ]; then
+    echo '{"installed": false, "user_access": true, "message": "Needed to save setups and to make devices standard joysticks."}'
+elif [ -f /etc/systemd/system/simrig-generic-usb@.service ]; then
+    echo '{"installed": true, "active": true, "version": "0.1.0", "user_access": true}'
+else
+    echo '{"installed": true, "active": false, "version": "0.1.0", "user_access": true, "message": "Development install: setups are saved, but no service turns devices into joysticks."}'
+fi

@@ -1,0 +1,30 @@
+# The Generic USB driver: a small service, started by udev when a set-up device is plugged in
+# and stopped when it is unplugged, that turns the device's raw reports into a standard
+# joystick (uinput). Setups are made by the plugin's setup procedure and saved here through
+# privileged operations. Nothing runs while no set-up device is connected.
+id = "generic-usb-service"
+version = "0.1.0"
+summary = "Turns set-up USB devices into standard joysticks (udev + systemd + uinput)"
+license = "GPL-3.0-or-later"
+
+install = "hooks/install"
+uninstall = "hooks/uninstall"
+status = "hooks/status"
+
+# Lets the user read a device's raw reports while setting it up (udev uaccess on its hidraw).
+[[privileged]]
+name = "allow-device"
+exec = "hooks/allow-device"
+args = { file = "[0-9a-f]{4}-[0-9a-f]{4}(-[a-z0-9]{1,32})?", vid = "[0-9a-f]{4}", pid = "[0-9a-f]{4}" }
+
+# Saves a device's setup (TOML, base64) and starts serving it.
+[[privileged]]
+name = "save-device"
+exec = "hooks/save-device"
+args = { file = "[0-9a-f]{4}-[0-9a-f]{4}(-[a-z0-9]{1,32})?", vid = "[0-9a-f]{4}", pid = "[0-9a-f]{4}", config = "[A-Za-z0-9+/]{4,16384}={0,2}" }
+
+# Forgets a device: its setup, its permission and its service.
+[[privileged]]
+name = "forget-device"
+exec = "hooks/forget-device"
+args = { file = "[0-9a-f]{4}-[0-9a-f]{4}(-[a-z0-9]{1,32})?" }

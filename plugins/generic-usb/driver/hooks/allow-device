@@ -1,0 +1,9 @@
+#!/bin/sh
+# Lets the user read a device's raw reports while setting it up.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA/allowed"
+printf '%s %s %s\n' "$SIMRIG_ARG_VID" "$SIMRIG_ARG_PID" "$SIMRIG_ARG_FILE" > "$DATA/allowed/$SIMRIG_ARG_FILE.ids"
+write_rules
+system_mode || echo "development install: reading the device needs access to its /dev/hidraw node"
+echo "allowed $SIMRIG_ARG_VID:$SIMRIG_ARG_PID"
