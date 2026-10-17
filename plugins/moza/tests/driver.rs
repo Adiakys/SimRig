@@ -49,7 +49,7 @@ fn on_older_kernels_the_bundled_module_is_built() {
     let sb = sandbox("build", true);
     let v = version();
     // A base already plugged in, on hid-generic without force feedback.
-    let id = sb.plug(0x346e, 0x0002, Some("hid-generic"));
+    sb.plug(0x346e, 0x0002, Some("hid-generic"));
     // A pedal set: not given to hid-universal-pidff.
     sb.plug(0x346e, 0x0003, Some("hid-generic"));
     sb.hid_driver("hid-universal-pidff");
@@ -63,10 +63,9 @@ fn on_older_kernels_the_bundled_module_is_built() {
     );
     let conf = sb.read(&format!("usr/src/hid-universal-pidff-{v}/dkms.conf"));
     assert!(conf.contains(&format!("PACKAGE_VERSION=\"{v}\"")), "{conf}");
-    assert_eq!(
-        sb.read("sys/bus/hid/drivers/hid-universal-pidff/bind"),
-        format!("{id}\n")
-    );
+    // The base started again, as if replugged; the pedals were left alone.
+    assert_eq!(sb.read("sys/bus/usb/devices/1-0002/authorized"), "1\n");
+    assert_eq!(sb.read("sys/bus/usb/devices/1-0003/authorized"), "");
     let status = sb.status();
     assert!(status.installed && status.active, "{status:?}");
     assert_eq!(status.version.as_deref(), Some(v.as_str()));

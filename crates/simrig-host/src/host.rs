@@ -262,7 +262,12 @@ impl Host {
             usb: Vec::new(),
             rig,
             catalog,
-            drivers: DriverManager::new(helper, options.dev_state_dir.clone(), dev_roots),
+            drivers: DriverManager::new(
+                helper,
+                options.dev_state_dir.clone(),
+                dev_roots,
+                options.default_dirs,
+            ),
             presets: PresetStore::new(&options.config_dir),
         };
         let usb = usb::scan_dir(&options.usb_root);

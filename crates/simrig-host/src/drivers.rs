@@ -29,6 +29,8 @@ pub(crate) struct DriverManager {
     helper: Option<PathBuf>,
     dev_state: StateLayout,
     dev_roots: Vec<PathBuf>,
+    /// System plugins are in use: their drivers, recorded in `/var/lib/simrig`, count.
+    system: bool,
 }
 
 /// How to run the helper for one plugin.
@@ -80,18 +82,20 @@ impl DriverManager {
         helper: Option<PathBuf>,
         dev_state: PathBuf,
         dev_roots: Vec<PathBuf>,
+        system: bool,
     ) -> Self {
         Self {
             helper,
             dev_state: StateLayout::new(dev_state),
             dev_roots,
+            system,
         }
     }
 
     /// Where the drivers of plugins at `location` are recorded; `None` if they may not have any.
     pub(crate) fn layout(&self, location: PluginLocation) -> Option<StateLayout> {
         match location {
-            PluginLocation::System => Some(StateLayout::system()),
+            PluginLocation::System => self.system.then(StateLayout::system),
             PluginLocation::Explicit => Some(self.dev_state.clone()),
             PluginLocation::User => None,
         }

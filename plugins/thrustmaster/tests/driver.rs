@@ -27,7 +27,7 @@ fn clean_install_and_uninstall() {
     let v = version();
     assert!(!sb.status().installed);
     // A T300 RS already plugged in, on hid-generic.
-    let t300 = sb.plug(0x044f, 0xb66e, Some("hid-generic"));
+    sb.plug(0x044f, 0xb66e, Some("hid-generic"));
     sb.hid_driver("tmff2");
 
     sb.install();
@@ -56,10 +56,8 @@ fn clean_install_and_uninstall() {
             "{module}"
         );
     }
-    assert_eq!(
-        sb.read("sys/bus/hid/drivers/tmff2/bind"),
-        format!("{t300}\n")
-    );
+    // The wheel started again, as if replugged.
+    assert_eq!(sb.read("sys/bus/usb/devices/1-b66e/authorized"), "1\n");
     assert!(sb.read(RULES).contains("tmff2"));
     let status = sb.status();
     assert!(status.installed && status.active, "{status:?}");

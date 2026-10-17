@@ -579,7 +579,9 @@ own tests use too).
 `module.sh` is what every kernel-module driver shares: where a module comes from (SimRig's
 version, an older one of SimRig's, one installed by other means, the kernel's, none), SimRig's
 DKMS build of the bundled sources with upgrade, reload and Secure Boot key enrollment, removal,
-rebinding devices already plugged in, and checking which USB devices are present. `dkms.sh`
+making devices already plugged in start again as if replugged (USB re-enumeration: devices
+send what they send at start-up, like a Fanatec base's tuning menu or a Thrustmaster wheel's
+switch to its own id), and checking which USB devices are present. `dkms.sh`
 takes upstream packages as they are: their fixed name and version are rewritten to SimRig's,
 and their `dkms.conf` may live in a subdirectory.
 
@@ -788,7 +790,7 @@ Driver recipes (dkms, udev, hid-bpf, systemd) come with the first real driver (M
 | Piece | What it does |
 |---|---|
 | `hid-fanatecff/` | upstream sources, a git submodule pinned to a tested commit; its DKMS version in `hid-fanatecff.version` |
-| `hooks/install` | refuses nothing it does not own: with a `hid-fanatec` installed by other means (another DKMS version, a package, a module built by hand) it does nothing. Otherwise checks the prerequisites (dkms, make, gcc, kernel headers; names the packages per distribution when missing), removes an older version SimRig installed, builds and installs the module with the `dkms` recipe for every kernel with headers, installs SimRig's udev rules and loads the module. Devices already plugged in are rebound from `hid-generic` to `fanatec`. When Secure Boot refuses the module, asks the firmware to enroll DKMS's signing key with a one-time password the user types at the next boot |
+| `hooks/install` | refuses nothing it does not own: with a `hid-fanatec` installed by other means (another DKMS version, a package, a module built by hand) it does nothing. Otherwise checks the prerequisites (dkms, make, gcc, kernel headers; names the packages per distribution when missing), removes an older version SimRig installed, builds and installs the module with the `dkms` recipe for every kernel with headers, installs SimRig's udev rules and loads the module. Devices already plugged in start again as if replugged, so the base sends the driver its tuning menu (until it has, the driver refuses to change it, the rotation included, and the adapter says to replug the base). When Secure Boot refuses the module, asks the firmware to enroll DKMS's signing key with a one-time password the user types at the next boot |
 | `hooks/status` | ours (version, loaded, waiting for the key to be enrolled, an update available), someone else's (*provided by the system*, with its version), or not installed |
 | `hooks/uninstall` | removes only SimRig's DKMS version and udev rules |
 | `udev/71-simrig-fanatec.rules` | raw HID with `uaccess` (Fanatec SDK games under Proton), and the driver's settings (rotation, display, tuning menu, LEDs) writable by local users, re-applied at every `bind`: no password for live settings. A test checks that every tuning attribute of the bundled driver is covered |
@@ -856,7 +858,7 @@ speaking a protocol worked out by [Boxflat](https://github.com/Lawstorant/boxfla
 **The driver** installs SimRig's udev rules (the serial port and event nodes for the logged-in
 user, the port hidden from ModemManager) and, only when the kernel has no
 `hid-universal-pidff`, builds the bundled [universal-pidff](https://github.com/JacKeTUs/universal-pidff)
-with DKMS (the `module.sh` recipe), rebinding the bases already plugged in. The kernel's module,
+with DKMS (the `module.sh` recipe), making the bases already plugged in start again with it. The kernel's module,
 or one installed by other means, is used as it is.
 
 **The adapter** claims every device of the vendor (Moza does not publish its product ids) and

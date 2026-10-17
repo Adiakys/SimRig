@@ -35,7 +35,7 @@ fn on_older_kernels_the_bundled_module_is_built() {
     let sb = sandbox("build");
     let v = version();
     sb.plug(0x11ff, 0x1212, Some("hid-generic"));
-    let vd6 = sb.plug(0x36e6, 0x400f, Some("hid-generic"));
+    sb.plug(0x36e6, 0x400f, Some("hid-generic"));
     sb.hid_driver("hid-universal-pidff");
     sb.install();
     assert!(
@@ -44,11 +44,9 @@ fn on_older_kernels_the_bundled_module_is_built() {
         "{}",
         sb.dkms()
     );
-    // Each vendor's bases are rebound (the fake bind file keeps the last one: the VD6).
-    assert_eq!(
-        sb.read("sys/bus/hid/drivers/hid-universal-pidff/bind"),
-        format!("{vd6}\n")
-    );
+    // Each vendor's bases started again, as if replugged.
+    assert_eq!(sb.read("sys/bus/usb/devices/1-1212/authorized"), "1\n");
+    assert_eq!(sb.read("sys/bus/usb/devices/1-400f/authorized"), "1\n");
     assert!(sb.status().installed);
 }
 

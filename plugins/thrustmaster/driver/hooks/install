@@ -29,7 +29,8 @@ write_conf
 modprobe -r hid_thrustmaster 2>/dev/null || true
 case $rc in
 0)
-    hid_rebind 044F tmff2 $WHEELS
+    # Wheels start again, as if replugged: hid-tminit starts them up and hid-tmff2 takes them.
+    usb_replug 044f
     udev_apply hid hidraw
     echo "hid-tmff2 $VERSION installed"
     ;;

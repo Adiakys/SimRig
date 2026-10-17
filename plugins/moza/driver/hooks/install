@@ -35,7 +35,8 @@ rc=0
 mod_build "$PACKAGE" "$VERSION" "$SOURCE" dkms.conf "$MODULE" || rc=$?
 case $rc in
 0)
-    hid_rebind 346E hid-universal-pidff $BASES
+    # The bases start again, as if replugged: the module just built takes them.
+    usb_replug 346e $BASES
     udev_apply tty input
     echo "hid-universal-pidff $VERSION installed"
     ;;

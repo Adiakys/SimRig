@@ -50,8 +50,8 @@ missing() {
 }
 
 # ensure PACKAGE MODULE VERSION SOURCE HID_DRIVER KERNEL_IS_ENOUGH WHEELS…: builds SimRig's
-# version when it is needed and not provided otherwise, or upgrades SimRig's; gives the wheels
-# plugged in to its HID driver. Returns 0, 3 (waiting for the signing key) or 1.
+# version when it is needed and not provided otherwise, or upgrades SimRig's; makes the wheels
+# plugged in start again with it. Returns 0, 3 (waiting for the signing key) or 1.
 ensure() {
     e_package=$1 e_module=$2 e_version=$3 e_source=$4 e_driver=$5 e_kernel=$6
     shift 6
@@ -69,7 +69,9 @@ ensure() {
     e_rc=0
     mod_build "$e_package" "$e_version" "$e_source" dkms.conf "$e_module" || e_rc=$?
     if [ "$e_rc" = 0 ]; then
-        hid_rebind 046D "$e_driver" "$@"
+        # The wheels start again, as if replugged: the module takes them and switches
+        # them to their own mode, as it does at start-up.
+        usb_replug 046d "$@"
         echo "$e_package $e_version installed"
     fi
     return "$e_rc"

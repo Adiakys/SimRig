@@ -42,7 +42,7 @@ fn a_g920_needs_only_the_rules() {
 fn a_g29_gets_new_lg4ff() {
     let sb = sandbox("g29", true);
     let v = version("new-lg4ff");
-    let g29 = sb.plug(0x046d, 0xc24f, Some("hid-generic"));
+    sb.plug(0x046d, 0xc24f, Some("hid-generic"));
     sb.hid_driver("logitech");
     assert!(sb.status().message.unwrap().contains("new-lg4ff"));
 
@@ -57,10 +57,8 @@ fn a_g29_gets_new_lg4ff() {
     let log = sb.log();
     assert!(log.contains("modprobe -r hid_logitech"), "{log}");
     assert!(!sb.dkms().contains("trueforce"));
-    assert_eq!(
-        sb.read("sys/bus/hid/drivers/logitech/bind"),
-        format!("{g29}\n")
-    );
+    // The wheel started again with it, as if replugged.
+    assert_eq!(sb.read("sys/bus/usb/devices/1-c24f/authorized"), "1\n");
     let status = sb.status();
     assert!(status.installed, "{status:?}");
     assert_eq!(status.version, Some(format!("new-lg4ff {v}")));
