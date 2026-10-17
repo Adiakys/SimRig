@@ -24,6 +24,10 @@ pub struct ProcedureDescriptor {
     pub help: Option<String>,
     /// A procedure can be unavailable too, always with a reason.
     pub availability: Support<()>,
+    /// Part of setting the device up: the app runs it when the device is added (e.g. mapping
+    /// pedals whose inputs the plugin does not know).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub setup: bool,
 }
 
 impl ProcedureDescriptor {
@@ -33,7 +37,14 @@ impl ProcedureDescriptor {
             label: label.into(),
             help: None,
             availability: Support::Supported(()),
+            setup: false,
         }
+    }
+
+    /// Marks it as part of setting the device up.
+    pub fn setup(mut self) -> Self {
+        self.setup = true;
+        self
     }
 
     pub fn help(mut self, help: &str) -> Self {

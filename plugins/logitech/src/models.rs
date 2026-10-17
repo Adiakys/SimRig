@@ -14,6 +14,30 @@ pub enum Family {
     DirectDrive,
 }
 
+use simrig_plugin_kit::pedals::Layout;
+use simrig_plugin_sdk::prelude::PedalRole::{Brake, Clutch, Throttle};
+
+/// Where the pedals plugged into each family of wheels are, at the top of their travel when
+/// released (Oversteer's tables).
+const Z_RZ_Y: Layout = &[
+    (Throttle, 0x02, true),
+    (Brake, 0x05, true),
+    (Clutch, 0x01, true),
+];
+const Y_Z_RZ: Layout = &[
+    (Throttle, 0x01, true),
+    (Brake, 0x02, true),
+    (Clutch, 0x05, true),
+];
+/// Two pedals, no clutch.
+const Y_Z: Layout = &[(Throttle, 0x01, true), (Brake, 0x02, true)];
+/// The G PRO's, at the bottom of their travel when released.
+const RX_RY_RZ: Layout = &[
+    (Throttle, 0x03, false),
+    (Brake, 0x04, false),
+    (Clutch, 0x05, false),
+];
+
 #[derive(Clone, Copy, Debug)]
 pub struct Model {
     pub pid: u16,
@@ -23,6 +47,8 @@ pub struct Model {
     pub family: Family,
     /// Widest rotation, in degrees.
     pub max_range: u32,
+    /// Where its pedals are, when known.
+    pub pedals: Option<Layout>,
 }
 
 pub const VENDOR: u16 = 0x046d;
@@ -33,6 +59,7 @@ const fn wheel(
     model: &'static str,
     family: Family,
     max_range: u32,
+    pedals: Option<Layout>,
 ) -> Model {
     Model {
         pid,
@@ -40,6 +67,7 @@ const fn wheel(
         model,
         family,
         max_range,
+        pedals,
     }
 }
 
@@ -52,6 +80,7 @@ pub const MODELS: &[Model] = &[
         "logitech/wingman-ffgp",
         Lg4ff,
         180,
+        None,
     ),
     // Also a G29 or G27 in compatibility mode, before lg4ff switches it to its own mode.
     wheel(
@@ -60,39 +89,79 @@ pub const MODELS: &[Model] = &[
         "logitech/driving-force",
         Lg4ff,
         270,
+        Some(Y_Z),
     ),
-    wheel(0xc295, "MOMO Racing", "logitech/momo-racing", Lg4ff, 270),
+    wheel(
+        0xc295,
+        "MOMO Racing",
+        "logitech/momo-racing",
+        Lg4ff,
+        270,
+        Some(Y_Z),
+    ),
     wheel(
         0xc298,
         "Driving Force Pro",
         "logitech/driving-force-pro",
         Lg4ff,
         900,
+        Some(Y_Z),
     ),
-    wheel(0xc299, "G25 Racing Wheel", "logitech/g25", Lg4ff, 900),
+    wheel(
+        0xc299,
+        "G25 Racing Wheel",
+        "logitech/g25",
+        Lg4ff,
+        900,
+        Some(Z_RZ_Y),
+    ),
     wheel(
         0xc29a,
         "Driving Force GT",
         "logitech/driving-force-gt",
         Lg4ff,
         900,
+        Some(Y_Z),
     ),
-    wheel(0xc29b, "G27 Racing Wheel", "logitech/g27", Lg4ff, 900),
+    wheel(
+        0xc29b,
+        "G27 Racing Wheel",
+        "logitech/g27",
+        Lg4ff,
+        900,
+        Some(Z_RZ_Y),
+    ),
     wheel(
         0xc29c,
         "Speed Force Wireless",
         "logitech/speed-force-wireless",
         Lg4ff,
         270,
+        Some(Y_Z),
     ),
-    wheel(0xca03, "MOMO Racing", "logitech/momo-racing-2", Lg4ff, 270),
-    wheel(0xc24f, "G29 Driving Force", "logitech/g29", Lg4ff, 900),
+    wheel(
+        0xca03,
+        "MOMO Racing",
+        "logitech/momo-racing-2",
+        Lg4ff,
+        270,
+        Some(Y_Z),
+    ),
+    wheel(
+        0xc24f,
+        "G29 Driving Force",
+        "logitech/g29",
+        Lg4ff,
+        900,
+        Some(Z_RZ_Y),
+    ),
     wheel(
         0xc266,
         "G923 Racing Wheel (PlayStation)",
         "logitech/g923-ps",
         Lg4ff,
         900,
+        Some(Z_RZ_Y),
     ),
     // The G923 in PlayStation mode: new-lg4ff switches it to c266.
     wheel(
@@ -101,14 +170,23 @@ pub const MODELS: &[Model] = &[
         "logitech/g923-ps",
         Lg4ff,
         900,
+        Some(Z_RZ_Y),
     ),
-    wheel(0xc262, "G920 Driving Force", "logitech/g920", Hidpp, 900),
+    wheel(
+        0xc262,
+        "G920 Driving Force",
+        "logitech/g920",
+        Hidpp,
+        900,
+        Some(Y_Z_RZ),
+    ),
     wheel(
         0xc26d,
         "G923 Racing Wheel (Xbox)",
         "logitech/g923-xbox",
         Hidpp,
         900,
+        Some(Y_Z_RZ),
     ),
     wheel(
         0xc26e,
@@ -116,6 +194,7 @@ pub const MODELS: &[Model] = &[
         "logitech/g923-xbox",
         Hidpp,
         900,
+        Some(Y_Z_RZ),
     ),
     wheel(
         0xc268,
@@ -123,6 +202,7 @@ pub const MODELS: &[Model] = &[
         "logitech/g-pro-ps",
         DirectDrive,
         1080,
+        Some(RX_RY_RZ),
     ),
     wheel(
         0xc272,
@@ -130,13 +210,16 @@ pub const MODELS: &[Model] = &[
         "logitech/g-pro",
         DirectDrive,
         1080,
+        Some(RX_RY_RZ),
     ),
+    // Not in Oversteer's tables: its pedals are mapped when it is added.
     wheel(
         0xc276,
         "RS50 Direct Drive Wheel Base",
         "logitech/rs50",
         DirectDrive,
         2700,
+        None,
     ),
 ];
 

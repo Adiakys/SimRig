@@ -73,7 +73,9 @@ fn a_g29_on_new_lg4ff() {
     let env = env("g29");
     let hid = g29(&env, true);
     let mut host = env.start();
-    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    until(&mut host, "base, rim, pedals", |h| {
+        h.components().len() == 3
+    });
     let base = host.find("base").unwrap().address.clone();
     let wheel = host.find("wheel").unwrap().address.clone();
     assert_eq!(
@@ -127,7 +129,9 @@ fn a_g29_on_the_kernels_driver() {
     let env = env("g29-kernel");
     g29(&env, false);
     let mut host = env.start();
-    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    until(&mut host, "base, rim, pedals", |h| {
+        h.components().len() == 3
+    });
     let base = host.find("base").unwrap().address.clone();
     assert_eq!(
         host.param(&base, "rotation").unwrap().value,
@@ -165,7 +169,9 @@ fn a_g_pro_on_the_truforce_driver() {
     .unwrap();
     env.input(&hid, "abs 0 32767 0 65535\n");
     let mut host = env.start();
-    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    until(&mut host, "base, rim, pedals", |h| {
+        h.components().len() == 3
+    });
     let base = host.find("base").unwrap().address.clone();
 
     let inputs = host.read_inputs(&base).unwrap();

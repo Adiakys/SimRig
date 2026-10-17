@@ -1,13 +1,11 @@
 //! End to end through the host: a fake R9 base (inputs, force feedback driver, serial port
 //! answering like the real one), SR-P pedals and an HBP handbrake.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use simrig_host::Target;
-use simrig_host::testing::{PluginEnv, reason, step, until};
-use simrig_model::{ProcedureState, Value};
+use simrig_host::testing::{PluginEnv, reason, until};
+use simrig_model::Value;
 
 fn env(name: &str) -> PluginEnv {
     PluginEnv::new(
@@ -50,7 +48,9 @@ fn an_r9_base_and_its_settings() {
         "limit 450\nmax-angle 450\nffb-strength 800\ndamper 10\ntorque 100\nprotection 1\n",
     );
     let mut host = env.start();
-    until(&mut host, "base", |h| h.components().len() == 1);
+    until(&mut host, "base and its pedals", |h| {
+        h.components().len() == 2
+    });
     let base = host.find("base").unwrap().address.clone();
     assert_eq!(host.find(&base).unwrap().description.name, "MOZA R9 Base");
 
@@ -97,7 +97,9 @@ fn without_hid_universal_pidff_there_is_no_force_feedback() {
     let hid = r9(&env, "limit 450\n");
     env.bind(&hid, "hid-generic");
     let mut host = env.start();
-    until(&mut host, "base", |h| h.components().len() == 1);
+    until(&mut host, "base and its pedals", |h| {
+        h.components().len() == 2
+    });
     let base = host.find("base").unwrap().address.clone();
     assert!(reason(&mut host, &base, "test_effect").contains("hid-universal-pidff"));
     // Settings and inputs still work.
@@ -133,12 +135,12 @@ fn pedals_handbrake_and_pedals_on_the_base() {
     env.input(&handbrake, "abs 7 65535 0 65535\n");
     let base = r9(&env, "limit 450\n");
     let mut host = env.start();
-    until(&mut host, "components", |h| h.components().len() == 3);
+    until(&mut host, "components", |h| h.components().len() == 4);
 
     // The SR-P's axes are known: no mapping.
-    let srp = host.find("pedals").unwrap().address.clone();
-    assert_eq!(host.find(&srp).unwrap().description.pedals.len(), 3);
-    let inputs = host.read_inputs(&srp).unwrap();
+    let srp = "moza/usb-1-4/pedals";
+    assert_eq!(host.find(srp).unwrap().description.pedals.len(), 3);
+    let inputs = host.read_inputs(srp).unwrap();
     let Some(Value::Axis(throttle)) = inputs.get("throttle.position") else {
         panic!("{inputs:?}")
     };
@@ -147,33 +149,16 @@ fn pedals_handbrake_and_pedals_on_the_base() {
     let inputs = host.read_inputs(&hb).unwrap();
     assert!(matches!(inputs.get("position"), Some(Value::Axis(a)) if a.value == 1.0));
 
-    // Pedals plugged into the base: mapped by pressing them.
-    let r9 = host.find("base").unwrap().address.clone();
-    let (session, _) = host
-        .start_procedure(&Target::Component(r9), "map-pedals")
-        .unwrap();
-    host.submit_procedure(&session, "next", BTreeMap::new())
-        .unwrap();
+    // Pedals plugged into the base are recognised too (Boxflat's table): brake on ABS_RZ.
     env.input(
         &base,
-        "abs 0 32767 0 65535\nabs 2 65535 0 65535\nabs 5 0 0 65535\n",
+        "abs 0 32767 0 65535\nabs 2 0 0 65535\nabs 5 65535 0 65535\nabs 6 0 0 65535\n",
     );
-    step(&mut host, "brake");
-    env.input(
-        &base,
-        "abs 0 32767 0 65535\nabs 2 0 0 65535\nabs 5 65535 0 65535\n",
-    );
-    step(&mut host, "clutch");
-    host.submit_procedure(&session, "skip", BTreeMap::new())
-        .unwrap();
-    let state = host
-        .submit_procedure(&session, "save", BTreeMap::new())
-        .unwrap();
-    assert!(
-        matches!(state, ProcedureState::Finished { .. }),
-        "{state:?}"
-    );
-    until(&mut host, "pedals on the base", |h| {
-        h.components().len() == 4
-    });
+    let on_base = "moza/usb-1-3/pedals";
+    assert_eq!(host.find(on_base).unwrap().description.pedals.len(), 3);
+    let inputs = host.read_inputs(on_base).unwrap();
+    let Some(Value::Axis(brake)) = inputs.get("brake.position") else {
+        panic!("{inputs:?}")
+    };
+    assert!(brake.value > 0.99);
 }

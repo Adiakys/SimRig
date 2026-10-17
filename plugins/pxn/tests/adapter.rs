@@ -101,6 +101,17 @@ fn a_v12_has_inputs_and_forces_but_no_settings() {
     until(&mut host, "base and rim", |h| h.components().len() == 2);
     let base = host.find("base").unwrap().address.clone();
     assert!(reason(&mut host, &base, "rotation").contains("VD series"));
+    // Its pedals are not in a known table: mapping them is part of adding the base.
+    let procedures = host.procedures(&simrig_host::Target::Device {
+        plugin: "pxn".into(),
+        device: "usb-1-11".into(),
+    });
+    let map = procedures
+        .unwrap()
+        .into_iter()
+        .find(|p| p.id == "map-pedals")
+        .unwrap();
+    assert!(map.setup);
     // No force feedback on the event node.
     assert!(reason(&mut host, &base, "test_effect").contains("hid-universal-pidff"));
 }

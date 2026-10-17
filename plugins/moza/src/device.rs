@@ -32,6 +32,10 @@ pub mod axes {
     pub const BRAKE: u16 = 0x04; // ABS_RY
     pub const CLUTCH: u16 = 0x05; // ABS_RZ
     pub const HANDBRAKE: u16 = 0x07; // ABS_RUDDER
+    // Pedals plugged into a base.
+    pub const BASE_THROTTLE: u16 = 0x02; // ABS_Z
+    pub const BASE_BRAKE: u16 = 0x05; // ABS_RZ
+    pub const BASE_CLUTCH: u16 = 0x06; // ABS_THROTTLE
 }
 
 pub struct MozaDevice {
@@ -62,6 +66,14 @@ impl MozaDevice {
         let steering = (kind == Kind::Base).then_some(axes::STEERING);
         let key = models::model_id(product);
         let mut hid = HidDevice::new(id, usb, BINDING, config, &key, steering);
+        if kind == Kind::Base {
+            // Pedals plugged into the base (Boxflat's table).
+            hid = hid.with_layout(&[
+                (PedalRole::Throttle, axes::BASE_THROTTLE, false),
+                (PedalRole::Brake, axes::BASE_BRAKE, false),
+                (PedalRole::Clutch, axes::BASE_CLUTCH, false),
+            ]);
+        }
         // A pedal set on its own USB has fixed axes: no mapping needed.
         if kind == Kind::Pedals && hid.pedal_map.pedals.is_empty() {
             hid.pedal_map = PedalMap {

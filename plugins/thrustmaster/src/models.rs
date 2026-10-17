@@ -1,6 +1,23 @@
 //! The Thrustmaster wheels hid-tmff2 drives (`src/hid-tmff2.h`), and the ids wheels have while
 //! they start up, before hid-tminit switches them to their own.
 
+use simrig_plugin_kit::pedals::Layout;
+use simrig_plugin_sdk::prelude::PedalRole::{Brake, Clutch, Throttle};
+
+/// Where the pedals plugged into a base are, at the top of their travel when released
+/// (Oversteer's tables).
+const Z_RZ_Y: Layout = &[
+    (Throttle, 0x02, true),
+    (Brake, 0x05, true),
+    (Clutch, 0x01, true),
+];
+/// The T248's: throttle ABS_RZ, brake ABS_Y, clutch ABS_THROTTLE.
+const T248: Layout = &[
+    (Throttle, 0x05, true),
+    (Brake, 0x01, true),
+    (Clutch, 0x06, true),
+];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     /// A wheel hid-tmff2 drives; rotation from `min_range` to `max_range` degrees.
@@ -16,6 +33,8 @@ pub struct Model {
     /// Catalog model id.
     pub model: &'static str,
     pub kind: Kind,
+    /// Where its pedals are, when known.
+    pub pedals: Option<Layout>,
 }
 
 pub const VENDOR: u16 = 0x044f;
@@ -35,6 +54,7 @@ const fn wheel(
             min_range,
             max_range,
         },
+        pedals: Some(Z_RZ_Y),
     }
 }
 
@@ -44,6 +64,7 @@ const fn starting(pid: u16) -> Model {
         name: "Thrustmaster wheel (starting up)",
         model: "thrustmaster/wheel",
         kind: Kind::StartingUp,
+        pedals: None,
     }
 }
 
@@ -66,7 +87,10 @@ pub const MODELS: &[Model] = &[
         1080,
     ),
     // Also the T128.
-    wheel(0xb696, "T248", "thrustmaster/t248", 140, 900),
+    Model {
+        pedals: Some(T248),
+        ..wheel(0xb696, "T248", "thrustmaster/t248", 140, 900)
+    },
     wheel(0xb669, "TX Racing Wheel", "thrustmaster/tx", 140, 900),
     wheel(0xb689, "TS-PC Racer", "thrustmaster/ts-pc", 140, 1080),
     wheel(0xb692, "TS-XW Racer", "thrustmaster/ts-xw", 140, 1080),

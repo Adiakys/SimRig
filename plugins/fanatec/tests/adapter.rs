@@ -101,7 +101,7 @@ fn a_csl_dd_with_a_formula_rim() {
     let env = Env::new("csl-dd");
     env.plug(true);
     let mut host = env.start();
-    until(&mut host, "components", |h| h.components().len() == 2);
+    until(&mut host, "components", |h| h.components().len() == 3);
 
     let base = host.find("base").unwrap().address.clone();
     let wheel = host.find("wheel").unwrap().address.clone();
@@ -169,33 +169,51 @@ fn a_csl_dd_with_a_formula_rim() {
     });
 }
 
+/// The pedals plugged into a base are recognised (throttle ABS_Z, brake ABS_RZ, clutch ABS_Y,
+/// released at the top of their travel, like on a real CSL DD). Mapping them by hand, for
+/// pedals that respond wrong, takes the direction from where each pedal is pressed to.
 #[test]
-fn pedals_are_mapped_by_pressing_them() {
+fn pedals_on_the_base_are_recognised() {
     let env = Env::new("pedals");
     env.plug(true);
+    // Released; the throttle halfway.
+    let released =
+        "abs 0 32767 0 65535\nabs 1 65535 0 65535\nabs 2 65535 0 65535\nabs 5 65535 0 65535\n";
+    env.input(
+        "abs 0 32767 0 65535\nabs 1 65535 0 65535\nabs 2 32767 0 65535\nabs 5 65535 0 65535\n",
+    );
     let mut host = env.start();
-    until(&mut host, "components", |h| h.components().len() == 2);
-    // No pedals until they are mapped: the base offers the mapping.
-    assert!(host.find("pedals").is_err());
-    let base = host.find("base").unwrap().address.clone();
-    let ids: Vec<String> = host
-        .describe(&base)
-        .unwrap()
-        .procedures
-        .iter()
-        .map(|p| p.id.clone())
-        .collect();
-    assert_eq!(ids, ["map-pedals"]);
+    until(&mut host, "components", |h| h.components().len() == 3);
+    let pedals = host.find("pedals").unwrap().address.clone();
+    assert_eq!(host.find(&pedals).unwrap().description.pedals.len(), 3);
+    let position = |host: &mut simrig_host::Host, pedal: &str| {
+        let inputs = host.read_inputs(&pedals).unwrap();
+        match inputs.get(&format!("{pedal}.position")) {
+            Some(Value::Axis(a)) => a.value,
+            other => panic!("{other:?}"),
+        }
+    };
+    assert!((position(&mut host, "throttle") - 0.5).abs() < 0.01);
+    assert!(position(&mut host, "brake") < 0.01);
 
-    let target = Target::Component(base);
-    let (session, _) = host.start_procedure(&target, "map-pedals").unwrap();
+    // Recognised: mapping by hand is offered, not needed to add the base.
+    let base = host.find("base").unwrap().address.clone();
+    let map = host.describe(&base).unwrap().procedures[0].clone();
+    assert_eq!(map.id, "map-pedals");
+    assert!(!map.setup);
+
+    // By hand: throttle and brake swapped, as for pedals plugged in the other way round.
+    env.input(released);
+    let (session, _) = host
+        .start_procedure(&Target::Component(base), "map-pedals")
+        .unwrap();
     host.submit_procedure(&session, "next", BTreeMap::new())
         .unwrap();
-    // Throttle on axis 1, brake on axis 2 (pressed towards its minimum), no clutch.
-    env.input("abs 0 32767 0 65535\nabs 1 1023 0 1023\nabs 2 0 0 1023\n");
+    env.input("abs 0 32767 0 65535\nabs 1 65535 0 65535\nabs 2 65535 0 65535\nabs 5 0 0 65535\n");
     step(&mut host, "brake");
-    env.input("abs 0 32767 0 65535\nabs 1 0 0 1023\nabs 2 1023 0 1023\n");
+    env.input("abs 0 32767 0 65535\nabs 1 65535 0 65535\nabs 2 0 0 65535\nabs 5 65535 0 65535\n");
     step(&mut host, "clutch");
+    env.input(released);
     host.submit_procedure(&session, "skip", BTreeMap::new())
         .unwrap();
     let state = host
@@ -205,23 +223,18 @@ fn pedals_are_mapped_by_pressing_them() {
         matches!(state, ProcedureState::Finished { .. }),
         "{state:?}"
     );
+    let saved = fs::read_to_string(env.env.config()).unwrap();
     assert!(
-        fs::read_to_string(env.env.config())
-            .unwrap()
-            .contains("throttle")
+        saved.contains("[models.0020.pedals.throttle]\ncode = 5\ninverted = true"),
+        "{saved}"
     );
-
-    until(&mut host, "pedals mapped", |h| {
+    until(&mut host, "mapped by hand", |h| {
         h.find("pedals")
             .is_ok_and(|c| c.description.pedals.len() == 2)
     });
-    env.input("abs 0 32767 0 65535\nabs 1 512 0 1023\nabs 2 0 0 1023\n");
-    let pedals = host.find("pedals").unwrap().address.clone();
-    let inputs = host.read_inputs(&pedals).unwrap();
-    let Some(Value::Axis(throttle)) = inputs.get("throttle.position") else {
-        panic!("{inputs:?}")
-    };
-    assert!((throttle.value - 0.5).abs() < 0.01, "{throttle:?}");
+    // Pressing the pedal now on ABS_RZ moves the throttle.
+    env.input("abs 0 32767 0 65535\nabs 1 65535 0 65535\nabs 2 65535 0 65535\nabs 5 0 0 65535\n");
+    assert!(position(&mut host, "throttle") > 0.99);
 }
 
 #[test]
@@ -229,7 +242,7 @@ fn without_the_driver_everything_says_so() {
     let env = Env::new("unbound");
     env.plug(false);
     let mut host = env.start();
-    until(&mut host, "components", |h| h.components().len() == 1);
+    until(&mut host, "components", |h| h.components().len() == 2);
     let base = host.find("base").unwrap().address.clone();
     assert!(reason(&mut host, &base, "rotation").contains("driver to be installed"));
     assert!(reason(&mut host, &base, "angle").contains("hid-fanatec"));
@@ -283,7 +296,7 @@ fn a_tuning_menu_not_received_yet_says_to_replug() {
         .unwrap();
     }
     let mut host = env.start();
-    until(&mut host, "components", |h| h.components().len() == 2);
+    until(&mut host, "components", |h| h.components().len() == 3);
     let base = host.find("base").unwrap().address.clone();
     let wheel = host.find("wheel").unwrap().address.clone();
     for (address, item) in [

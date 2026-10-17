@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use simrig_plugin_sdk::prelude::*;
 
 use crate::input::Inputs;
-use crate::pedals::{self, PedalMap};
+use crate::pedals::{self, Layout, PedalMap};
 use crate::sysfs;
 
 /// Which HID devices below the USB device belong to the driver.
@@ -33,6 +33,8 @@ pub struct HidDevice {
     pub config: PathBuf,
     pub map_key: String,
     pub pedal_map: PedalMap,
+    /// Where the plugin knows the pedals to be (they need no mapping), if it does.
+    pub layout: Option<PedalMap>,
     /// The steering axis of a wheel base (not a pedal); `None` for a pedal set.
     pub steering: Option<u16>,
 }
@@ -56,10 +58,22 @@ impl HidDevice {
             config,
             map_key: map_key.into(),
             pedal_map,
+            layout: None,
             steering,
         };
         device.refresh();
         device
+    }
+
+    /// The pedals are where `layout` says: no mapping needed, unless the user mapped them by
+    /// hand (that mapping wins).
+    pub fn with_layout(mut self, layout: Layout) -> Self {
+        let map = PedalMap::from_layout(layout);
+        if self.pedal_map.pedals.is_empty() {
+            self.pedal_map = map.clone();
+        }
+        self.layout = Some(map);
+        self
     }
 
     /// Looks for the driver again (installed or bound later); true when that changed.

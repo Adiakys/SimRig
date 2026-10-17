@@ -54,7 +54,9 @@ fn a_t300rs_on_hid_tmff2() {
     let env = env("t300");
     let hid = t300(&env, true);
     let mut host = env.start();
-    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    until(&mut host, "base, rim, pedals", |h| {
+        h.components().len() == 3
+    });
     let base = host.find("base").unwrap().address.clone();
     assert_eq!(host.find(&base).unwrap().description.name, "T300 RS");
 
@@ -93,7 +95,9 @@ fn without_the_driver_everything_says_so() {
     let env = env("unbound");
     t300(&env, false);
     let mut host = env.start();
-    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    until(&mut host, "base, rim, pedals", |h| {
+        h.components().len() == 3
+    });
     let base = host.find("base").unwrap().address.clone();
     assert!(reason(&mut host, &base, "rotation").contains("driver to be installed"));
     assert!(reason(&mut host, &base, "angle").contains("hid-tmff2"));

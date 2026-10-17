@@ -320,15 +320,15 @@ impl App {
         let installed = self.flows.installed.contains(&adding.plugin);
         if plugin.as_ref().is_some_and(needs_driver) && !installed {
             self.flows.step = DRIVER;
-        } else if !has_components(&self.snapshot, &adding.plugin, &adding.device) {
+        } else {
+            // Its setup, if it has one: devices without components yet always do; others may
+            // (pedals the plugin does not recognise, to map).
             self.flows.step = SETUP;
             self.flows.busy = true;
             self.send(Command::ListProcedures(Target::Device {
                 plugin: adding.plugin.clone(),
                 device: adding.device.clone(),
             }));
-        } else {
-            self.flows.step = DONE;
         }
         self.flows.error.clear();
         self.refresh_flows();
@@ -362,11 +362,17 @@ impl App {
             .iter()
             .filter(|p| p.availability.is_supported())
             .collect();
-        let setup = available
-            .iter()
-            .find(|p| p.id == "setup")
-            .or(available.first())
-            .map(|p| p.id.clone());
+        let setup = if has_components(&self.snapshot, plugin, device) {
+            // Already working: only what the plugin marks as part of its setup.
+            available.iter().find(|p| p.setup)
+        } else {
+            // Nothing works yet: its setup, else whatever it offers.
+            available
+                .iter()
+                .find(|p| p.setup || p.id == "setup")
+                .or(available.first())
+        }
+        .map(|p| p.id.clone());
         match setup {
             Some(id) => {
                 // The procedure screen shows the steps of the flow.

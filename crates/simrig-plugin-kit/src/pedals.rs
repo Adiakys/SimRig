@@ -29,7 +29,28 @@ pub struct MappedAxis {
     pub inverted: bool,
 }
 
+/// Where a plugin knows a pedal set's inputs to be: each pedal, its evdev axis, and whether
+/// pressing it goes towards the axis minimum.
+pub type Layout = &'static [(PedalRole, u16, bool)];
+
 impl PedalMap {
+    pub fn from_layout(layout: Layout) -> Self {
+        Self {
+            pedals: layout
+                .iter()
+                .map(|(role, code, inverted)| {
+                    (
+                        role.key().to_string(),
+                        MappedAxis {
+                            code: *code,
+                            inverted: *inverted,
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+
     /// The pedals mapped, as on the floor: clutch, brake, throttle.
     pub fn roles(&self) -> Vec<PedalRole> {
         [PedalRole::Clutch, PedalRole::Brake, PedalRole::Throttle]
@@ -178,13 +199,25 @@ pub const MAP_PEDALS: &str = "map-pedals";
 pub fn descriptor<D: HasHid>(device: &Rc<RefCell<D>>) -> ProcedureDescriptor {
     let d = device.borrow();
     let d = d.hid();
-    let label = match (d.pedal_map.pedals.is_empty(), d.steering.is_some()) {
-        (false, _) => "Map the pedals again",
-        (true, true) => "Map the pedals connected to the base",
-        (true, false) => "Map the pedals",
+    let mut descriptor = if d.layout.is_some() {
+        // Recognised by the plugin: mapping by hand is only for pedals that respond wrong.
+        ProcedureDescriptor::new(MAP_PEDALS, "Map the pedals by hand")
+            .help("The pedals are recognised. Map them by hand only if one of them responds wrong.")
+    } else {
+        let label = match (d.pedal_map.pedals.is_empty(), d.steering.is_some()) {
+            (false, _) => "Map the pedals again",
+            (true, true) => "Map the pedals connected to the base",
+            (true, false) => "Map the pedals",
+        };
+        let descriptor = ProcedureDescriptor::new(MAP_PEDALS, label)
+            .help("Press each pedal when asked, so SimRig knows which input is which.");
+        // Not known and not mapped yet: part of adding the device.
+        if d.pedal_map.pedals.is_empty() {
+            descriptor.setup()
+        } else {
+            descriptor
+        }
     };
-    let mut descriptor = ProcedureDescriptor::new(MAP_PEDALS, label)
-        .help("Press each pedal when asked, so SimRig knows which input is which.");
     if let Some(u) = d.unbound() {
         descriptor = descriptor.availability(Support::Unsupported(u));
     }
@@ -211,6 +244,8 @@ pub struct MapPedals<D: HasHid> {
 const ORDER: [PedalRole; 3] = [PedalRole::Throttle, PedalRole::Brake, PedalRole::Clutch];
 /// How far an axis must move to count as the pedal pressed.
 const PRESSED: f64 = 0.5;
+/// How close to an end of its travel a pedal pressed all the way is.
+const END: f64 = 0.2;
 
 impl<D: HasHid> MapPedals<D> {
     pub fn new(device: Rc<RefCell<D>>) -> Self {
@@ -342,21 +377,24 @@ impl<D: HasHid> Procedure for MapPedals<D> {
             return None;
         }
         let taken: Vec<u16> = self.map.pedals.values().map(|m| m.code).collect();
+        // Pressed all the way: moved far from rest and now near one end of its travel. Which
+        // end says the direction: a value read at rest can be stale (some devices report an
+        // axis only once it moves), the end a pedal is pressed to cannot.
         let moved = self
             .axes()
             .into_iter()
             .filter(|(code, _)| !taken.contains(code))
             .filter_map(|(code, now)| {
                 let rest = *self.rest.get(&code)?;
-                let delta = now - rest;
-                (delta.abs() >= PRESSED).then_some((code, delta))
+                let at_end = !(END..=1.0 - END).contains(&now);
+                ((now - rest).abs() >= PRESSED && at_end).then_some((code, now, (now - rest).abs()))
             })
-            .max_by(|a, b| a.1.abs().total_cmp(&b.1.abs()))?;
+            .max_by(|a, b| a.2.total_cmp(&b.2))?;
         self.map.pedals.insert(
             ORDER[self.step].key().into(),
             MappedAxis {
                 code: moved.0,
-                inverted: moved.1 < 0.0,
+                inverted: moved.1 < 0.5,
             },
         );
         Some(self.next())

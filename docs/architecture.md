@@ -587,8 +587,18 @@ and their `dkms.conf` may live in a subdirectory.
 
 On the adapter side, `crates/simrig-plugin-kit` holds what plugins of kernel-driven wheels and
 pedals share: the HID device a driver is bound to and its sysfs attributes, the event node
-(axes, buttons, force feedback test), and pedal mapping (the **Map the pedals** procedure and a
-standard pedals component).
+(axes, buttons, force feedback test), and pedals: a standard pedals component over evdev axes.
+
+**Pedals are recognised, not configured.** Like Oversteer, each plugin knows where the pedals of
+its wheels are: a table of axes and directions per model (`Layout`), from Oversteer's and
+Boxflat's tables and checked on hardware where possible. Pedals with a known table show up as
+soon as the device does. Only pedals no table covers need mapping: the **Map the pedals**
+procedure is then marked as part of the device's setup (`ProcedureDescriptor::setup`), so the
+app runs it while adding the device, not afterwards. Mapping by hand stays available for pedals
+that respond wrong, and wins over the table. It takes each pedal's direction from where it is
+pressed all the way to, not from a reading at rest (a device may report an axis only once it
+moves). Pedals that are not plugged in, or not used (a separate pedal set), are excluded from
+the rig.
 
 **Third-party drivers ship with SimRig.** A plugin that builds an existing open-source driver
 bundles its sources as a git submodule pinned to an upstream commit (the Fanatec plugin bundles
@@ -807,12 +817,12 @@ uploads force feedback effects for the test. Components:
 
 | Device | Components |
 |---|---|
-| A base | wheel base (angle from the steering axis and the rotation, firmware, rotation, the tuning menu, force feedback test, reset); steering wheel when a rim is mounted (name, rim shape from `wheel_id`, buttons, display, paddle mode, vibration), swapped live; pedals plugged into the base, once mapped |
-| A USB pedal set | pedals, once mapped |
+| A base | wheel base (angle from the steering axis and the rotation, firmware, rotation, the tuning menu, force feedback test, reset); steering wheel when a rim is mounted (name, rim shape from `wheel_id`, buttons, display, paddle mode, vibration), swapped live; pedals plugged into the base, recognised (throttle ABS_Z, brake ABS_RZ, clutch ABS_Y, released at the top: checked on a CSL DD) |
+| A USB pedal set | pedals, once mapped (no known table yet: mapped while the device is added) |
 
-Which axis is which pedal is not in the driver: the plugin's **Map the pedals** procedure (on
-the base, and on unmapped pedal sets, which show up as devices to set up) detects the axis that
-moves as each pedal is pressed, and keeps it in the user's configuration (`fanatec.toml`). The
+Which axis is which pedal is not in the driver: the plugin knows it for pedals on a base, and
+USB pedal sets are mapped while they are added, by pressing each pedal; a mapping made by hand
+is kept in the user's configuration (`fanatec.toml`). The
 tuning menu lives in the base's memory; the rotation is saved as the driver's `init_range`
 option (`save-range`, a privileged operation writing `/etc/modprobe.d/simrig-fanatec.conf`).
 What the driver does not expose (a tuning entry an older driver lacks, centering, pedal dead
@@ -894,8 +904,8 @@ build it for a G923, which keeps the kernel's driver (or new-lg4ff). Settings ar
 next plug-in by the `save-setting` privileged operation, as udev rules that write the attribute
 when the driver binds to that model (`72-simrig-logitech-settings.rules`).
 
-**The adapter** gives each wheel a wheel base, its rim (buttons) and, once mapped, the pedals
-plugged into it. What a family's driver lacks stays visible with the reason (new-lg4ff's
+**The adapter** gives each wheel a wheel base, its rim (buttons) and the pedals plugged into it
+(Oversteer's tables per model; the RS50's, which no table covers, are mapped while it is added). What a family's driver lacks stays visible with the reason (new-lg4ff's
 settings on the kernel's driver say it is needed). Tested end to end on a fake G29 (with and
 without new-lg4ff) and a fake G PRO.
 
@@ -914,7 +924,7 @@ with it. Settings are saved as options of the module (`save-setting`): hid-tmff2
 to every wheel it starts.
 
 **The adapter** gives each wheel a wheel base (rotation within the wheel's limits, gain, spring,
-damper and friction levels, force feedback test), its rim (buttons) and, once mapped, the pedals
+damper and friction levels, force feedback test), its rim (buttons) and the pedals
 plugged into it. A wheel still starting up (hid-tminit's ids) is claimed without components, so
 adding it installs the driver. Tested end to end on a fake T300 RS.
 

@@ -34,17 +34,18 @@ impl HasHid for LogitechDevice {
 
 impl LogitechDevice {
     pub fn new(id: &str, model: &'static Model, usb: PathBuf, config: PathBuf) -> Self {
-        Self {
-            hid: HidDevice::new(
-                id,
-                usb,
-                BINDING,
-                config,
-                &format!("{:04x}", model.pid),
-                Some(0),
-            ),
-            model,
+        let mut hid = HidDevice::new(
+            id,
+            usb,
+            BINDING,
+            config,
+            &format!("{:04x}", model.pid),
+            Some(0),
+        );
+        if let Some(layout) = model.pedals {
+            hid = hid.with_layout(layout);
         }
+        Self { hid, model }
     }
 
     /// The rotation the driver applies.

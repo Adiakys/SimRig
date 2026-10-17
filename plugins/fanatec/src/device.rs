@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
+use simrig_plugin_kit::pedals::Layout;
 use simrig_plugin_kit::sysfs;
 use simrig_plugin_sdk::prelude::*;
 
@@ -23,6 +24,14 @@ pub const BINDING: Binding = Binding {
 /// What to do when the driver has not received the tuning menu from the base.
 pub const TUNING_UNREAD: &str = "The base has not sent its tuning menu to the driver yet: \
      unplug the base's USB cable and plug it in again.";
+
+/// The pedals plugged into a base: throttle ABS_Z, brake ABS_RZ, clutch ABS_Y, at the top of
+/// their travel when released (checked on a CSL DD; the same table as Oversteer's).
+pub const BASE_PEDALS: Layout = &[
+    (PedalRole::Throttle, 0x02, true),
+    (PedalRole::Brake, 0x05, true),
+    (PedalRole::Clutch, 0x01, true),
+];
 
 pub struct FanatecDevice {
     pub hid: HidDevice,
@@ -42,18 +51,19 @@ impl HasHid for FanatecDevice {
 
 impl FanatecDevice {
     pub fn new(id: &str, model: &'static Model, usb: PathBuf, config: PathBuf) -> Self {
-        let steering = matches!(model.kind, Kind::Base { .. }).then_some(0);
-        Self {
-            hid: HidDevice::new(
-                id,
-                usb,
-                BINDING,
-                config,
-                &format!("{:04x}", model.pid),
-                steering,
-            ),
-            model,
+        let base = matches!(model.kind, Kind::Base { .. });
+        let mut hid = HidDevice::new(
+            id,
+            usb,
+            BINDING,
+            config,
+            &format!("{:04x}", model.pid),
+            base.then_some(0),
+        );
+        if base {
+            hid = hid.with_layout(BASE_PEDALS);
         }
+        Self { hid, model }
     }
 
     /// An entry of the tuning menu (`ftec_tuning/<name>/<entry>`), when the base has it.
