@@ -10,20 +10,18 @@ if ! system_mode; then
     exit 0
 fi
 
-# The service ships with the driver, or next to the adapter in the plugin directory.
-for candidate in "$SIMRIG_DRIVER_DIR/bin/simrig-generic-usb-service" \
-                 "$SIMRIG_DRIVER_DIR/../simrig-generic-usb-service"; do
-    if [ -x "$candidate" ]; then
-        install -m 0755 "$candidate" "$SERVICE"
-        break
-    fi
-done
-if [ ! -x "$SERVICE" ]; then
-    echo "simrig-generic-usb-service not found next to the driver" >&2
+# The service ships inside the driver (bin/): hooks run from the copy of the driver SimRig keeps
+# in its state directory, not from the plugin's.
+if [ -x "$SIMRIG_DRIVER_DIR/bin/simrig-generic-usb-service" ]; then
+    mkdir -p "$(dirname "$SERVICE")"
+    install -m 0755 "$SIMRIG_DRIVER_DIR/bin/simrig-generic-usb-service" "$SERVICE"
+else
+    echo "simrig-generic-usb-service is missing from the driver ($SIMRIG_DRIVER_DIR/bin)" >&2
     exit 1
 fi
 command -v systemctl >/dev/null || { echo "systemd is required to start the service with the device" >&2; exit 1; }
 
+mkdir -p "$(dirname "$UNIT")"
 cat > "$UNIT" <<UNIT
 # Installed by the SimRig Generic USB driver. Started by udev for a set-up device.
 [Unit]

@@ -289,17 +289,8 @@ impl App {
                 "error",
             );
         }
-        let to_set_up = self.flows.devices_to_set_up(&self.snapshot);
-        if to_set_up > 0 {
-            return (
-                if to_set_up == 1 {
-                    "1 device to set up".into()
-                } else {
-                    format!("{to_set_up} devices to set up")
-                },
-                "warning",
-            );
-        }
+        // Devices whose setup was left halfway are not a problem to point at: they wait in
+        // "New device", marked to set up.
         match count {
             0 => ("No devices".into(), "neutral"),
             1 => ("1 device ready".into(), "success"),

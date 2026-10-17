@@ -34,12 +34,14 @@ install -D -m 0644 "$root/crates/simrig-gui/ui/icons/mark.svg" \
 
 plugins="$dest/usr/lib/simrig/plugins"
 
-# Generic USB: adapter, the driver's service next to it, the driver.
+# Generic USB: adapter and driver, with the driver's service.
 generic="$plugins/generic-usb"
 install -d "$generic"
 install -m 0644 "$root/plugins/generic-usb/plugin.toml" "$generic/"
-install -m 0755 "$bin/simrig-plugin-generic-usb" "$bin/simrig-generic-usb-service" "$generic/"
+install -m 0755 "$bin/simrig-plugin-generic-usb" "$generic/"
 cp -r "$root/plugins/generic-usb/driver" "$generic/driver"
+# Inside the driver: its hooks run from the copy SimRig keeps when it installs it.
+install -D -m 0755 "$bin/simrig-generic-usb-service" "$generic/driver/bin/simrig-generic-usb-service"
 
 # Brands: adapter and driver, with the bundled driver sources (no VCS files).
 for brand in $BRANDS; do

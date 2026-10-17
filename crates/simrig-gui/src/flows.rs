@@ -47,18 +47,6 @@ pub struct Flows {
     first_installing: BTreeSet<String>,
 }
 
-impl Flows {
-    /// Devices handled by a plugin but without components yet: they need a setup.
-    pub fn devices_to_set_up(&self, snapshot: &Snapshot) -> usize {
-        snapshot
-            .plugins
-            .iter()
-            .flat_map(|p| p.devices.iter().map(move |d| (p, d)))
-            .filter(|(p, d)| !has_components(snapshot, &p.id, &d.id))
-            .count()
-    }
-}
-
 fn has_components(snapshot: &Snapshot, plugin: &str, device: &str) -> bool {
     snapshot
         .components

@@ -32,8 +32,10 @@ install)
     rm -rf "$dest"
     install -d -o root -g root -m 0755 "$dest"
     install -o root -g root -m 0644 "$root/plugins/generic-usb/plugin.toml" "$dest/"
-    install -o root -g root -m 0755 "$bin/simrig-plugin-generic-usb" "$bin/simrig-generic-usb-service" "$dest/"
+    install -o root -g root -m 0755 "$bin/simrig-plugin-generic-usb" "$dest/"
     cp -r "$root/plugins/generic-usb/driver" "$dest/driver"
+    # Inside the driver: its hooks run from the copy SimRig keeps when it installs it.
+    install -D -o root -g root -m 0755 "$bin/simrig-generic-usb-service" "$dest/driver/bin/simrig-generic-usb-service"
     chown -R root:root "$dest/driver"
     chmod -R go-w "$dest"
 

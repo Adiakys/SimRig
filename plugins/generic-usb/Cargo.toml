@@ -21,6 +21,8 @@ toml.workspace = true
 evdev = "0.13"
 
 [dev-dependencies]
+serde_json.workspace = true
+simrig-driver = { workspace = true, features = ["testing"] }
 simrig-host.workspace = true
 simrig-model.workspace = true
 
