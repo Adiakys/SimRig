@@ -180,6 +180,25 @@ hid_rebind() {
     done
 }
 
+# usb_replug VENDOR [PID…]: makes USB devices of the vendor (hex) start again, as if they were
+# unplugged and plugged in: the kernel enumerates them anew and the drivers just installed take
+# them, and the devices send what they send at start-up (e.g. a Fanatec base's tuning menu).
+usb_replug() {
+    vendor=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    shift
+    pids=$(echo "$*" | tr '[:upper:]' '[:lower:]')
+    for dev in "${SIMRIG_TEST_ROOT:-}"/sys/bus/usb/devices/*; do
+        [ "$(cat "$dev/idVendor" 2>/dev/null)" = "$vendor" ] || continue
+        if [ -n "$pids" ]; then
+            case " $pids " in *" $(cat "$dev/idProduct" 2>/dev/null) "*) ;; *) continue ;; esac
+        fi
+        [ -w "$dev/authorized" ] || [ -n "${SIMRIG_TEST_ROOT:-}" ] || continue
+        echo 0 > "$dev/authorized" 2>/dev/null || continue
+        sleep 1
+        echo 1 > "$dev/authorized" 2>/dev/null || true
+    done
+}
+
 # usb_present VENDOR [PID…]: a USB device of the vendor (hex), of one of the products, is
 # plugged in.
 usb_present() {

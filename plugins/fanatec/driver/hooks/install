@@ -27,7 +27,9 @@ rc=0
 mod_build "$PACKAGE" "$VERSION" "$SOURCE" dkms.conf "$MODULE" || rc=$?
 case $rc in
 0)
-    hid_rebind 0EB7 fanatec
+    # Bases plugged in start again with the driver: they send their tuning menu at start-up,
+    # and the driver refuses to change it (the rotation included) until it has.
+    usb_replug 0eb7
     udev_apply $SUBSYSTEMS
     echo "hid-fanatec $VERSION installed"
     ;;

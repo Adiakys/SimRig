@@ -267,3 +267,45 @@ fn manifest_matches_the_driver() {
     modelled.sort();
     assert_eq!(modelled, from_driver);
 }
+
+/// Right after the driver binds to a base, before the base sends its tuning menu, the driver
+/// shows it as zeros and refuses writes, the rotation included: SimRig says to replug, and
+/// reports no invalid values.
+#[test]
+fn a_tuning_menu_not_received_yet_says_to_replug() {
+    let env = Env::new("unread");
+    env.plug(true);
+    for attr in ["SLOT", "ACP", "FF"] {
+        fs::write(
+            env.hid(&format!("ftec_tuning/0003:0EB7:0020.0001/{attr}")),
+            "0\n",
+        )
+        .unwrap();
+    }
+    let mut host = env.start();
+    until(&mut host, "components", |h| h.components().len() == 2);
+    let base = host.find("base").unwrap().address.clone();
+    let wheel = host.find("wheel").unwrap().address.clone();
+    for (address, item) in [
+        (&base, "rotation"),
+        (&base, "ffb_strength"),
+        (&wheel, "analog_paddle_mode"),
+    ] {
+        assert!(
+            reason(&mut host, address, item).contains("plug it in again"),
+            "{item}"
+        );
+    }
+    // Custom parameters too.
+    let slot = host
+        .describe(&base)
+        .unwrap()
+        .custom_param("tuning_slot")
+        .unwrap()
+        .clone();
+    match slot.availability {
+        simrig_model::Support::Unsupported(u) => assert!(u.explain().contains("plug it in again")),
+        other => panic!("{other:?}"),
+    }
+    assert!(host.problems().is_empty(), "{:?}", host.problems());
+}

@@ -294,10 +294,13 @@ fn hid_devices_are_rebound_and_usb_devices_found() {
     sb.hid_driver("logitech");
     let (ok, out, err) = sb.run(
         "hid_rebind 046d logitech c24f; usb_present 046D C24F && echo yes; \
-         usb_present 046d c999 || echo no; usb_present 046d && echo any",
+         usb_present 046d c999 || echo no; usb_present 046d && echo any; usb_replug 046d c262",
     );
     assert!(ok, "{err}");
     assert_eq!(out, "yes\nno\nany\n");
+    // Started again: authorized went 0, then 1; the other device was left alone.
+    assert_eq!(sb.read("sys/bus/usb/devices/1-c262/authorized"), "1\n");
+    assert_eq!(sb.read("sys/bus/usb/devices/1-c24f/authorized"), "");
     assert_eq!(
         sb.read("sys/bus/hid/drivers/logitech/bind"),
         format!("{generic}\n")

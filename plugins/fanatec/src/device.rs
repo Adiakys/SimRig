@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
 use simrig_plugin_kit::sysfs;
+use simrig_plugin_sdk::prelude::*;
 
 use crate::models::{Kind, Model};
 
@@ -18,6 +19,10 @@ pub const BINDING: Binding = Binding {
     rich: &["range", "input"],
     unbound: "The hid-fanatec driver is not installed, or not bound to the device.",
 };
+
+/// What to do when the driver has not received the tuning menu from the base.
+pub const TUNING_UNREAD: &str = "The base has not sent its tuning menu to the driver yet: \
+     unplug the base's USB cable and plug it in again.";
 
 pub struct FanatecDevice {
     pub hid: HidDevice,
@@ -56,6 +61,14 @@ impl FanatecDevice {
         let dir = sysfs::first_dir(&self.hid.hid.as_ref()?.join("ftec_tuning"))?;
         let path = dir.join(name);
         path.exists().then_some(path)
+    }
+
+    /// The base has a tuning menu that the driver has not received yet: the base sends it when
+    /// it starts up with the driver bound, and until then the driver refuses every write to it
+    /// (the rotation included, which goes through the menu's SEN entry).
+    pub fn tuning_unread(&self) -> Option<Unsupported> {
+        let slot = sysfs::read_int(&self.tuning("SLOT")?)?;
+        (slot == 0).then(|| Unsupported::new(Reason::Unavailable).with_detail(TUNING_UNREAD))
     }
 
     /// The mounted rim's directory (`ftec_wheel/<name>/`), when the driver knows it.

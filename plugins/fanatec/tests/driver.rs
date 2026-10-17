@@ -26,16 +26,8 @@ fn clean_install_and_uninstall() {
     let status = sb.status();
     assert!(!status.installed);
 
-    // A base plugged in before the driver, bound to hid-generic.
-    let dev = sb.file("sys/bus/hid/devices/0003:0EB7:0020.0005");
-    fs::create_dir_all(&dev).unwrap();
-    fs::create_dir_all(sb.file("sys/bus/hid/drivers/hid-generic")).unwrap();
-    fs::create_dir_all(sb.file("sys/bus/hid/drivers/fanatec")).unwrap();
-    std::os::unix::fs::symlink(
-        sb.file("sys/bus/hid/drivers/hid-generic"),
-        dev.join("driver"),
-    )
-    .unwrap();
+    // A base plugged in before the driver, on hid-generic.
+    sb.plug(0x0eb7, 0x0020, Some("hid-generic"));
 
     let (ok, out, err) = sb.hook("install");
     assert!(ok, "{out}{err}");
@@ -53,15 +45,8 @@ fn clean_install_and_uninstall() {
         sb.file("etc/udev/rules.d/71-simrig-fanatec.rules")
             .is_file()
     );
-    // The base went to the fanatec driver without replugging.
-    assert_eq!(
-        fs::read_to_string(sb.file("sys/bus/hid/drivers/hid-generic/unbind")).unwrap(),
-        "0003:0EB7:0020.0005\n"
-    );
-    assert_eq!(
-        fs::read_to_string(sb.file("sys/bus/hid/drivers/fanatec/bind")).unwrap(),
-        "0003:0EB7:0020.0005\n"
-    );
+    // The base started again with the driver, as if replugged.
+    assert_eq!(sb.read("sys/bus/usb/devices/1-0020/authorized"), "1\n");
 
     let status = sb.status();
     assert!(

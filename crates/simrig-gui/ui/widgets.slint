@@ -597,11 +597,6 @@ export component Card inherits Rectangle {
     accessible-label: label;
     accessible-action-default => { if interactive { activated(); } }
     forward-focus: fs;
-    touch := TouchArea {
-        enabled: root.interactive;
-        mouse-cursor: root.interactive ? pointer : default;
-        clicked => { root.activated(); }
-    }
     fs := FocusScope {
         enabled: root.interactive;
         key-pressed(e) => {
@@ -610,6 +605,16 @@ export component Card inherits Rectangle {
                 return accept;
             }
             reject
+        }
+    }
+    // Above the focus scope: a focus scope takes the first press to get the focus, which
+    // would make opening a card take two clicks.
+    touch := TouchArea {
+        enabled: root.interactive;
+        mouse-cursor: root.interactive ? pointer : default;
+        clicked => {
+            fs.focus();
+            root.activated();
         }
     }
     Rectangle {

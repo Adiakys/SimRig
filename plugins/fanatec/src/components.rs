@@ -7,7 +7,7 @@ use simrig_plugin_sdk::prelude::*;
 use simrig_plugin_kit::pedals::{self, PedalNotes, PedalSet};
 use simrig_plugin_kit::sysfs;
 
-use crate::device::{FanatecDevice, Shared};
+use crate::device::{FanatecDevice, Shared, TUNING_UNREAD};
 use crate::models;
 use crate::tuning::{self, Entry, Place};
 
@@ -22,6 +22,9 @@ fn tuning_spec(device: &Shared, entry: &Entry) -> Support<ParamSpec> {
     let Some(value) = d.tuning(entry.attr).and_then(|p| sysfs::read_int(&p)) else {
         return Support::not_in_driver();
     };
+    if let Some(u) = d.tuning_unread() {
+        return Support::Unsupported(u);
+    }
     let max = if entry.attr == "SEN" {
         d.max_range() as i64
     } else {
@@ -36,6 +39,9 @@ fn tuning_spec(device: &Shared, entry: &Entry) -> Support<ParamSpec> {
 }
 
 fn write_tuning(device: &Shared, entry: &Entry, value: &Value) -> Result<()> {
+    if device.borrow().tuning_unread().is_some() {
+        return Err(Error::failed(TUNING_UNREAD));
+    }
     let path = device
         .borrow()
         .tuning(entry.attr)
@@ -182,6 +188,10 @@ impl WheelBase for Base {
             let Some(range) = d.range() else {
                 return Support::not_in_driver();
             };
+            // On bases with a tuning menu the driver sets the rotation through it.
+            if let Some(u) = d.tuning_unread() {
+                return Support::Unsupported(u);
+            }
             // Saved as the driver's start-up rotation (a module option): restored at plug-in.
             return Support::Supported(
                 ParamSpec::float(range, 90.0, d.max_range(), 10.0).persistent(),
@@ -195,6 +205,9 @@ impl WheelBase for Base {
 
     fn set_param(&mut self, param: WheelBaseParam, value: &Value) -> Result<()> {
         if param == WheelBaseParam::Rotation {
+            if self.device.borrow().tuning_unread().is_some() {
+                return Err(Error::failed(TUNING_UNREAD));
+            }
             let degrees = value
                 .as_f64()
                 .ok_or_else(|| Error::InvalidValue("expected degrees".into()))?;
@@ -295,6 +308,9 @@ impl SteeringWheel for Wheel {
                 let Some(v) = d.tuning("ACP").and_then(|p| sysfs::read_int(&p)) else {
                     return Support::not_in_driver();
                 };
+                if let Some(u) = d.tuning_unread() {
+                    return Support::Unsupported(u);
+                }
                 Support::Supported(
                     ParamSpec::choice(&v.to_string(), &tuning::PADDLE_MODES).persistent(),
                 )
@@ -311,6 +327,9 @@ impl SteeringWheel for Wheel {
     fn set_param(&mut self, param: SteeringWheelParam, value: &Value) -> Result<()> {
         match (param, value) {
             (SteeringWheelParam::AnalogPaddleMode, Value::Choice(mode)) => {
+                if self.device.borrow().tuning_unread().is_some() {
+                    return Err(Error::failed(TUNING_UNREAD));
+                }
                 let path = self
                     .device
                     .borrow()
