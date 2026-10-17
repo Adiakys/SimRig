@@ -1,0 +1,8 @@
+# Installed by SimRig: Moza devices for the logged-in user, without a password.
+
+# The serial port of each device, where its settings are read and written. ModemManager must
+# not probe it.
+SUBSYSTEM=="tty", KERNEL=="ttyACM*", ATTRS{idVendor}=="346e", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Inputs and force feedback (usually given to the user already, as joysticks).
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="346e", TAG+="uaccess"

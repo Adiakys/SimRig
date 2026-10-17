@@ -8,12 +8,19 @@ each under its own license.
 | Component | Where | Authors | License | Version |
 |---|---|---|---|---|
 | [hid-fanatecff](https://github.com/gotzl/hid-fanatecff): Linux kernel driver for Fanatec devices | `plugins/fanatec/driver/hid-fanatecff` (git submodule) | Matthias Gorzellik (gotzl) and contributors | GPL-2.0 ([LICENSE](plugins/fanatec/driver/hid-fanatecff/LICENSE)) | see [`hid-fanatecff.version`](plugins/fanatec/driver/hid-fanatecff.version) |
+| [universal-pidff](https://github.com/JacKeTUs/universal-pidff): Linux kernel driver for direct drive bases (Moza and others), upstream in Linux 6.15 | `plugins/moza/driver/universal-pidff` (git submodule) | Oleg Makarenko (JacKeTUs), Tomasz Pakuła and contributors | GPL-2.0 ([LICENSE](plugins/moza/driver/universal-pidff/LICENSE)) | see [`universal-pidff.version`](plugins/moza/driver/universal-pidff.version) |
 
-`hid-fanatecff` is a separate program: it is distributed as its unmodified source code and built
-on the user's machine by DKMS when the Fanatec plugin installs its driver. SimRig talks to it
-only through the kernel's interfaces (sysfs, evdev), like a game does: the two are aggregated,
-not combined into one work. Any change SimRig makes to it is published under GPL-2.0 and offered
-upstream.
+The kernel drivers are separate programs: each is distributed as its unmodified source code and
+built on the user's machine by DKMS when its plugin installs its driver. SimRig talks to them
+only through the kernel's interfaces (sysfs, evdev), like a game does: they are aggregated with
+SimRig, not combined into one work. Any change SimRig makes to them is published under GPL-2.0
+and offered upstream.
+
+## Derived from other projects
+
+| What | Where | From | License |
+|---|---|---|---|
+| The Moza serial protocol: frame format, checksum, command table and value scales | `plugins/moza/src/protocol.rs`, `plugins/moza/src/settings.rs` | [Boxflat](https://github.com/Lawstorant/boxflat) by Tomasz Pakuła (`moza-protocol.md`, `data/serial.yml`, the base panel) | GPL-3.0, like SimRig |
 
 ## Fonts
 

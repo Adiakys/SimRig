@@ -27,7 +27,7 @@ Your devices keep working in every game with SimRig closed.
 |---|---|---|---|
 | **Fanatec** | Wheel bases: CSL DD / GT DD Pro / ClubSport DD, CSL Elite, ClubSport V2 and V2.5, Podium DD1 and DD2, CSR Elite, Porsche 911 Turbo S. Their steering wheels. Pedals on the base, CSL Elite and CSL load cell pedals, ClubSport V3 | [hid-fanatecff](https://github.com/gotzl/hid-fanatecff), installed by SimRig (or yours, if you have it) | **Partial**: tested on a CSL DD (live inputs, rotation, tuning menu); other models untested |
 | **Any USB device** | Shifters (H-pattern, sequential) and handbrakes without a brand, or whose descriptor is useless: mapped by moving them | SimRig's generic USB driver | **Untested** on real hardware (works on simulated devices) |
-| **Moza** | Wheel bases, wheels, pedals, shifters, handbrakes | in the kernel (6.15+) | Planned |
+| **Moza** | Wheel bases R3 to R21 (rotation, force feedback, base settings), pedals on the base, SR-P and CRP pedals, HBP handbrake. Shifters and wheels' own settings not yet | [hid-universal-pidff](https://github.com/JacKeTUs/universal-pidff), in the kernel from 6.15 (built by SimRig on older kernels); settings over the serial port, with the protocol worked out by [Boxflat](https://github.com/Lawstorant/boxflat) | **Untested** on real hardware (works on simulated devices) |
 | **Logitech** | G29, G920, G923, G Pro and others | in the kernel, improved drivers available | Planned |
 | **Thrustmaster** | T300RS, T248, TX, T-GT II, T818 and others | hid-tmff2 | Planned |
 
@@ -88,6 +88,7 @@ credited with their licenses in [THIRD-PARTY.md](THIRD-PARTY.md).
 | Plugin | Driver | Upstream | License |
 |---|---|---|---|
 | Fanatec | hid-fanatecff, kernel module (force feedback, tuning menu, LEDs, display), built with DKMS | [github.com/gotzl/hid-fanatecff](https://github.com/gotzl/hid-fanatecff) | GPL-2.0 |
+| Moza | hid-universal-pidff, kernel module (force feedback): the kernel's from Linux 6.15, built with DKMS on older kernels. udev rules for the devices' serial port (settings) | [github.com/JacKeTUs/universal-pidff](https://github.com/JacKeTUs/universal-pidff); serial protocol from [github.com/Lawstorant/boxflat](https://github.com/Lawstorant/boxflat) | GPL-2.0; GPL-3.0 |
 | Generic USB | SimRig's own userspace service (hidraw in, uinput out) | this repository | GPL-3.0-or-later |
 
 A driver you installed yourself (a distribution package, a newer version built by hand) is

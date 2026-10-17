@@ -17,7 +17,7 @@ simrig-plugin-sdk.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 simrig-driver = { workspace = true, features = ["testing"] }
-simrig-host.workspace = true
+simrig-host = { workspace = true, features = ["testing"] }
 simrig-model.workspace = true
 
 [lints]

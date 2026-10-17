@@ -1,0 +1,11 @@
+id = "moza"
+name = "Moza"
+version = "0.1.0"
+api = 1
+exec = "simrig-plugin-moza"
+driver = "driver/driver.toml"
+description = "Moza wheel bases, pedals and handbrakes: force feedback through the kernel, settings over their serial port."
+
+# Moza does not publish its product ids: every device of the vendor, told apart by its name.
+[match]
+usb = [{ vid = 0x346e }]

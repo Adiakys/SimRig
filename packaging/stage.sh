@@ -12,13 +12,15 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 bin="$root/target/release"
 dest="${1:-$root/dist/root}"
 
-for b in simrig simrig-cli simrig-helper simrig-plugin-generic-usb simrig-generic-usb-service simrig-plugin-fanatec; do
+. "$root/packaging/brands.sh"
+
+for b in simrig simrig-cli simrig-helper simrig-plugin-generic-usb simrig-generic-usb-service; do
     [ -x "$bin/$b" ] || { echo "$bin/$b missing: run cargo build --release" >&2; exit 1; }
 done
-[ -f "$root/plugins/fanatec/driver/hid-fanatecff/Kbuild" ] || {
-    echo "plugins/fanatec/driver/hid-fanatecff is empty: git submodule update --init" >&2
-    exit 1
-}
+for brand in $BRANDS; do
+    [ -x "$bin/simrig-plugin-$brand" ] || { echo "$bin/simrig-plugin-$brand missing: run cargo build --release" >&2; exit 1; }
+done
+brand_check "$root"
 
 rm -rf "$dest"
 install -D -m 0755 "$bin/simrig" "$dest/usr/bin/simrig"
@@ -39,17 +41,15 @@ install -m 0644 "$root/plugins/generic-usb/plugin.toml" "$generic/"
 install -m 0755 "$bin/simrig-plugin-generic-usb" "$bin/simrig-generic-usb-service" "$generic/"
 cp -r "$root/plugins/generic-usb/driver" "$generic/driver"
 
-# Fanatec: adapter and driver, with the bundled hid-fanatecff sources (no VCS files).
-fanatec="$plugins/fanatec"
-install -d "$fanatec"
-install -m 0644 "$root/plugins/fanatec/plugin.toml" "$fanatec/"
-install -m 0755 "$bin/simrig-plugin-fanatec" "$fanatec/"
-(cd "$root/plugins/fanatec" && tar cf - --exclude=.git --exclude=.github driver) | (cd "$fanatec" && tar xf -)
+# Brands: adapter and driver, with the bundled driver sources (no VCS files).
+for brand in $BRANDS; do
+    brand_install "$root" "$bin" "$plugins" "$brand"
+done
 
 doc="$dest/usr/share/doc/simrig"
 install -d "$doc"
 install -m 0644 "$root/README.md" "$root/THIRD-PARTY.md" "$root/LICENSE" "$doc/"
-install -m 0644 "$root/plugins/fanatec/driver/hid-fanatecff/LICENSE" "$doc/LICENSE.hid-fanatecff"
+brand_licenses "$root" "$doc"
 install -m 0644 "$root/assets/fonts/OFL-Barlow.txt" "$root/assets/fonts/OFL-MartianMono.txt" "$doc/"
 
 # Nothing writable by others, whatever the build machine's umask.

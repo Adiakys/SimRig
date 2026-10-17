@@ -1,0 +1,13 @@
+#!/bin/sh
+# Removes what SimRig installed: its DKMS version of hid-universal-pidff and its udev rules.
+# Never the kernel's module or one installed by other means. Works on partial installs.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+
+if [ "$(id -u)" = 0 ]; then
+    mod_remove "$PACKAGE" "$MODULE"
+    udev_remove "$RULES"
+    udev_apply tty input
+fi
+rm -f "$DATA/$PACKAGE.installed" "$DATA/integration" "$DATA/mok-pending" "$DATA/dev-installed" "$DATA/rules"
+echo "SimRig's Moza driver removed"

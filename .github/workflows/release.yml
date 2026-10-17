@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ steps.ref.outputs.tag }}
-          # The Fanatec plugin bundles hid-fanatecff as a submodule.
+          # Brand plugins bundle their drivers' sources as submodules.
           submodules: recursive
 
       - name: System libraries for the GUI (Slint)

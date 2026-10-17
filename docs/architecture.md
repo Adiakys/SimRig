@@ -569,11 +569,24 @@ So that drivers do not reinvent the same things, the SDK offers ready-made hooks
 | `systemd-device-unit` | installs a service started when the device is plugged in and stopped when unplugged |
 | `udev-attr-settings` | persists sysfs attributes via a generated udev rule (`ATTR{range}="900"`) |
 
-Recipes are POSIX shell libraries in `crates/simrig-driver/recipes` (`dkms.sh`, `secureboot.sh`,
-`udev.sh`, `prereq.sh`, `status.sh`). A driver keeps copies of the ones it uses in its own
-`recipes/` directory and sources them from its hooks, so it keeps working, and can be removed,
-after the app is gone; a test checks that the copies match the originals. The recipes run for
-real in tests against stub system commands.
+Recipes are POSIX shell libraries in `crates/simrig-driver/recipes` (`dkms.sh`, `module.sh`,
+`secureboot.sh`, `udev.sh`, `prereq.sh`, `status.sh`). A driver keeps copies of the ones it uses
+in its own `recipes/` directory and sources them from its hooks, so it keeps working, and can be
+removed, after the app is gone; a test checks that the copies match the originals. The recipes
+run for real in tests against stub system commands (`simrig_driver::testing`, which drivers'
+own tests use too).
+
+`module.sh` is what every kernel-module driver shares: where a module comes from (SimRig's
+version, an older one of SimRig's, one installed by other means, the kernel's, none), SimRig's
+DKMS build of the bundled sources with upgrade, reload and Secure Boot key enrollment, removal,
+rebinding devices already plugged in, and checking which USB devices are present. `dkms.sh`
+takes upstream packages as they are: their fixed name and version are rewritten to SimRig's,
+and their `dkms.conf` may live in a subdirectory.
+
+On the adapter side, `crates/simrig-plugin-kit` holds what plugins of kernel-driven wheels and
+pedals share: the HID device a driver is bound to and its sysfs attributes, the event node
+(axes, buttons, force feedback test), and pedal mapping (the **Map the pedals** procedure and a
+standard pedals component).
 
 **Third-party drivers ship with SimRig.** A plugin that builds an existing open-source driver
 bundles its sources as a git submodule pinned to an upstream commit (the Fanatec plugin bundles
@@ -832,6 +845,33 @@ Unsupported with this driver, shown disabled with their reason: e.g. `pedals.for
 Load Cell Kit"), `steering_wheel.display` on rims without a display (`NotInHardware`).
 
 Whether the tuning menu really persists in the base's memory must be **verified on hardware**.
+
+### 11.1 Moza
+
+Moza bases need no driver of their own on recent kernels: force feedback goes through
+`hid-universal-pidff`, in Linux from 6.15 (backported to 6.12.24, 6.13.12, 6.14.3). Their
+settings do not go through the kernel at all: every Moza device has a serial port (`ttyACM`)
+speaking a protocol worked out by [Boxflat](https://github.com/Lawstorant/boxflat).
+
+**The driver** installs SimRig's udev rules (the serial port and event nodes for the logged-in
+user, the port hidden from ModemManager) and, only when the kernel has no
+`hid-universal-pidff`, builds the bundled [universal-pidff](https://github.com/JacKeTUs/universal-pidff)
+with DKMS (the `module.sh` recipe), rebinding the bases already plugged in. The kernel's module,
+or one installed by other means, is used as it is.
+
+**The adapter** claims every device of the vendor (Moza does not publish its product ids) and
+tells them apart by USB product name, like Boxflat: bases, SR-P/CRP pedal sets, the HBP
+handbrake. Shifters, hubs and the like are attached without components for now (they can be
+given to the generic USB plugin). Settings are read and written over the serial port: rotation
+(stored as half the angle, with the games' maximum kept equal), force feedback strength, natural
+damper and friction, the games' spring and damper gains as standard parameters; torque, maximum
+speed, natural inertia, centering spring, road sensitivity, the games' friction and inertia
+gains and the protection settings as custom ones. The base keeps them in its memory. Values are
+cached (the base answers in milliseconds, not microseconds); a port that fails is reopened.
+Force feedback (test, stop) needs `hid-universal-pidff` bound to the base; without it the base
+still has inputs and settings, and says why forces are missing. The SR-P's axes are known (no
+mapping); pedals plugged into a base are mapped by pressing them. Tested end to end on a fake R9
+whose fake serial port decodes requests and answers like the real one.
 
 ## 12. Decisions
 

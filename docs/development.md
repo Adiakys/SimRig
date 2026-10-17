@@ -91,14 +91,16 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `crates/simrig-model` | Domain model: component interfaces, parameters, unsupported reasons, custom parameters |
 | `crates/simrig-protocol` | App ↔ plugin protocol (JSON-RPC 2.0 over stdio) |
 | `crates/simrig-plugin-sdk` | SDK to write plugin adapters in Rust |
-| `crates/simrig-driver` | Driver contract (`driver.toml`), hooks, installation registry, recipes for drivers (`recipes/`: DKMS, Secure Boot, udev) |
+| `crates/simrig-driver` | Driver contract (`driver.toml`), hooks, installation registry, recipes for drivers (`recipes/`: DKMS, kernel modules, Secure Boot, udev); `testing`: a sandbox for driver hooks |
 | `crates/simrig-helper` | Privileged helper, run through `pkexec` only for driver operations |
 | `crates/simrig-host` | The app core: plugins, rig, events, drivers, presets, catalog, system check |
 | `crates/simrig-cli` | Command-line interface |
 | `crates/simrig-gui` | The desktop app (`simrig`, Slint) |
 | `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
 | `plugins/generic-usb` | Generic USB plugin: any USB device as a shifter or a handbrake, with its driver service |
+| `crates/simrig-plugin-kit` | Shared by brand plugins: the HID device a kernel driver is bound to, sysfs, evdev inputs and force feedback, pedal mapping |
 | `plugins/fanatec` | Fanatec plugin: bases, rims and pedals; bundles [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) as a submodule, built with DKMS |
+| `plugins/moza` | Moza plugin: bases, pedals, handbrake; settings over the serial port ([Boxflat](https://github.com/Lawstorant/boxflat)'s protocol); bundles [universal-pidff](https://github.com/JacKeTUs/universal-pidff) for kernels older than 6.15 |
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
 | `design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
 | `scripts` | Development helpers |

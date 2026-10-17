@@ -13,6 +13,8 @@ pub mod presets;
 mod process;
 pub mod rig;
 pub mod system;
+#[cfg(feature = "testing")]
+pub mod testing;
 pub mod usb;
 
 pub use catalog::{Catalog, CatalogEntry, Image, Model};

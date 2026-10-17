@@ -44,6 +44,7 @@ run)
         --plugin-dir "$root/plugins/sim" \
         --plugin-dir "$root/plugins/generic-usb" \
         --plugin-dir "$root/plugins/fanatec" \
+        --plugin-dir "$root/plugins/moza" \
         --no-default-dirs \
         --config-dir "$dev/config" \
         --state-dir "$dev/state" \

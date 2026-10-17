@@ -15,5 +15,9 @@ simrig-driver.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 
+[features]
+# A sandbox to run a plugin through the host in tests, against a fake USB tree.
+testing = []
+
 [lints]
 workspace = true

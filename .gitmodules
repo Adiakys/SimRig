@@ -1,3 +1,6 @@
 [submodule "plugins/fanatec/driver/hid-fanatecff"]
 	path = plugins/fanatec/driver/hid-fanatecff
 	url = https://github.com/gotzl/hid-fanatecff
+[submodule "plugins/moza/driver/universal-pidff"]
+	path = plugins/moza/driver/universal-pidff
+	url = https://github.com/JacKeTUs/universal-pidff

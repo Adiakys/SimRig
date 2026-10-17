@@ -81,6 +81,12 @@ impl HidDevice {
             .then(|| Unsupported::new(Reason::NeedsDriver).with_detail(self.binding.unbound))
     }
 
+    /// The kernel driver bound to the HID device.
+    pub fn driver(&self) -> Option<String> {
+        let link = std::fs::read_link(self.hid.as_ref()?.join("driver")).ok()?;
+        Some(link.file_name()?.to_string_lossy().into_owned())
+    }
+
     /// A sysfs attribute of the HID device, when it exists.
     pub fn attr(&self, name: &str) -> Option<PathBuf> {
         let path = self.hid.as_ref()?.join(name);
