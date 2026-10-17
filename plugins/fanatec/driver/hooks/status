@@ -3,31 +3,33 @@
 set -eu
 . "$SIMRIG_DRIVER_DIR/hooks/common.sh"
 
-mine=$(ours)
-if [ -n "$mine" ]; then
-    active=false
-    loaded && active=true
-    if [ -f "$DATA/mok-pending" ] && ! loaded; then
-        status_json true false "$mine" true false true \
-            "Restart, choose \"Enroll MOK\" and type $(cat "$DATA/mok-pending") to trust the key that signs the driver."
-    elif [ "$mine" != "$VERSION" ]; then
-        status_json true "$active" "$mine" false false true "Version $VERSION of the driver is available."
+active=false
+mod_loaded "$MODULE" && active=true
+set -- $(mod_state "$PACKAGE" "$MODULE" "$VERSION")
+case $1 in
+pending)
+    status_json true false "$2" true false true "To trust the key that signs the driver: $(mod_key_message)."
+    ;;
+outdated)
+    status_json true "$active" "$2" false false true "Version $VERSION of the driver is available."
+    ;;
+ours)
+    status_json true "$active" "$2" false false true ""
+    ;;
+*)
+    if [ -f "$DATA/dev-installed" ]; then
+        status_json true false "$VERSION" false false true "Development install: hid-fanatecff is not built."
+    elif [ -f "$DATA/integration" ]; then
+        other=${2:-$(cat "$DATA/integration")}
+        status_json true "$active" "$other" false false true \
+            "Uses hid-fanatec $other installed by you or your distribution (SimRig is tested with $VERSION)."
+    elif [ "$1" = foreign ]; then
+        # Someone else's module: SimRig still offers its access rules and saved settings.
+        status_json false false "$2" false false true \
+            "hid-fanatec $2 is installed (by you or your distribution): SimRig keeps it and adds its access rules. Asks for the password once."
     else
-        status_json true "$active" "$mine" false false true ""
+        status_json false false "" false false true \
+            "Builds the open source hid-fanatecff driver for your kernel. Asks for the password once."
     fi
-elif [ -f "$DATA/dev-installed" ]; then
-    status_json true false "$VERSION" false false true "Development install: hid-fanatecff is not built."
-elif [ -f "$DATA/integration" ]; then
-    other=$(foreign || cat "$DATA/integration")
-    active=false
-    loaded && active=true
-    status_json true "$active" "$other" false false true \
-        "Uses hid-fanatec $other installed by you or your distribution (SimRig is tested with $VERSION)."
-elif other=$(foreign); then
-    # Someone else's module: SimRig still offers its access rules and saved settings.
-    status_json false false "$other" false false true \
-        "hid-fanatec $other is installed (by you or your distribution): SimRig keeps it and adds its access rules. Asks for the password once."
-else
-    status_json false false "" false false true \
-        "Builds the open source hid-fanatecff driver for your kernel. Asks for the password once."
-fi
+    ;;
+esac

@@ -5,17 +5,5 @@
 pub mod adapter;
 pub mod components;
 pub mod device;
-pub mod input;
 pub mod models;
-pub mod sysfs;
 pub mod tuning;
-
-use simrig_plugin_sdk::prelude::PedalRole;
-
-pub fn role_label(role: PedalRole) -> &'static str {
-    match role {
-        PedalRole::Throttle => "Throttle",
-        PedalRole::Brake => "Brake",
-        PedalRole::Clutch => "Clutch",
-    }
-}

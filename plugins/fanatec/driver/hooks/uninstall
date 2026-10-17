@@ -5,14 +5,10 @@ set -eu
 . "$SIMRIG_DRIVER_DIR/hooks/common.sh"
 
 if [ "$(id -u)" = 0 ]; then
-    mine=$(ours)
-    if [ -n "$mine" ]; then
-        modprobe -r "$MODULE" 2>/dev/null || true
-        dkms_remove "$NAME" "$mine"
-    fi
+    mod_remove "$PACKAGE" "$MODULE"
     udev_remove "$RULES"
     udev_apply hid hidraw
     rm -f "$ROOT/etc/modprobe.d/simrig-fanatec.conf"
 fi
-rm -f "$DATA/installed" "$DATA/integration" "$DATA/mok-pending" "$DATA/dev-installed" "$DATA/init_range"
+rm -f "$DATA/$PACKAGE.installed" "$DATA/integration" "$DATA/mok-pending" "$DATA/dev-installed" "$DATA/init_range"
 echo "SimRig's Fanatec driver removed"

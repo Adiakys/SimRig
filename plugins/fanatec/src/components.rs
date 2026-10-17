@@ -4,9 +4,11 @@
 use simrig_plugin_sdk::model::StdItem;
 use simrig_plugin_sdk::prelude::*;
 
-use crate::device::{Shared, save_map};
+use simrig_plugin_kit::pedals::{self, PedalNotes, PedalSet};
+use simrig_plugin_kit::sysfs;
+
+use crate::device::{FanatecDevice, Shared};
 use crate::models;
-use crate::sysfs;
 use crate::tuning::{self, Entry, Place};
 
 const NO_ATTR: &str = "Not exposed by the installed hid-fanatec for this device.";
@@ -14,7 +16,7 @@ const NO_ATTR: &str = "Not exposed by the installed hid-fanatec for this device.
 /// A tuning entry as a parameter (percent-like entries are floats, the rest whole numbers).
 fn tuning_spec(device: &Shared, entry: &Entry) -> Support<ParamSpec> {
     let d = device.borrow();
-    if let Some(u) = d.unbound() {
+    if let Some(u) = d.hid.unbound() {
         return Support::Unsupported(u);
     }
     let Some(value) = d.tuning(entry.attr).and_then(|p| sysfs::read_int(&p)) else {
@@ -54,7 +56,7 @@ pub struct Base {
 
 impl Component for Base {
     fn id(&self) -> String {
-        format!("{}/base", self.device.borrow().id)
+        format!("{}/base", self.device.borrow().hid.id)
     }
 
     fn name(&self) -> String {
@@ -105,14 +107,11 @@ impl Component for Base {
     }
 
     fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
-        vec![map_pedals_descriptor(&self.device)]
+        vec![pedals::descriptor(&self.device)]
     }
 
     fn start_procedure(&mut self, id: &str) -> Result<Box<dyn Procedure>> {
-        if id != "map-pedals" {
-            return Err(Error::NotFound(format!("unknown procedure '{id}'")));
-        }
-        Ok(Box::new(MapPedals::new(self.device.clone(), true)))
+        pedals::start(&self.device, id)
     }
 
     fn set_custom(&mut self, id: &str, value: &Value) -> Result<()> {
@@ -142,17 +141,7 @@ impl Component for Base {
 impl WheelBase for Base {
     fn angle(&mut self) -> Support<Degrees> {
         let d = self.device.borrow();
-        if let Some(u) = d.unbound() {
-            return Support::Unsupported(u);
-        }
-        let Some(axis) = d.inputs.axes().get(&0).copied() else {
-            return Support::Unsupported(
-                Unsupported::new(Reason::Unavailable)
-                    .with_detail(d.inputs.error().unwrap_or("No steering axis.")),
-            );
-        };
-        let range = d.range().unwrap_or(d.max_range());
-        Support::Supported((axis.unit() - 0.5) * range)
+        d.hid.angle(d.range().unwrap_or(d.max_range()))
     }
 
     fn angular_velocity(&mut self) -> Support<f64> {
@@ -161,7 +150,7 @@ impl WheelBase for Base {
 
     fn status(&mut self) -> Support<String> {
         let d = self.device.borrow();
-        Support::Supported(if d.paths.is_some() {
+        Support::Supported(if d.hid.hid.is_some() {
             "ok".into()
         } else {
             "the driver is not bound".into()
@@ -170,12 +159,13 @@ impl WheelBase for Base {
 
     fn firmware(&mut self) -> Support<String> {
         let d = self.device.borrow();
-        match d.attr("fw_version").and_then(|p| sysfs::read(&p)) {
+        match d.hid.attr("fw_version").and_then(|p| sysfs::read(&p)) {
             Some(v) if v == "0" => Support::Unsupported(
                 Unsupported::new(Reason::Unavailable).with_detail("The base does not report it."),
             ),
             Some(v) => Support::Supported(v),
             None => d
+                .hid
                 .unbound()
                 .map(Support::Unsupported)
                 .unwrap_or_else(Support::not_in_driver),
@@ -186,7 +176,7 @@ impl WheelBase for Base {
         let item = param.key();
         if param == WheelBaseParam::Rotation {
             let d = self.device.borrow();
-            if let Some(u) = d.unbound() {
+            if let Some(u) = d.hid.unbound() {
                 return Support::Unsupported(u);
             }
             let Some(range) = d.range() else {
@@ -205,16 +195,14 @@ impl WheelBase for Base {
 
     fn set_param(&mut self, param: WheelBaseParam, value: &Value) -> Result<()> {
         if param == WheelBaseParam::Rotation {
-            let path = self
-                .device
-                .borrow()
-                .attr("range")
-                .ok_or_else(|| Error::failed(NO_ATTR))?;
             let degrees = value
                 .as_f64()
                 .ok_or_else(|| Error::InvalidValue("expected degrees".into()))?;
-            return sysfs::write(&path, &format!("{}", degrees.round() as i64))
-                .map_err(|e| Error::failed(e.to_string()));
+            return self
+                .device
+                .borrow()
+                .hid
+                .write("range", &format!("{}", degrees.round() as i64));
         }
         write_tuning(
             &self.device,
@@ -224,19 +212,19 @@ impl WheelBase for Base {
     }
 
     fn action(&mut self, action: WheelBaseAction) -> Support<ActionSpec> {
-        if let Some(u) = self.device.borrow().unbound() {
+        let d = self.device.borrow();
+        if let Some(u) = d.hid.unbound() {
             return Support::Unsupported(u);
+        }
+        if let Some(spec) = d.hid.force_action(action) {
+            return spec;
         }
         match action {
             WheelBaseAction::SetCenter => Support::Unsupported(Unsupported::not_in_driver().with_detail(
                 "hid-fanatecff has no centering command: hold the wheel straight and use the base's own menu.",
             )),
-            WheelBaseAction::TestEffect => Support::Supported(ActionSpec::confirm(
-                "The wheel turns left and right by itself for two seconds. Hold it firmly.",
-            )),
-            WheelBaseAction::StopForce => Support::Supported(ActionSpec::default()),
             WheelBaseAction::Reset => {
-                if self.device.borrow().tuning("RESET").is_some() {
+                if d.tuning("RESET").is_some() {
                     Support::Supported(ActionSpec::confirm(
                         "The tuning menu of the current slot goes back to the base's defaults.",
                     ))
@@ -244,30 +232,22 @@ impl WheelBase for Base {
                     Support::not_in_driver()
                 }
             }
+            WheelBaseAction::TestEffect | WheelBaseAction::StopForce => Support::not_in_driver(),
         }
     }
 
     fn run_action(&mut self, action: WheelBaseAction, _args: &Value) -> Result<ActionOutcome> {
         let mut d = self.device.borrow_mut();
+        if let Some(outcome) = d.hid.run_force_action(action) {
+            return outcome;
+        }
         match action {
-            WheelBaseAction::TestEffect => {
-                d.inputs
-                    .test_effect()
-                    .map_err(|e| Error::failed(e.to_string()))?;
-                Ok(ActionOutcome::message("Force feedback test running."))
-            }
-            WheelBaseAction::StopForce => {
-                d.inputs
-                    .stop_force()
-                    .map_err(|e| Error::failed(e.to_string()))?;
-                Ok(ActionOutcome::message("Forces stopped."))
-            }
             WheelBaseAction::Reset => {
                 let path = d.tuning("RESET").ok_or_else(|| Error::failed(NO_ATTR))?;
                 sysfs::write(&path, "1").map_err(|e| Error::failed(e.to_string()))?;
                 Ok(ActionOutcome::message("Tuning menu reset."))
             }
-            WheelBaseAction::SetCenter => Err(Error::unsupported()),
+            _ => Err(Error::unsupported()),
         }
     }
 }
@@ -279,16 +259,12 @@ pub struct Wheel {
 
 impl Component for Wheel {
     fn id(&self) -> String {
-        format!("{}/wheel", self.device.borrow().id)
+        format!("{}/wheel", self.device.borrow().hid.id)
     }
 
     fn name(&self) -> String {
         let d = self.device.borrow();
-        let from_driver = d
-            .paths
-            .as_ref()
-            .and_then(|p| p.wheel())
-            .and_then(|w| sysfs::read(&w.join("name")));
+        let from_driver = d.wheel_dir().and_then(|w| sysfs::read(&w.join("name")));
         from_driver
             .or_else(|| models::rim(self.rim).map(|(n, _)| n.to_string()))
             .unwrap_or_else(|| format!("Fanatec steering wheel {:04x}", self.rim))
@@ -305,12 +281,7 @@ impl Component for Wheel {
 
 impl SteeringWheel for Wheel {
     fn buttons(&mut self) -> Support<Vec<bool>> {
-        let d = self.device.borrow();
-        let buttons = d.inputs.buttons();
-        if buttons.is_empty() {
-            return Support::not_in_driver();
-        }
-        Support::Supported(buttons.into_iter().map(|(_, pressed)| pressed).collect())
+        self.device.borrow().hid.buttons()
     }
 
     fn rim_id(&mut self) -> Support<String> {
@@ -356,7 +327,7 @@ impl SteeringWheel for Wheel {
 
     fn output(&mut self, output: SteeringWheelOutput) -> Support<ParamType> {
         match output {
-            SteeringWheelOutput::Display if self.device.borrow().attr("display").is_some() => {
+            SteeringWheelOutput::Display if self.device.borrow().hid.attr("display").is_some() => {
                 Support::Supported(ParamType::Text { max_len: 3 })
             }
             SteeringWheelOutput::RpmLeds | SteeringWheelOutput::FlagLeds => Support::Unsupported(
@@ -369,287 +340,29 @@ impl SteeringWheel for Wheel {
     fn write_output(&mut self, output: SteeringWheelOutput, value: &Value) -> Result<()> {
         match (output, value) {
             (SteeringWheelOutput::Display, Value::Text(text)) => {
-                let path = self
-                    .device
-                    .borrow()
-                    .attr("display")
-                    .ok_or_else(|| Error::failed(NO_ATTR))?;
-                sysfs::write(&path, text).map_err(|e| Error::failed(e.to_string()))
+                self.device.borrow().hid.write("display", text)
             }
             _ => Err(Error::unsupported()),
         }
     }
 }
 
-pub struct Pedals {
-    pub device: Shared,
-    /// The base's pedal inputs, or a pedal set of its own.
-    pub on_base: bool,
-}
-
-impl Component for Pedals {
-    fn id(&self) -> String {
-        format!("{}/pedals", self.device.borrow().id)
-    }
-
-    fn name(&self) -> String {
-        let d = self.device.borrow();
-        if self.on_base {
+/// Fanatec pedals: plugged into a base, or a USB pedal set of their own.
+pub fn pedals(device: &Shared) -> PedalSet<FanatecDevice> {
+    let d = device.borrow();
+    let on_base = matches!(d.model.kind, models::Kind::Base { .. });
+    PedalSet {
+        device: device.clone(),
+        name: if on_base {
             format!("Pedals on the {}", d.model.name)
         } else {
             d.model.name.into()
-        }
-    }
-
-    fn model(&self) -> Option<String> {
-        (!self.on_base).then(|| self.device.borrow().model.model.into())
-    }
-
-    fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
-        vec![map_pedals_descriptor(&self.device)]
-    }
-
-    fn start_procedure(&mut self, id: &str) -> Result<Box<dyn Procedure>> {
-        if id != "map-pedals" {
-            return Err(Error::NotFound(format!("unknown procedure '{id}'")));
-        }
-        Ok(Box::new(MapPedals::new(self.device.clone(), self.on_base)))
-    }
-}
-
-impl simrig_plugin_sdk::Pedals for Pedals {
-    fn pedals(&self) -> Vec<PedalRole> {
-        self.device.borrow().pedal_map.roles()
-    }
-
-    fn position(&mut self, pedal: PedalRole) -> Support<Axis> {
-        let d = self.device.borrow();
-        if let Some(u) = d.unbound() {
-            return Support::Unsupported(u);
-        }
-        let Some(mapped) = d.pedal_map.pedals.get(pedal.key()).copied() else {
-            return Support::Unsupported(
-                Unsupported::not_in_driver().with_detail("Map the pedals first."),
-            );
-        };
-        let Some(axis) = d.inputs.axes().get(&mapped.code).copied() else {
-            return Support::Unsupported(Unsupported::new(Reason::Unavailable));
-        };
-        let unit = axis.unit();
-        Support::Supported(Axis {
-            raw: i64::from(axis.value),
-            value: if mapped.inverted { 1.0 - unit } else { unit },
-        })
-    }
-
-    fn force(&mut self, _pedal: PedalRole) -> Support<Kilograms> {
-        Support::not_in_driver()
-    }
-
-    fn param(&mut self, _pedal: PedalRole, param: PedalParam) -> Support<ParamSpec> {
-        let detail = match param {
-            PedalParam::CalibrationMin | PedalParam::CalibrationMax => {
-                "Fanatec pedals calibrate themselves (see the base's menu)."
-            }
-            PedalParam::DeadzoneLow | PedalParam::DeadzoneHigh | PedalParam::Curve => {
-                "hid-fanatecff has no dead zones or curves: set them in the game."
-            }
-            PedalParam::MaxForce => "Set as \"Brake force (load cell)\" in the base's settings.",
-            PedalParam::Inverted | PedalParam::Vibration => return Support::not_in_driver(),
-        };
-        Support::Unsupported(Unsupported::not_in_driver().with_detail(detail))
-    }
-
-    fn action(&mut self, _pedal: PedalRole, action: PedalAction) -> Support<ActionSpec> {
-        match action {
-            PedalAction::Calibrate => Support::Unsupported(
-                Unsupported::not_in_driver()
-                    .with_detail("Fanatec pedals calibrate themselves (see the base's menu)."),
-            ),
-            PedalAction::VibrationTest => Support::not_in_driver(),
-        }
-    }
-}
-
-pub fn map_pedals_descriptor(device: &Shared) -> ProcedureDescriptor {
-    let d = device.borrow();
-    let mapped = !d.pedal_map.pedals.is_empty();
-    let label = match (mapped, d.model.kind) {
-        (true, _) => "Map the pedals again",
-        (false, models::Kind::Base { .. }) => "Map the pedals connected to the base",
-        (false, models::Kind::Pedals) => "Map the pedals",
-    };
-    let mut descriptor = ProcedureDescriptor::new("map-pedals", label)
-        .help("Press each pedal when asked, so SimRig knows which input is which.");
-    if let Some(u) = d.unbound() {
-        descriptor = descriptor.availability(Support::Unsupported(u));
-    }
-    descriptor
-}
-
-/// The guided mapping: at rest, then each pedal pressed in turn; the axis that moves most is
-/// that pedal. Saved in the user's configuration (it only tells SimRig how to read them).
-pub struct MapPedals {
-    device: Shared,
-    on_base: bool,
-    rest: std::collections::BTreeMap<u16, f64>,
-    /// The pedal being pressed, by index in `ORDER`.
-    step: usize,
-    map: crate::device::PedalMap,
-}
-
-const ORDER: [PedalRole; 3] = [PedalRole::Throttle, PedalRole::Brake, PedalRole::Clutch];
-/// How far an axis must move to count as the pedal pressed.
-const PRESSED: f64 = 0.5;
-
-impl MapPedals {
-    pub fn new(device: Shared, on_base: bool) -> Self {
-        Self {
-            device,
-            on_base,
-            rest: Default::default(),
-            step: 0,
-            map: Default::default(),
-        }
-    }
-
-    fn axes(&self) -> std::collections::BTreeMap<u16, f64> {
-        self.device
-            .borrow()
-            .inputs
-            .axes()
-            .into_iter()
-            // A base's first axis is the steering.
-            .filter(|(code, _)| !(self.on_base && *code == 0))
-            .map(|(code, a)| (code, a.unit()))
-            .collect()
-    }
-
-    fn table(&self) -> Element {
-        Element::Table {
-            columns: vec!["Pedal".into(), "Input".into()],
-            rows: ORDER
-                .iter()
-                .map(|role| {
-                    let input = match self.map.pedals.get(role.key()) {
-                        Some(m) => format!(
-                            "axis {}{}",
-                            m.code,
-                            if m.inverted { ", inverted" } else { "" }
-                        ),
-                        None => "not mapped".into(),
-                    };
-                    vec![crate::role_label(*role).into(), input]
-                })
-                .collect(),
-        }
-    }
-
-    fn press_step(&self) -> Step {
-        let role = ORDER[self.step];
-        let name = crate::role_label(role).to_lowercase();
-        Step::new(&format!("Press the {name} all the way"))
-            .text("Hold it until it is detected, then release it.")
-            .element(self.table())
-            .preview(Preview::new(ComponentKind::Pedals).target(role.key()))
-            .waiting()
-            .progress(self.step as u32 + 1, ORDER.len() as u32)
-            .action(StepAction::new(
-                "skip",
-                &format!("No {name}"),
-                ActionRole::Secondary,
-            ))
-            .action(StepAction::cancel())
-    }
-
-    fn summary(&self) -> Step {
-        Step::new("Check the pedals")
-            .element(self.table())
-            .action(StepAction::new("save", "Save", ActionRole::Primary))
-            .action(StepAction::new(
-                "restart",
-                "Start again",
-                ActionRole::Secondary,
-            ))
-            .action(StepAction::cancel())
-    }
-
-    fn next(&mut self) -> Outcome {
-        self.step += 1;
-        if self.step < ORDER.len() {
-            Outcome::Step(self.press_step())
-        } else {
-            Outcome::Step(self.summary())
-        }
-    }
-}
-
-impl Procedure for MapPedals {
-    fn start(&mut self, _host: &mut HostLink<'_>) -> Result<Outcome> {
-        if let Some(u) = self.device.borrow().unbound() {
-            return Err(Error::failed(u.explain()));
-        }
-        Ok(Outcome::Step(
-            Step::new("Release every pedal")
-                .text("Feet off the pedals, then continue.")
-                .action(StepAction::next())
-                .action(StepAction::cancel()),
-        ))
-    }
-
-    fn submit(
-        &mut self,
-        action: &str,
-        _values: &std::collections::BTreeMap<String, Value>,
-        host: &mut HostLink<'_>,
-    ) -> Result<Outcome> {
-        match action {
-            "cancel" => Ok(Outcome::Cancelled),
-            "next" => {
-                self.rest = self.axes();
-                self.step = 0;
-                self.map = Default::default();
-                Ok(Outcome::Step(self.press_step()))
-            }
-            "skip" => Ok(self.next()),
-            "restart" => self.start(host),
-            "save" => {
-                let mut d = self.device.borrow_mut();
-                save_map(&d.config, d.model.pid, &self.map)
-                    .map_err(|e| Error::failed(e.to_string()))?;
-                d.pedal_map = self.map.clone();
-                let n = self.map.pedals.len();
-                Ok(Outcome::finished(format!(
-                    "{n} pedal{} mapped.",
-                    if n == 1 { "" } else { "s" }
-                )))
-            }
-            other => Err(Error::InvalidValue(format!("unexpected action '{other}'"))),
-        }
-    }
-
-    fn poll(&mut self) -> Option<Outcome> {
-        if self.step >= ORDER.len() || self.rest.is_empty() {
-            return None;
-        }
-        let taken: Vec<u16> = self.map.pedals.values().map(|m| m.code).collect();
-        let moved = self
-            .axes()
-            .into_iter()
-            .filter(|(code, _)| !taken.contains(code))
-            .filter_map(|(code, now)| {
-                let rest = *self.rest.get(&code)?;
-                let delta = now - rest;
-                (delta.abs() >= PRESSED).then_some((code, delta))
-            })
-            .max_by(|a, b| a.1.abs().total_cmp(&b.1.abs()))?;
-        self.map.pedals.insert(
-            ORDER[self.step].key().into(),
-            crate::device::MappedAxis {
-                code: moved.0,
-                inverted: moved.1 < 0.0,
-            },
-        );
-        Some(self.next())
+        },
+        model: (!on_base).then(|| d.model.model.into()),
+        notes: PedalNotes {
+            calibration: "Fanatec pedals calibrate themselves (see the base's menu).",
+            shaping: "hid-fanatecff has no dead zones or curves: set them in the game.",
+            max_force: "Set as \"Brake force (load cell)\" in the base's settings.",
+        },
     }
 }

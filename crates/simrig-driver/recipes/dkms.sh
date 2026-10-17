@@ -16,19 +16,23 @@ dkms_installed() {
     dkms status -m "$1" -v "$2" -k "${3:-$(uname -r)}" 2>/dev/null | grep -q ': installed'
 }
 
-# dkms_install NAME VERSION SOURCE_DIR
-# Copies the sources to /usr/src/NAME-VERSION (without VCS files), replaces the `#VERSION#`
-# placeholder of dkms.conf and the sources, then adds, builds and installs the module for the
-# running kernel and for every other kernel that has headers. Idempotent. On a build failure,
-# prints the build log.
+# dkms_install NAME VERSION SOURCE_DIR [DKMS_CONF]
+# Copies the sources to /usr/src/NAME-VERSION (without VCS files), with DKMS_CONF (a path in
+# the sources, default dkms.conf) as its dkms.conf. Sets the package's name and version there
+# (upstream ones are fixed, or a `#VERSION#` placeholder, also replaced in the sources), then
+# adds, builds and installs the module for the running kernel and for every other kernel that
+# has headers. Idempotent. On a build failure, prints the build log.
 dkms_install() {
-    name="$1" version="$2" source="$3"
+    name="$1" version="$2" source="$3" conf="${4:-dkms.conf}"
     dest=$(dkms_src_dir "$name" "$version")
     rm -rf "$dest"
     mkdir -p "$dest"
     (cd "$source" && tar cf - --exclude=.git --exclude=.github .) | (cd "$dest" && tar xf -)
+    [ "$conf" = dkms.conf ] || cp "$dest/$conf" "$dest/dkms.conf"
     find "$dest" -type f \( -name dkms.conf -o -name '*.c' -o -name '*.h' \) \
         -exec sed -i "s/#VERSION#/$version/g" {} +
+    sed -i -e "s/^PACKAGE_NAME=.*/PACKAGE_NAME=\"$name\"/" \
+        -e "s/^PACKAGE_VERSION=.*/PACKAGE_VERSION=\"$version\"/" "$dest/dkms.conf"
     if ! dkms status -m "$name" -v "$version" 2>/dev/null | grep -q .; then
         dkms add -m "$name" -v "$version" >/dev/null
     fi

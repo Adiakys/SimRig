@@ -9,7 +9,9 @@ use std::rc::Rc;
 use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
-use crate::components::{Base, Pedals, Wheel};
+use simrig_plugin_kit::pedals;
+
+use crate::components::{Base, Wheel};
 use crate::device::{FanatecDevice, Shared};
 use crate::models::{self, Kind};
 
@@ -36,29 +38,15 @@ impl FanatecAdapter {
 
     /// `--config <file>`, else `$XDG_CONFIG_HOME/simrig/fanatec.toml`.
     pub fn from_args() -> Self {
-        let mut args = std::env::args().skip(1);
-        let mut config = None;
-        while let Some(arg) = args.next() {
-            if arg == "--config" {
-                config = args.next().map(PathBuf::from);
-            }
-        }
-        let config = config.unwrap_or_else(|| {
-            std::env::var_os("XDG_CONFIG_HOME")
-                .map(PathBuf::from)
-                .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-                .unwrap_or_else(std::env::temp_dir)
-                .join("simrig/fanatec.toml")
-        });
-        Self::new(config)
+        Self::new(simrig_plugin_kit::config_path("fanatec"))
     }
 
     fn shape(device: &Shared) -> Shape {
         let d = device.borrow();
         Shape {
-            bound: d.paths.is_some(),
+            bound: d.hid.hid.is_some(),
             rim: d.wheel_id(),
-            pedals: d.pedal_map.roles(),
+            pedals: d.hid.pedal_map.roles(),
         }
     }
 
@@ -76,19 +64,17 @@ impl FanatecAdapter {
                     })));
                 }
                 // Pedals plugged into the base, once mapped (until then, a procedure).
-                if !d.pedal_map.pedals.is_empty() {
-                    list.push(AnyComponent::Pedals(Box::new(Pedals {
-                        device: device.clone(),
-                        on_base: true,
-                    })));
+                if !d.hid.pedal_map.pedals.is_empty() {
+                    list.push(AnyComponent::Pedals(Box::new(crate::components::pedals(
+                        device,
+                    ))));
                 }
                 list
             }
-            Kind::Pedals if !d.pedal_map.pedals.is_empty() => {
-                vec![AnyComponent::Pedals(Box::new(Pedals {
-                    device: device.clone(),
-                    on_base: false,
-                }))]
+            Kind::Pedals if !d.hid.pedal_map.pedals.is_empty() => {
+                vec![AnyComponent::Pedals(Box::new(crate::components::pedals(
+                    device,
+                )))]
             }
             // A pedal set not mapped yet: set up by its procedure.
             Kind::Pedals => Vec::new(),
@@ -137,24 +123,22 @@ impl Adapter for FanatecAdapter {
     fn device_procedures(&mut self, device_id: &str) -> Vec<ProcedureDescriptor> {
         self.devices
             .get(device_id)
-            .map(|(device, _)| vec![crate::components::map_pedals_descriptor(device)])
+            .map(|(device, _)| vec![pedals::descriptor(device)])
             .unwrap_or_default()
     }
 
     fn start_device_procedure(&mut self, device_id: &str, id: &str) -> Result<Box<dyn Procedure>> {
-        match (self.devices.get(device_id), id) {
-            (Some((device, _)), "map-pedals") => Ok(Box::new(crate::components::MapPedals::new(
-                device.clone(),
-                matches!(device.borrow().model.kind, Kind::Base { .. }),
-            ))),
-            _ => Err(Error::NotFound(format!("unknown procedure '{id}'"))),
-        }
+        let (device, _) = self
+            .devices
+            .get(device_id)
+            .ok_or_else(|| Error::NotFound(format!("unknown device '{device_id}'")))?;
+        pedals::start(device, id)
     }
 
     fn take_changes(&mut self) -> Vec<Change> {
         let mut changes = Vec::new();
         for (id, (device, shape)) in &mut self.devices {
-            device.borrow_mut().refresh();
+            device.borrow_mut().hid.refresh();
             let now = Self::shape(device);
             if now == *shape {
                 continue;

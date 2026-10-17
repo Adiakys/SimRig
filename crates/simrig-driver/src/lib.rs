@@ -11,6 +11,8 @@ mod hooks;
 mod layout;
 mod ops;
 mod registry;
+#[cfg(feature = "testing")]
+pub mod testing;
 
 pub use contract::{DriverContract, DriverStatus, PrivilegedOp};
 pub use error::DriverError;

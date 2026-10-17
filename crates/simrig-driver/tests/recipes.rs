@@ -1,127 +1,44 @@
-//! The shell recipes, run for real with stub system commands (dkms, modprobe, mokutil, udevadm,
-//! uname) that log their calls and keep a little state: no root, nothing touched outside a
-//! temporary directory.
+//! The shell recipes, run for real in the test sandbox (stub system commands, a fake root).
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+
+use simrig_driver::testing::KERNEL;
 
 const RECIPES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recipes");
-const KERNEL: &str = "7.0.0-test";
 
-/// The stub `dkms`: state lines are `<name> <version> <kernel or -> <state>`.
-const DKMS: &str = r#"#!/bin/sh
-state="$SIMRIG_TEST_ROOT/dkms-state"; touch "$state"
-echo "dkms $*" >> "$SIMRIG_TEST_ROOT/log"
-cmd=$1; shift; m=; v=; k=
-while [ $# -gt 0 ]; do
-    case $1 in -m) m=$2; shift ;; -v) v=$2; shift ;; -k) k=$2; shift ;; esac
-    shift
-done
-case $cmd in
-status)
-    while read -r n vv kk st; do
-        [ "$n" = "$m" ] || continue
-        [ -z "$v" ] || [ "$vv" = "$v" ] || continue
-        [ -z "$k" ] || [ "$kk" = "$k" ] || continue
-        echo "$n/$vv, $kk, x86_64: $st"
-    done < "$state" ;;
-add) echo "$m $v - added" >> "$state" ;;
-install)
-    if [ -f "$SIMRIG_TEST_ROOT/fail-build" ]; then
-        mkdir -p "$SIMRIG_TEST_ROOT/var/lib/dkms/$m/$v/build"
-        echo "error: implicit declaration" > "$SIMRIG_TEST_ROOT/var/lib/dkms/$m/$v/build/make.log"
-        exit 10
-    fi
-    echo "$m $v $k installed" >> "$state" ;;
-remove) grep -v "^$m $v " "$state" > "$state.t" || true; mv "$state.t" "$state" ;;
-esac
-"#;
-
-const LOGGER: &str = r#"#!/bin/sh
-echo "$(basename "$0") $*" >> "$SIMRIG_TEST_ROOT/log"
-"#;
-
-const MODPROBE: &str = r#"#!/bin/sh
-echo "modprobe $*" >> "$SIMRIG_TEST_ROOT/log"
-if [ -f "$SIMRIG_TEST_ROOT/sb-reject" ]; then
-    echo "modprobe: ERROR: could not insert '$1': Key was rejected by service" >&2
-    exit 1
-fi
-"#;
-
-const MOKUTIL: &str = r#"#!/bin/sh
-echo "mokutil $*" >> "$SIMRIG_TEST_ROOT/log"
-case $1 in
---sb-state) echo "SecureBoot enabled" ;;
---test-key) echo "$2 is not enrolled" ;;
---generate-hash=*) echo '$6$hash' ;;
-esac
-"#;
-
-struct Sandbox {
-    root: PathBuf,
-}
+struct Sandbox(simrig_driver::testing::Sandbox);
 
 impl Sandbox {
     fn new(name: &str) -> Self {
-        let root =
-            std::env::temp_dir().join(format!("simrig-recipes-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
-        let bin = root.join("bin");
-        fs::create_dir_all(&bin).unwrap();
-        let uname = format!("#!/bin/sh\necho {KERNEL}\n");
-        for (cmd, body) in [
-            ("dkms", DKMS),
-            ("modprobe", MODPROBE),
-            ("mokutil", MOKUTIL),
-            ("udevadm", LOGGER),
-            ("uname", uname.as_str()),
-        ] {
-            let path = bin.join(cmd);
-            fs::write(&path, body).unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-        }
-        fs::create_dir_all(root.join("lib/modules").join(KERNEL).join("build")).unwrap();
-        Sandbox { root }
+        Sandbox(simrig_driver::testing::Sandbox::new(
+            Path::new(RECIPES),
+            "recipes",
+            name,
+            true,
+        ))
     }
 
     /// Runs `script` with the recipes sourced; returns (success, stdout, stderr).
     fn run(&self, script: &str) -> (bool, String, String) {
-        let sources: String = ["prereq", "status", "dkms", "secureboot", "udev"]
+        let sources: String = ["prereq", "status", "dkms", "secureboot", "udev", "module"]
             .iter()
             .map(|r| format!(". {RECIPES}/{r}.sh\n"))
             .collect();
-        let out = Command::new("sh")
-            .arg("-c")
-            .arg(format!("set -eu\n{sources}{script}"))
-            .env_clear()
-            .env(
-                "PATH",
-                format!("{}:/usr/bin:/bin", self.root.join("bin").display()),
-            )
-            .env("SIMRIG_TEST_ROOT", &self.root)
-            .output()
-            .unwrap();
-        (
-            out.status.success(),
-            String::from_utf8_lossy(&out.stdout).into_owned(),
-            String::from_utf8_lossy(&out.stderr).into_owned(),
-        )
+        self.0.shell(&format!("{sources}{script}"))
     }
 
     fn log(&self) -> String {
-        fs::read_to_string(self.root.join("log")).unwrap_or_default()
+        self.0.log()
     }
 
     fn state(&self) -> String {
-        fs::read_to_string(self.root.join("dkms-state")).unwrap_or_default()
+        self.0.dkms()
     }
 
     /// A module's sources, with a VCS directory that must not be copied.
     fn source(&self) -> PathBuf {
-        let src = self.root.join("source");
+        let src = self.0.root.join("source");
         fs::create_dir_all(src.join(".git")).unwrap();
         fs::write(src.join(".git/HEAD"), "ref").unwrap();
         fs::write(src.join("dkms.conf"), "PACKAGE_VERSION=\"#VERSION#\"\n").unwrap();
@@ -130,9 +47,10 @@ impl Sandbox {
     }
 }
 
-impl Drop for Sandbox {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
+impl std::ops::Deref for Sandbox {
+    type Target = simrig_driver::testing::Sandbox;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -274,4 +192,118 @@ fn driver_copies_match_the_recipes() {
             );
         }
     }
+}
+
+#[test]
+fn dkms_takes_upstream_packages_as_they_are() {
+    let sb = Sandbox::new("upstream");
+    let src = sb.root.join("upstream");
+    fs::create_dir_all(src.join("dkms")).unwrap();
+    // A fixed name and version, and the configuration in a subdirectory.
+    fs::write(
+        src.join("dkms/dkms.conf"),
+        "PACKAGE_NAME=\"hid-up\"\nPACKAGE_VERSION=\"0.82\"\nAUTOINSTALL=\"yes\"\n",
+    )
+    .unwrap();
+    let (ok, _, err) = sb.run(&format!(
+        "dkms_install hid-x 0.83-4-gabc {} dkms/dkms.conf",
+        src.display()
+    ));
+    assert!(ok, "{err}");
+    let conf = read(&sb.file("usr/src/hid-x-0.83-4-gabc/dkms.conf"));
+    assert!(conf.contains("PACKAGE_NAME=\"hid-x\""), "{conf}");
+    assert!(conf.contains("PACKAGE_VERSION=\"0.83-4-gabc\""), "{conf}");
+    assert!(conf.contains("AUTOINSTALL"), "{conf}");
+}
+
+#[test]
+fn module_build_load_and_states() {
+    let sb = Sandbox::new("module");
+    let src = sb.source();
+    let script = |s: &str| {
+        let (ok, out, err) = sb.run(s);
+        assert!(ok, "{s}: {err}");
+        out
+    };
+    assert_eq!(script("mod_state hid-x hid_x 1.2"), "none\n");
+    sb.module("hid_x", "", true);
+    assert_eq!(script("mod_state hid-x hid_x 1.2"), "kernel\n");
+
+    let out = script(&format!(
+        "rc=0; mod_build hid-x 1.2 {} dkms.conf hid_x || rc=$?; echo $rc",
+        src.display()
+    ));
+    assert_eq!(out, "0\n");
+    assert!(sb.file("sys/module/hid_x").is_dir());
+    // The kernel's module was unloaded first, so the new one runs.
+    assert!(sb.log().contains("modprobe -r hid_x"), "{}", sb.log());
+    assert_eq!(script("mod_state hid-x hid_x 1.2"), "ours 1.2\n");
+    assert_eq!(script("mod_state hid-x hid_x 1.3"), "outdated 1.2\n");
+
+    // An upgrade replaces SimRig's version.
+    script(&format!(
+        "mod_build hid-x 1.3 {} dkms.conf hid_x",
+        src.display()
+    ));
+    assert!(!sb.state().contains("1.2"), "{}", sb.state());
+    assert_eq!(script("mod_state hid-x hid_x 1.3"), "ours 1.3\n");
+
+    script("mod_remove hid-x hid_x");
+    assert!(!sb.state().contains("hid-x"), "{}", sb.state());
+    assert_eq!(script("mod_state hid-x hid_x 1.3"), "kernel\n");
+}
+
+#[test]
+fn module_of_someone_else_is_foreign() {
+    let sb = Sandbox::new("foreign");
+    sb.module("hid_x", "0.9", false);
+    let (_, out, _) = sb.run("mod_state hid-x hid_x 1.2");
+    assert_eq!(out, "foreign 0.9\n");
+    fs::write(
+        sb.file("dkms-state"),
+        format!("hid-x 0.8 {KERNEL} installed\n"),
+    )
+    .unwrap();
+    let (_, out, _) = sb.run("mod_state hid-x hid_x 1.2");
+    assert_eq!(out, "foreign 0.8\n");
+}
+
+#[test]
+fn module_refused_by_secure_boot_waits_for_the_key() {
+    let sb = Sandbox::new("modsb");
+    let src = sb.source();
+    sb.write("sb-reject", "");
+    sb.write("var/lib/dkms/mok.pub", "key");
+    let (ok, out, err) = sb.run(&format!(
+        "rc=0; mod_build hid-x 1.2 {} dkms.conf hid_x || rc=$?; echo $rc; mod_state hid-x hid_x 1.2; mod_key_message",
+        src.display()
+    ));
+    assert!(ok, "{err}");
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines[0], "3");
+    assert_eq!(lines[1], "pending 1.2");
+    let password = read(&sb.data.join("mok-pending"));
+    assert!(lines[2].contains(password.trim()), "{out}");
+}
+
+#[test]
+fn hid_devices_are_rebound_and_usb_devices_found() {
+    let sb = Sandbox::new("rebind");
+    let generic = sb.plug(0x046d, 0xc24f, Some("hid-generic"));
+    sb.plug(0x046d, 0xc262, Some("hid-generic"));
+    sb.hid_driver("logitech");
+    let (ok, out, err) = sb.run(
+        "hid_rebind 046d logitech c24f; usb_present 046D C24F && echo yes; \
+         usb_present 046d c999 || echo no; usb_present 046d && echo any",
+    );
+    assert!(ok, "{err}");
+    assert_eq!(out, "yes\nno\nany\n");
+    assert_eq!(
+        sb.read("sys/bus/hid/drivers/logitech/bind"),
+        format!("{generic}\n")
+    );
+    assert_eq!(
+        sb.read("sys/bus/hid/drivers/hid-generic/unbind"),
+        format!("{generic}\n")
+    );
 }

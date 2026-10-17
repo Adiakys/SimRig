@@ -13,5 +13,12 @@ serde_json.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 
+[dev-dependencies]
+simrig-driver = { path = ".", features = ["testing"] }
+
+[features]
+# A sandbox to run a driver's hooks in tests, against stub system commands.
+testing = []
+
 [lints]
 workspace = true

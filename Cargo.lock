@@ -4541,6 +4541,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "simrig-driver",
  "thiserror 2.0.21",
  "toml 0.8.23",
 ]
@@ -4596,14 +4597,12 @@ dependencies = [
 name = "simrig-plugin-fanatec"
 version = "0.1.0"
 dependencies = [
- "evdev",
- "serde",
  "serde_json",
  "simrig-driver",
  "simrig-host",
  "simrig-model",
+ "simrig-plugin-kit",
  "simrig-plugin-sdk",
- "toml 0.8.23",
 ]
 
 [[package]]
@@ -4614,6 +4613,16 @@ dependencies = [
  "serde",
  "simrig-host",
  "simrig-model",
+ "simrig-plugin-sdk",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "simrig-plugin-kit"
+version = "0.1.0"
+dependencies = [
+ "evdev",
+ "serde",
  "simrig-plugin-sdk",
  "toml 0.8.23",
 ]

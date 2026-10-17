@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "plugins/*"]
+exclude = ["plugins/moza", "plugins/logitech", "plugins/thrustmaster"]
 
 [workspace.package]
 version = "0.1.0"
@@ -20,6 +21,7 @@ toml = "0.8"
 simrig-driver = { path = "crates/simrig-driver" }
 simrig-host = { path = "crates/simrig-host" }
 simrig-model = { path = "crates/simrig-model" }
+simrig-plugin-kit = { path = "crates/simrig-plugin-kit" }
 simrig-plugin-sdk = { path = "crates/simrig-plugin-sdk" }
 simrig-protocol = { path = "crates/simrig-protocol" }
 
