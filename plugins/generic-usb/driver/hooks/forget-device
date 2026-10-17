@@ -4,7 +4,7 @@ set -eu
 . "$SIMRIG_DRIVER_DIR/hooks/common.sh"
 rm -f "$DATA/devices/$SIMRIG_ARG_FILE.toml" "$DATA/devices/$SIMRIG_ARG_FILE.ids" "$DATA/allowed/$SIMRIG_ARG_FILE.ids"
 if system_mode; then
-    systemctl stop 'simrig-generic-usb@*.service' 2>/dev/null || true
+    systemctl stop 'simrig-generic-usb@*.service' 'simrig-generic-usb-raw@*.service' 2>/dev/null || true
 fi
 write_rules
 echo "forgot $SIMRIG_ARG_FILE"

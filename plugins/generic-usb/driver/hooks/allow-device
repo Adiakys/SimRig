@@ -5,5 +5,5 @@ set -eu
 mkdir -p "$DATA/allowed"
 printf '%s %s %s\n' "$SIMRIG_ARG_VID" "$SIMRIG_ARG_PID" "$SIMRIG_ARG_FILE" > "$DATA/allowed/$SIMRIG_ARG_FILE.ids"
 write_rules
-system_mode || echo "development install: reading the device needs access to its /dev/hidraw node"
+system_mode || echo "development install: reading the device needs access to its /dev/hidraw node (or its USB device)"
 echo "allowed $SIMRIG_ARG_VID:$SIMRIG_ARG_PID"

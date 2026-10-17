@@ -7,6 +7,8 @@
 # SIMRIG_TEST_ROOT: a fake root, for tests.
 RULES="${SIMRIG_TEST_ROOT:-}/etc/udev/rules.d/69-simrig-generic-usb.rules"
 UNIT="${SIMRIG_TEST_ROOT:-}/etc/systemd/system/simrig-generic-usb@.service"
+# Devices the kernel's HID driver rejects (no hidraw) are served straight from USB.
+RAW_UNIT="${SIMRIG_TEST_ROOT:-}/etc/systemd/system/simrig-generic-usb-raw@.service"
 DATA="$SIMRIG_DRIVER_DATA"
 SERVICE="$DATA/bin/simrig-generic-usb-service"
 
@@ -35,6 +37,8 @@ write_rules() {
             read -r vid pid _ < "$f"
             echo "# setting up $vid:$pid: the user may read its raw reports"
             echo "SUBSYSTEM==\"hidraw\", ATTRS{idVendor}==\"$vid\", ATTRS{idProduct}==\"$pid\", TAG+=\"uaccess\""
+            echo "# (or its USB device, when the kernel's HID driver rejects it)"
+            echo "SUBSYSTEM==\"usb\", ENV{DEVTYPE}==\"usb_device\", ATTR{idVendor}==\"$vid\", ATTR{idProduct}==\"$pid\", TAG+=\"uaccess\""
         done
         for f in "$DATA"/devices/*.ids; do
             [ -f "$f" ] || continue
@@ -42,6 +46,8 @@ write_rules() {
             echo "# $vid:$pid is set up: serve it while connected, and hide the raw device from games"
             echo "SUBSYSTEM==\"hidraw\", ATTRS{idVendor}==\"$vid\", ATTRS{idProduct}==\"$pid\", TAG+=\"uaccess\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}+=\"simrig-generic-usb@%k.service\""
             echo "SUBSYSTEM==\"input\", ATTRS{idVendor}==\"$vid\", ATTRS{idProduct}==\"$pid\", ENV{ID_INPUT_JOYSTICK}=\"\""
+            echo "# without hidraw (rejected by the kernel's HID driver): served straight from USB"
+            echo "SUBSYSTEM==\"usb\", ENV{DEVTYPE}==\"usb_device\", ATTR{idVendor}==\"$vid\", ATTR{idProduct}==\"$pid\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}+=\"simrig-generic-usb-raw@%k.service\""
         done
     } > "$tmp"
     mv "$tmp" "$RULES"
@@ -49,5 +55,20 @@ write_rules() {
     # "add" again, so set-up devices already plugged in start their service now.
     udevadm trigger --action=add --subsystem-match=hidraw
     udevadm trigger --action=change --subsystem-match=input
+    udevadm trigger --action=change --subsystem-match=usb
     udevadm settle --timeout=5 || true
+    start_raw
+}
+
+# Starts the service of set-up devices plugged in that have no hidraw (udev starts it at the
+# next plug-in); an instance for a device with hidraw just exits.
+start_raw() {
+    devices | while read -r vid pid file; do
+        [ -f "$DATA/devices/$file.ids" ] || continue
+        for dev in "${SIMRIG_TEST_ROOT:-}"/sys/bus/usb/devices/*; do
+            [ "$(cat "$dev/idVendor" 2>/dev/null)" = "$vid" ] || continue
+            [ "$(cat "$dev/idProduct" 2>/dev/null)" = "$pid" ] || continue
+            systemctl start --no-block "simrig-generic-usb-raw@$(basename "$dev").service" || true
+        done
+    done
 }

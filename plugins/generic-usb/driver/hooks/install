@@ -38,6 +38,24 @@ PrivateTmp=yes
 PrivateNetwork=yes
 RestrictAddressFamilies=AF_UNIX
 UNIT
+cat > "$RAW_UNIT" <<UNIT
+# Installed by the SimRig Generic USB driver. Started by udev for a set-up device the kernel's
+# HID driver rejects (no hidraw), read straight from USB; stops when it is unplugged.
+[Unit]
+Description=SimRig Generic USB device %i, read straight from USB
+
+[Service]
+ExecStart=$SERVICE usb:%i $DATA/devices
+# The reports relayed to the app, which shows the device live.
+RuntimeDirectory=simrig-generic-usb
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+UNIT
 systemctl daemon-reload
 write_rules
 touch "$DATA/installed"

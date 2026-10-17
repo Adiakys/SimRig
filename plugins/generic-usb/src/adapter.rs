@@ -11,7 +11,7 @@ use simrig_plugin_sdk::prelude::*;
 
 use crate::config::{self, DeviceConfig, HandbrakeInput, Setup};
 use crate::decode::State;
-use crate::hid::Reports;
+use crate::hid::{Reports, Source};
 use crate::setup::DeviceSetup;
 
 pub const PLUGIN_ID: &str = "generic-usb";
@@ -38,9 +38,12 @@ pub struct DeviceState {
 pub type Shared = Rc<RefCell<DeviceState>>;
 
 impl DeviceState {
-    /// Opens the device's HID interfaces, again if needed (e.g. once reading was allowed).
+    /// Opens the device's HID interfaces, again if needed (e.g. once reading was allowed). A
+    /// set-up device read straight from USB belongs to the driver's service: read through its
+    /// relay; the app claims it only while it is not set up.
     pub fn reopen(&mut self) {
-        match Reports::open(&self.sysfs) {
+        let relay = crate::usbraw::relay_path(&self.file_stem());
+        match Reports::open(&self.sysfs, Some(&relay), self.saved.is_none()) {
             Ok(reports) => {
                 self.reports = Some(reports);
                 self.read_error = None;
@@ -222,6 +225,23 @@ impl Adapter for GenericAdapter {
 
     fn take_changes(&mut self) -> Vec<Change> {
         let mut changes = Vec::new();
+        for state in self.devices.values() {
+            let mut s = state.borrow_mut();
+            let broken = s.reports.as_ref().is_some_and(|r| !r.errors().is_empty());
+            // Set up and claimed by the app: the driver's service takes it from here.
+            let handed = s.saved.is_some()
+                && s.reports
+                    .as_ref()
+                    .is_some_and(|r| r.source() == Source::Usb);
+            if handed {
+                s.reports = None;
+            }
+            // Not readable yet (no permission, the service starting, a reader that stopped):
+            // tried again at every poll.
+            if s.reports.is_none() || broken {
+                s.reopen();
+            }
+        }
         for (device, state) in &self.devices {
             let now = state.borrow().draft.as_ref().map(|c| kind_of(&c.setup));
             let before = state.borrow().attached_kind;

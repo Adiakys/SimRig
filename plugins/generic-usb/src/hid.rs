@@ -1,5 +1,7 @@
 //! Raw reports of a USB device's HID interfaces, through `hidraw`. Each interface is read on its
-//! own thread; the latest report of each is kept.
+//! own thread; the latest report of each is kept. Devices without `hidraw` (the kernel's HID
+//! driver rejects them) are read straight from USB, or through the relay of the driver's
+//! service once they are set up ([`crate::usbraw`]).
 //!
 //! Tests and development use a fake device: a USB directory outside `/sys` with a
 //! `simrig-fake-report` file holding the current report in hex, one interface per line.
@@ -78,27 +80,47 @@ pub fn usb_device_of(hidraw: &str) -> Option<(PathBuf, u16, u16, Option<String>)
     }
 }
 
+/// Where the reports come from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Source {
+    Hidraw,
+    /// Straight from USB: the interfaces are claimed, for this reader only.
+    Usb,
+    /// The relay of the driver's service, which reads the device straight from USB.
+    Relay,
+    Fake,
+}
+
 /// Latest reports of every HID interface of a device.
 pub struct Reports {
     latest: Arc<Mutex<Vec<Option<Vec<u8>>>>>,
     stop: Arc<AtomicBool>,
     errors: Arc<Mutex<Vec<String>>>,
+    source: Source,
 }
 
 impl Reports {
     /// Starts reading every interface of the device at `usb_sysfs`. Fails when no interface can
-    /// be read at all (no HID interface, or no permission yet).
-    pub fn open(usb_sysfs: &Path) -> io::Result<Self> {
+    /// be read at all (no HID interface, or no permission yet). A device without `hidraw` is
+    /// read through `relay` when the driver's service relays it, else straight from USB if
+    /// `claim` allows taking it.
+    pub fn open(usb_sysfs: &Path, relay: Option<&Path>, claim: bool) -> io::Result<Self> {
         let fake = usb_sysfs.join(FAKE_REPORT);
         if !usb_sysfs.starts_with("/sys") && fake.is_file() {
-            return Ok(Self::fake(fake));
+            return Ok(Self::fake(fake, Source::Fake));
         }
         let nodes = hidraw_nodes(usb_sysfs);
         if nodes.is_empty() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "the device has no HID interface",
-            ));
+            if let Some(relay) = relay.filter(|r| r.is_file()) {
+                return Ok(Self::fake(relay.to_path_buf(), Source::Relay));
+            }
+            if !claim {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "the driver's service is not reading the device yet",
+                ));
+            }
+            return Self::usb(usb_sysfs);
         }
         let mut files = Vec::new();
         let mut denied = None;
@@ -114,31 +136,51 @@ impl Reports {
         if files.iter().all(Option::is_none) {
             return Err(denied.unwrap_or_else(|| io::Error::other("no readable interface")));
         }
-        let reports = Self::empty(nodes.len());
+        let reports = Self::empty(nodes.len(), Source::Hidraw);
         for (i, file) in files.into_iter().enumerate() {
-            if let Some(file) = file {
-                reports.spawn_reader(i, file);
+            if let Some(mut file) = file {
+                reports.spawn_reader(i, move |buf| file.read(buf));
             }
         }
         Ok(reports)
     }
 
-    fn empty(interfaces: usize) -> Self {
+    /// Straight from USB, for devices without `hidraw`.
+    fn usb(usb_sysfs: &Path) -> io::Result<Self> {
+        let interfaces = crate::usbraw::open(usb_sysfs)?;
+        let reports = Self::empty(interfaces.len(), Source::Usb);
+        for (i, mut interface) in interfaces.into_iter().enumerate() {
+            reports.spawn_reader(i, move |buf| interface.read(buf));
+        }
+        Ok(reports)
+    }
+
+    fn empty(interfaces: usize, source: Source) -> Self {
         Self {
             latest: Arc::new(Mutex::new(vec![None; interfaces])),
             stop: Arc::new(AtomicBool::new(false)),
             errors: Arc::default(),
+            source,
         }
     }
 
-    fn spawn_reader(&self, interface: usize, mut file: File) {
+    /// Where the reports come from.
+    pub fn source(&self) -> Source {
+        self.source
+    }
+
+    fn spawn_reader(
+        &self,
+        interface: usize,
+        mut read: impl FnMut(&mut [u8]) -> io::Result<usize> + Send + 'static,
+    ) {
         let latest = self.latest.clone();
         let stop = self.stop.clone();
         let errors = self.errors.clone();
         thread::spawn(move || {
             let mut buf = [0u8; MAX_REPORT];
             while !stop.load(Ordering::Relaxed) {
-                match file.read(&mut buf) {
+                match read(&mut buf) {
                     Ok(0) => break,
                     Ok(n) => {
                         if let Ok(mut l) = latest.lock() {
@@ -156,13 +198,15 @@ impl Reports {
         });
     }
 
-    fn fake(path: PathBuf) -> Self {
+    /// Reports from a file of hex lines, one per interface, read again and again: the fake
+    /// device of tests, and the relay of the driver's service.
+    fn fake(path: PathBuf, source: Source) -> Self {
         let lines = fs::read_to_string(&path)
             .unwrap_or_default()
             .lines()
             .count()
             .max(1);
-        let reports = Self::empty(lines);
+        let reports = Self::empty(lines.max(8), source);
         let latest = reports.latest.clone();
         let stop = reports.stop.clone();
         thread::spawn(move || {
@@ -247,12 +291,39 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// A set-up device without hidraw is read through the relay of the driver's service; without
+    /// the relay the app does not take it unless it may.
+    #[test]
+    fn device_without_hidraw_through_the_relay() {
+        let root = std::env::temp_dir().join(format!("simrig-relay-dev-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let usb = root.join("1-3");
+        fs::create_dir_all(&usb).unwrap();
+        let relay = root.join("x.report");
+        let err = Reports::open(&usb, Some(&relay), false).err().unwrap();
+        assert!(err.to_string().contains("service"), "{err}");
+
+        crate::usbraw::write_relay(&relay, 1, &[0x00, 0x08]).unwrap();
+        let reports = Reports::open(&usb, Some(&relay), false).unwrap();
+        assert_eq!(reports.source(), Source::Relay);
+        let mut seen = None;
+        for _ in 0..100 {
+            seen = reports.latest(1);
+            if seen.is_some() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(seen, Some(vec![0, 8]));
+        let _ = fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn fake_device() {
         let root = std::env::temp_dir().join(format!("simrig-fake-{}", std::process::id()));
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join(FAKE_REPORT), "00 04\n").unwrap();
-        let reports = Reports::open(&root).unwrap();
+        let reports = Reports::open(&root, None, false).unwrap();
         let mut seen = None;
         for _ in 0..100 {
             seen = reports.latest(0);

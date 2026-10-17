@@ -68,3 +68,50 @@ fn a_driver_without_its_service_says_so() {
     assert!(!ok);
     assert!(err.contains("missing from the driver"), "{err}");
 }
+
+/// Devices the kernel's HID driver rejects have no hidraw: their USB device is given to the user
+/// while they are set up, and served straight from USB once they are.
+#[test]
+fn devices_without_hidraw_are_served_straight_from_usb() {
+    let sb = sandbox("raw", true);
+    sb.install();
+    assert!(
+        sb.read("etc/systemd/system/simrig-generic-usb-raw@.service")
+            .contains("usb:%i")
+    );
+    let rules = "etc/udev/rules.d/69-simrig-generic-usb.rules";
+    let (ok, _, err) = sb.hook_with(
+        "allow-device",
+        &[("vid", "1234"), ("pid", "0001"), ("file", "1234-0001")],
+    );
+    assert!(ok, "{err}");
+    let allowed = sb.read(rules);
+    assert!(
+        allowed.contains(r#"SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="1234", ATTR{idProduct}=="0001", TAG+="uaccess""#),
+        "{allowed}"
+    );
+
+    // Set up while plugged in: its service starts now.
+    sb.plug(0x1234, 0x0001, None);
+    let (ok, _, err) = sb.hook_with(
+        "save-device",
+        &[
+            ("vid", "1234"),
+            ("pid", "0001"),
+            ("file", "1234-0001"),
+            ("config", "bmFtZSA9ICJ4Igo="),
+        ],
+    );
+    assert!(ok, "{err}");
+    let saved = sb.read(rules);
+    assert!(
+        saved.contains(r#"ENV{SYSTEMD_WANTS}+="simrig-generic-usb-raw@%k.service""#),
+        "{saved}"
+    );
+    assert!(
+        sb.log()
+            .contains("systemctl start --no-block simrig-generic-usb-raw@1-0001.service"),
+        "{}",
+        sb.log()
+    );
+}

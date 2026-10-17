@@ -3,7 +3,8 @@
 //!
 //! - [`config`]: a device's setup, shared by the adapter and the driver's service.
 //! - [`decode`]: raw reports to gears and travel; [`detect`]: recognizing positions.
-//! - [`hid`]: raw reports from `hidraw`.
+//! - [`hid`]: raw reports from `hidraw`, or, for devices the kernel's HID driver rejects,
+//!   straight from USB ([`usbraw`]).
 //! - [`adapter`], [`components`], [`setup`]: the plugin's adapter (runs with the app).
 //! - [`service`]: the driver's service (runs with the device, app closed).
 
@@ -15,3 +16,4 @@ pub mod detect;
 pub mod hid;
 pub mod service;
 pub mod setup;
+pub mod usbraw;
