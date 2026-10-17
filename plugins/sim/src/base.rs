@@ -46,7 +46,7 @@ impl SimBase {
 
 impl Component for SimBase {
     fn id(&self) -> String {
-        format!("{}/base", crate::DEVICE_ID)
+        format!("{}/base", crate::RIG)
     }
 
     fn name(&self) -> String {
@@ -60,7 +60,37 @@ impl Component for SimBase {
     fn custom_params(&mut self) -> Vec<CustomParam> {
         let s = self.shared.get();
         let advanced = Value::Bool(s.advanced_mode);
+        let rims = [
+            ("formula", "Formula rim"),
+            ("gt", "GT rim"),
+            (crate::sim::NO_RIM, "No rim"),
+        ];
         vec![
+            CustomParam::new(
+                "rim",
+                "Mounted rim",
+                ParamType::Choice {
+                    options: rims
+                        .iter()
+                        .map(|(id, label)| ChoiceOption::new(id, label))
+                        .collect(),
+                },
+                Value::Choice(s.rim.clone()),
+            )
+            .default_value(Value::Choice("formula".into()))
+            .group("Simulation")
+            .order(10)
+            .help("Simulates swapping the rim on the base."),
+            CustomParam::new(
+                "handbrake_connected",
+                "Handbrake connected",
+                ParamType::Bool,
+                Value::Bool(s.handbrake_connected),
+            )
+            .default_value(Value::Bool(true))
+            .group("Simulation")
+            .order(11)
+            .help("Simulates plugging and unplugging the handbrake."),
             CustomParam::new(
                 "wave_speed",
                 "Wave speed",
@@ -126,6 +156,8 @@ impl Component for SimBase {
     fn set_custom(&mut self, id: &str, value: &Value) -> Result<()> {
         let mut s = self.shared.get();
         match (id, value) {
+            ("rim", Value::Choice(v)) => s.rim = v.clone(),
+            ("handbrake_connected", Value::Bool(v)) => s.handbrake_connected = *v,
             ("wave_speed", Value::Float(v)) => s.wave_speed = *v,
             ("noise", Value::Float(v)) => s.noise = *v,
             ("advanced_mode", Value::Bool(v)) => s.advanced_mode = *v,
@@ -133,6 +165,9 @@ impl Component for SimBase {
             _ => return Err(Error::unsupported()),
         }
         Ok(())
+    }
+    fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
+        self.shared.save(&self.id(), item, value, host)
     }
 }
 

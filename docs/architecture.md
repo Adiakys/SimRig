@@ -1,6 +1,6 @@
 # simrig — Architecture
 
-> Draft 0.6 (2026-10-17). M0 implemented. Companion to [requirements.md](requirements.md).
+> Draft 0.7 (2026-10-17). Core implemented (M0). Companion to [requirements.md](requirements.md).
 
 ## 1. Principles
 
@@ -21,8 +21,12 @@
 6. **Plugins may add custom parameters.** Anything beyond the standard interface is declared by
    the plugin at runtime, fully self-described, and the app loads and renders it dynamically.
    Nothing brand-specific is ever written in the core.
-7. **Least privilege.** The app runs as the user. Privileged driver operations go through a
-   single-shot helper.
+7. **No privileges at runtime.** The app runs as the user and needs no privileges to read
+   inputs, change settings (rotation, force feedback…), run force-feedback tests or apply
+   presets live: it uses the driver's interfaces like a game. It asks for authorization only when
+   something touches the system: installing or removing a driver, and saving a setting when the
+   driver persists it in a system file. Drivers must therefore grant the user access to their
+   devices at install (e.g. udev `uaccess` rules bound to `bind`).
 
 ## 2. Two worlds: system and app
 
@@ -51,6 +55,23 @@
 
 With the app closed, no simrig process runs. GUI and CLI use the `simrig-host` library directly;
 there is no background agent.
+
+### 2.1 What the GUI builds on
+
+`simrig_host::Host` is the whole app core; the GUI only calls it:
+
+| Area | API |
+|---|---|
+| Rig | `start`, `components`, `find`, `describe`, `plugins`, `problems` |
+| Changes | `poll()` → `HostEvent`: plugin started/stopped/failed, device added/removed, components changed (rim swap), description changed, live inputs |
+| Settings | `set`, `param`, `save`, `run_action`, `write_output`, `read_inputs`, `subscribe` |
+| Composition | `set_excluded`, `choose_plugin`, `set_planned`, `usb_devices`, `rig_config` |
+| Catalog | `catalog`, `image` (user picture → model image → generic illustration) |
+| Drivers | `driver_status`, `install_driver`, `uninstall_driver`, `installed_drivers`, `restart_plugin` |
+| Presets | `presets()` (list, get, save, delete, export, import), `capture_preset`, `apply_preset` |
+| Wizard | `system()`: distribution, kernel, Secure Boot, session, systemd, pkexec |
+
+`simrig-cli` exposes the same functions from the terminal.
 
 ## 3. Domain model
 
@@ -269,7 +290,7 @@ The catalog is **data** provided by plugins, plus the core's generic entries:
 id         = "fanatec/csl-dd"
 vendor     = "Fanatec"
 name       = "CSL DD"
-kind       = "wheel-base"
+kind       = "wheel_base"
 usb        = [{ vid = 0x0eb7, pid = 0x0020 }]
 image      = "images/csl-dd.webp"
 image_license = "CC-BY-4.0, illustration by <author>"
@@ -280,8 +301,8 @@ provides   = ["wheel-base", "steering-wheel?", "pedals?"]   # ? = optional, the 
 rotation_center = [0.50, 0.46]
 ```
 
-- **Images**: model image first, then the user's own (`~/.local/share/simrig/images/`), then the
-  generic illustration for the type (`assets/generic/<kind>.svg`).
+- **Images**: the user's own picture first (`~/.local/share/simrig/images/<vendor>_<model>.{svg,webp,png,jpg}`),
+  then the model image shipped by the plugin, then the app's generic illustration of the type.
 - **Anchors** (`overlay`): where to rotate the wheel, fill the pedals, light up the gear.
 - **Licensing**: no manufacturer photos without permission; license declared per entry.
 - The catalog also lists models that are not plugged in: they can be added to the rig (and their
@@ -347,12 +368,13 @@ usb = [{ vid = 0x0eb7 }]                  # pid optional; `virtual = true` for p
 | app → plugin | `input/subscribe` `input/unsubscribe` → `input/state` | live inputs at a capped rate |
 | plugin → app | `params/changed` | fresh description after a set or action (availability may have changed) |
 | app → plugin | `shutdown` | the app is closing |
-| plugin → app | `components/changed` | *(planned)* components of a device changed (rim swap) |
-| app → plugin | `param/save` | *(planned, M1/M2)* persist a value, the way the driver decides (§6.3) |
-| plugin → app | `privileged/request` | *(planned, M2)* run one of the driver's privileged operations (§6.1) via the helper |
+| plugin → app | `components/changed` | components of a device changed (rim swap), with their descriptions |
+| plugin → app | `devices/changed` | the plugin's virtual devices changed |
+| app → plugin | `param/save` | make the current value of a persistent item the one restored at plug-in, the way the driver decides (§6.3) |
+| plugin → app | `privileged/request` | during a request, run one of the driver's privileged operations (§6.1); the host runs the helper and answers |
 
 Error codes: `-32001` unsupported (data: `Unsupported`), `-32002` invalid value, `-32003` not
-found, `-32004` incompatible API, `-32005` device failure. Messages and codes are defined in
+found, `-32004` incompatible API, `-32005` device failure, `-32006` not authorized. Messages and codes are defined in
 `simrig-protocol`.
 
 - **Rust SDK** (`simrig-plugin-sdk`): the author implements the component interfaces (§3.3) and
@@ -365,6 +387,12 @@ pub trait Adapter {
     fn discover(&mut self) -> Vec<DeviceInfo> { Vec::new() }       // virtual devices
     fn attach(&mut self, device: &DeviceInfo) -> Result<Vec<AnyComponent>>;  // AnyComponent::WheelBase(Box<dyn WheelBase>), ...
     fn detach(&mut self, _device_id: &str) {}
+    fn take_changes(&mut self) -> Vec<Change> { Vec::new() }       // e.g. a rim swap
+}
+
+// On every component: saving goes through the host when the driver needs privileges.
+fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
+    host.privileged("save-setting", &[("key", item), ("value", &value.to_text())]).map(|_| ())
 }
 
 fn main() -> ExitCode { simrig_plugin_sdk::run(MyAdapter::default()) }
@@ -398,7 +426,7 @@ license  = "GPL-2.0"
 # Required hooks: executables in the driver directory, launched with argv (never through a shell)
 install   = "hooks/install"      # root, via helper
 uninstall = "hooks/uninstall"    # root, via helper
-status    = "hooks/status"       # user: prints JSON {installed, active, version, needs_reboot, message}
+status    = "hooks/status"       # user: prints JSON, see below
 
 # Prerequisites the app installs via PackageKit before `install` (abstract names, mapped per distro)
 requires = ["dkms", "kernel-headers"]
@@ -407,8 +435,17 @@ requires = ["dkms", "kernel-headers"]
 [[privileged]]
 name = "save-setting"
 exec = "hooks/save-setting"
-args = { key = "^[a-z_]+$", value = "^[0-9]+$" }   # every argument validated by a regex
+args = { key = "[a-z_]+", value = "[0-9]+" }   # each value must fully match its pattern
 ```
+
+`status` prints `{"installed", "active", "version", "needs_reboot", "provided_by_system",
+"user_access", "message"}`. It runs as the user, so `user_access` says whether the user can really
+use the device without privileges; the wizard flags it when it is false.
+
+Hooks run with a clean environment: `SIMRIG_PLUGIN`, `SIMRIG_DRIVER_DIR`, `SIMRIG_DRIVER_DATA`
+(the driver's own data directory, also given to the adapter) and one `SIMRIG_ARG_<NAME>` per
+argument of a privileged operation. The contract, hooks and registry are implemented in
+`simrig-driver`.
 
 - Hooks are **any executable** (shell, Rust, Python…). The helper runs them with pre-validated
   arguments and a clean environment, and records what was installed in
@@ -473,9 +510,17 @@ wizard ──▶ hooks/status (user) → not installed
      hooks/status → installed / reboot needed (e.g. MOK enrollment for Secure Boot)
 ```
 
-- **Generic, closed helper**: actions `install`, `uninstall`, `privileged` (operation name plus
-  arguments validated against the regexes in `driver.toml`). No arbitrary paths or commands. Each
-  action has its own polkit rule `org.simrig.helper.*`.
+- **Generic, closed helper** (`simrig-helper`): actions `install`, `uninstall`, `privileged`
+  (operation name plus arguments validated against `driver.toml`) and `list`. It takes no paths or
+  commands from its caller and finds plugins only in system directories when run as root.
+- **Authorization**: for system plugins the host runs `pkexec simrig-helper …`; pkexec authorizes
+  per executable, so one polkit action covers the helper (`packaging/polkit/org.simrig.helper.policy`,
+  `auth_admin_keep`: a password once for a while, not at every change). Plugins in explicit
+  development directories run the helper as the user with a private state directory
+  (`~/.local/state/simrig/dev`), so the whole flow works without privileges; plugins in the user's
+  home may not install drivers.
+- **Prerequisites** (`requires`) through PackageKit: not implemented yet (M2); the app asks the
+  user to install them.
 - **Upgrades**: when a plugin ships a new driver version, the app offers the upgrade when opened
   (old `uninstall` → new `install`, or an `upgrade` hook if the driver declares one). Kernel
   upgrades are handled by DKMS (or whatever the driver chose).
@@ -541,21 +586,26 @@ ffb_scaling = 1
 
 ## 8. Simulated rig and tests
 
-- The **`sim`** plugin (M0, done) implements every interface with fake components: base, rim with
-  RPM LEDs and display, 3-pedal set with a brake load cell, H/sequential shifter, handbrake with
-  analog/button mode. Inputs move by themselves (waves, optional noise), parameters live in
-  memory, and items are deliberately unsupported with every kind of reason, including live
-  `DependsOn` (shifter mode, handbrake mode, a custom parameter depending on another).
-- **Conformance checks** (`simrig-host::conformance`, M0, done): every standard item present once
-  with the right class and value kind, valid current values, known `DependsOn` targets, unique and
-  valid custom parameters, `test_effect` ⇒ `stop_force`. The host runs them on every attach.
-- **End-to-end tests** (M0, done): `plugins/sim/tests` start the real plugin process through the
-  host, as the app does.
-- *(Planned)* a fake driver with `install`/`status`/`uninstall` hooks that do not touch the system,
-  to exercise the wizard and the installation flow (M1).
-- *(Planned)* `--uinput` option: exposes the simulated rig as real evdev devices.
-- *(Planned)* **record and replay**: `simrig-cli record` captures interactions with a real device;
-  `Io` replays them in tests.
+- The **`sim`** plugin implements every interface with fake components on separate virtual
+  devices: base with rim (`rig0`), pedals (`pedals0`), shifter (`shifter0`), handbrake (`hb0`).
+  Inputs move by themselves (waves, optional noise), and items are deliberately unsupported with
+  every kind of reason, including live `DependsOn`.
+- It simulates what hardware does to the app: **rim swap** (custom parameter `rim`: formula, GT,
+  none; the two rims support different items), **device unplugged** (`handbrake_connected`),
+  and a **fake driver** (`plugins/sim/driver`) with install, status, uninstall and a
+  `save-setting` privileged operation that only touches its data directory: saved settings are
+  restored by the next session.
+- `--id`, `--devices` and `--usb-pedals` options let tests run it as a second "brand" handling
+  USB devices from a fake sysfs tree.
+- **Conformance checks** (`simrig-host::conformance`): every standard item present once with the
+  right class and value kind, valid current values, known `DependsOn` targets, unique and valid
+  custom parameters, `test_effect` ⇒ `stop_force`. The host runs them on every attach.
+- **End-to-end tests** (`plugins/sim/tests`) start real plugin processes and the real helper
+  through the host, with temporary configuration, state and sysfs directories: parameters,
+  reasons, dependencies, actions, live inputs, rim swap, virtual and USB hotplug, mixed brands,
+  driver install/save/uninstall without leftovers, exclusions, presets.
+- *(Planned, M2)* `--uinput` option, and **record and replay** of real devices through an `Io`
+  layer.
 
 ## 9. Wizard
 
@@ -581,19 +631,20 @@ simrig/
 ├── crates/
 │   ├── simrig-model/               domain types, standard component interfaces, custom parameters (no I/O)
 │   ├── simrig-protocol/            adapter ↔ app messages and JSON-RPC framing, versioned
-│   ├── simrig-plugin-sdk/          adapter SDK: interfaces, validation, protocol server
-│   ├── simrig-host/                plugin discovery and processes, rig, USB scan, conformance (used by GUI and CLI)
+│   ├── simrig-plugin-sdk/          adapter SDK: interfaces, validation, protocol server, host link
+│   ├── simrig-driver/              driver contract, hooks, installation registry, removal scripts
+│   ├── simrig-helper/              privileged helper (run through pkexec)
+│   ├── simrig-host/                the app core: plugins, rig, events, drivers, presets, catalog, system
 │   ├── simrig-cli/                 `simrig-cli`
-│   ├── simrig-gui/                 (M1) Slint
-│   ├── simrig-driver-recipes/      (M2) ready-made driver hooks (dkms, udev, hid-bpf, systemd…)
-│   └── simrig-helper/              (M2) runs driver hooks + polkit policy + installation registry
+│   └── simrig-gui/                 (M1) Slint
 ├── plugins/                        official plugins: same repo and release, separate packages
-│   ├── sim/                        simulated rig + end-to-end tests
+│   ├── sim/                        simulated rig, fake driver, catalog, end-to-end tests
 │   └── fanatec/                    (M2) adapter + driver/ (hid-fanatecff submodule + hooks)
-├── assets/generic/                 (M1)
-├── packaging/                      (M5)
+├── packaging/polkit/               polkit action of the helper
 └── docs/
 ```
+
+Driver recipes (dkms, udev, hid-bpf, systemd) come with the first real driver (M2).
 
 ## 11. Example: adding Fanatec
 
@@ -650,6 +701,7 @@ Whether the tuning menu really persists in the base's memory must be **verified 
 | D12 | Drivers kept by default on app removal; removal optional via the app's uninstall dialog, purge, or a standalone script | devices keep working unless the user explicitly asks otherwise |
 | D13 | Unsupported items shown disabled with a reason, never hidden | the user understands what the hardware can do and how to enable missing features |
 | D14 | Any mix of brands; each device belongs to exactly one plugin (most specific match); components addressed by plugin, never by type alone | no constraint on how users build their rig |
+| D15 | No privileges at runtime: live settings, tests and presets go through the drivers' interfaces; authorization only for system changes, through pkexec + `simrig-helper` | the app is always started as a normal user; the password is asked only when it is really needed |
 
 ## 13. Risks
 

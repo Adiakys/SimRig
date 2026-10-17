@@ -7,6 +7,9 @@ const ONLY_BRAKE: &str = "Only the brake pedal has a load cell.";
 /// Simulated 3-pedal set. The brake has a load cell; vibration is not implemented.
 pub struct SimPedals {
     shared: Shared,
+    id: String,
+    name: String,
+    model: String,
     shapes: [AxisShape; 3],
     brake_max_force: Kilograms,
 }
@@ -20,9 +23,12 @@ fn index(pedal: PedalRole) -> usize {
 }
 
 impl SimPedals {
-    pub fn new(shared: Shared) -> Self {
+    pub fn new(shared: Shared, id: &str, name: &str, model: &str) -> Self {
         Self {
             shared,
+            id: id.into(),
+            name: name.into(),
+            model: model.into(),
             shapes: Default::default(),
             brake_max_force: 80.0,
         }
@@ -37,15 +43,19 @@ impl SimPedals {
 
 impl Component for SimPedals {
     fn id(&self) -> String {
-        format!("{}/pedals", crate::DEVICE_ID)
+        self.id.clone()
     }
 
     fn name(&self) -> String {
-        "Simulated load-cell pedals".into()
+        self.name.clone()
     }
 
     fn model(&self) -> Option<String> {
-        Some("sim/pedals".into())
+        Some(self.model.clone())
+    }
+
+    fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
+        self.shared.save(&self.id(), item, value, host)
     }
 }
 

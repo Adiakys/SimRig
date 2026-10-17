@@ -41,8 +41,14 @@ pub mod method {
     pub const INPUT_SUBSCRIBE: &str = "input/subscribe";
     /// host → plugin: stop sending `input/state` notifications.
     pub const INPUT_UNSUBSCRIBE: &str = "input/unsubscribe";
+    /// host → plugin: make the current value of a persistent item the one the driver restores
+    /// when the device is plugged in.
+    pub const SAVE: &str = "param/save";
     /// host → plugin: the app is closing; the plugin must exit.
     pub const SHUTDOWN: &str = "shutdown";
+
+    /// plugin → host request: run one of the plugin's driver privileged operations.
+    pub const PRIVILEGED: &str = "privileged/request";
 
     /// plugin → host notification: live input state.
     pub const INPUT_STATE: &str = "input/state";
@@ -50,6 +56,8 @@ pub mod method {
     pub const COMPONENTS_CHANGED: &str = "components/changed";
     /// plugin → host notification: custom parameters or ranges of a component changed.
     pub const PARAMS_CHANGED: &str = "params/changed";
+    /// plugin → host notification: the plugin's virtual devices changed.
+    pub const DEVICES_CHANGED: &str = "devices/changed";
 }
 
 /// JSON-RPC error codes.
@@ -69,4 +77,6 @@ pub mod code {
     pub const INCOMPATIBLE: i64 = -32004;
     /// The device or driver failed to perform the operation.
     pub const FAILED: i64 = -32005;
+    /// The user or the system refused a privileged operation.
+    pub const DENIED: i64 = -32006;
 }

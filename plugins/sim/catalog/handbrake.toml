@@ -1,0 +1,5 @@
+id = "sim/handbrake"
+vendor = "SimRig"
+name = "Simulated handbrake"
+kind = "handbrake"
+provides = ["handbrake"]

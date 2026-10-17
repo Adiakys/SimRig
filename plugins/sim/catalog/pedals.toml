@@ -1,0 +1,5 @@
+id = "sim/pedals"
+vendor = "SimRig"
+name = "Simulated load-cell pedals"
+kind = "pedals"
+provides = ["pedals"]

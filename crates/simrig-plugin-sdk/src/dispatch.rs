@@ -12,6 +12,8 @@ use simrig_model::{
 
 use crate::error::{Error, Result};
 use crate::interfaces::{AnyComponent, Handbrake, Pedals, Shifter, SteeringWheel, WheelBase};
+use crate::server::HostLink;
+use simrig_model::{CUSTOM_PREFIX, Persistence};
 
 /// Uniform view of a component's standard items. `None` means "no such item".
 trait Facade {
@@ -312,4 +314,43 @@ pub(crate) fn write_output(c: &mut AnyComponent, id: &str, value: &Value) -> Res
     ty.validate(value)?;
     f.write_output(id, value)
         .unwrap_or_else(|| Err(not_found("output", id)))
+}
+
+/// Type, current value and persistence of a parameter (standard id or `custom.<id>`).
+fn param_state(c: &mut AnyComponent, item: &str) -> Result<(ParamType, Value, Persistence)> {
+    match item.strip_prefix(CUSTOM_PREFIX) {
+        Some(id) => {
+            let param = c
+                .component_mut()
+                .custom_params()
+                .into_iter()
+                .find(|p| p.id == id)
+                .ok_or_else(|| not_found("custom parameter", id))?;
+            supported(param.availability)?;
+            Ok((param.ty, param.value, param.persistence))
+        }
+        None => {
+            let spec = get_param(c, item)?;
+            Ok((spec.ty, spec.value, spec.persistence))
+        }
+    }
+}
+
+pub(crate) fn save(c: &mut AnyComponent, item: &str, host: &mut HostLink<'_>) -> Result<()> {
+    let (_, value, persistence) = param_state(c, item)?;
+    if persistence != Persistence::Persistent {
+        return Err(Error::InvalidValue(format!(
+            "'{item}' cannot be saved: it lasts until unplugged"
+        )));
+    }
+    c.component_mut().save(item, &value, host)
+}
+
+pub(crate) fn apply_text(c: &mut AnyComponent, item: &str, text: &str) -> Result<()> {
+    let (ty, _, _) = param_state(c, item)?;
+    let value = ty.parse(text)?;
+    match item.strip_prefix(CUSTOM_PREFIX) {
+        Some(id) => set_custom(c, id, &value),
+        None => set_param(c, item, &value),
+    }
 }

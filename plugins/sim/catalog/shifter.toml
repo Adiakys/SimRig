@@ -1,0 +1,5 @@
+id = "sim/shifter"
+vendor = "SimRig"
+name = "Simulated H/sequential shifter"
+kind = "shifter"
+provides = ["shifter"]

@@ -1,11 +1,43 @@
 //! State shared by the simulated components: time base, wave speed and noise.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::f64::consts::TAU;
+use std::fs;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
 
 use simrig_plugin_sdk::prelude::*;
+
+pub const NO_RIM: &str = "none";
+
+/// The simulated driver: it remembers saved settings in its data directory (given by the host
+/// in `SIMRIG_DRIVER_DATA`), written by its `save-setting` privileged operation.
+pub struct SimDriver {
+    data: PathBuf,
+}
+
+impl SimDriver {
+    fn from_env() -> Option<Self> {
+        std::env::var_os("SIMRIG_DRIVER_DATA").map(|d| SimDriver {
+            data: PathBuf::from(d),
+        })
+    }
+
+    pub fn installed(&self) -> bool {
+        self.data.join("installed").is_file()
+    }
+
+    /// `key=value` lines of the settings file.
+    fn saved(&self) -> BTreeMap<String, String> {
+        let text = fs::read_to_string(self.data.join("settings")).unwrap_or_default();
+        text.lines()
+            .filter_map(|l| l.split_once('='))
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+}
 
 pub struct SimState {
     start: Instant,
@@ -15,17 +47,33 @@ pub struct SimState {
     pub noise: f64,
     pub advanced_mode: bool,
     pub demo_filter: i64,
+    /// Rim mounted on the base: `formula`, `gt` or `none`.
+    pub rim: String,
+    pub handbrake_connected: bool,
+    pub driver: Option<SimDriver>,
+    /// Settings saved by the driver, `<component id>.<item>` → text value.
+    pub saved: BTreeMap<String, String>,
     rng: u64,
 }
 
 impl Default for SimState {
     fn default() -> Self {
+        let driver = SimDriver::from_env();
+        let saved = driver
+            .as_ref()
+            .filter(|d| d.installed())
+            .map(SimDriver::saved)
+            .unwrap_or_default();
         Self {
             start: Instant::now(),
             wave_speed: 0.2,
             noise: 0.0,
             advanced_mode: false,
             demo_filter: 3,
+            rim: "formula".into(),
+            handbrake_connected: true,
+            driver,
+            saved,
             rng: 0x2545_f491_4f6c_dd1d,
         }
     }
@@ -63,6 +111,26 @@ pub struct Shared(Rc<RefCell<SimState>>);
 impl Shared {
     pub fn get(&self) -> std::cell::RefMut<'_, SimState> {
         self.0.borrow_mut()
+    }
+
+    /// Saves a value through the simulated driver's privileged operation, like a real driver
+    /// writing a system file.
+    pub fn save(
+        &self,
+        component: &str,
+        item: &str,
+        value: &Value,
+        host: &mut HostLink<'_>,
+    ) -> Result<()> {
+        let installed = self.get().driver.as_ref().is_some_and(SimDriver::installed);
+        if !installed {
+            return Err(Error::Unsupported(Unsupported::new(Reason::NeedsDriver)));
+        }
+        let key = format!("{component}.{item}");
+        let text = value.to_text();
+        host.privileged("save-setting", &[("key", &key), ("value", &text)])?;
+        self.get().saved.insert(key, text);
+        Ok(())
     }
 }
 

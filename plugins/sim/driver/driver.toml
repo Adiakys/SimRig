@@ -1,0 +1,15 @@
+# Fake driver of the simulated rig. It touches nothing outside its own data directory, so the
+# whole driver flow (install, status, privileged operations, uninstall) can be exercised safely.
+id = "sim-driver"
+version = "1.0"
+summary = "Simulated driver: remembers saved settings"
+license = "GPL-3.0-or-later"
+
+install = "hooks/install"
+uninstall = "hooks/uninstall"
+status = "hooks/status"
+
+[[privileged]]
+name = "save-setting"
+exec = "hooks/save-setting"
+args = { key = "[a-z0-9][a-z0-9/._-]{0,63}", value = "[A-Za-z0-9 .:,_+-]{0,64}" }

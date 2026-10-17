@@ -1,6 +1,6 @@
 //! The adapter side of the protocol: reads requests from stdin, answers on stdout.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
@@ -12,14 +12,21 @@ use serde::de::DeserializeOwned;
 use serde_json::Value as Json;
 use simrig_model::DeviceInfo;
 use simrig_protocol::{
-    API_VERSION, ActionParams, AttachParams, AttachResult, ComponentParams, DetachParams,
-    DiscoverResult, InitializeParams, InitializeResult, InputState, ItemParams, Message,
-    ParamsChanged, RpcError, SetParams, SubscribeParams, code, method, read_message, write_message,
+    API_VERSION, ActionParams, AttachParams, AttachResult, ComponentParams, ComponentsChanged,
+    DetachParams, DevicesChanged, DiscoverResult, InitializeParams, InitializeResult, InputState,
+    ItemParams, Message, ParamsChanged, PrivilegedRequest, PrivilegedResult, RpcError, SetParams,
+    SubscribeParams, code, method, read_message, write_message,
 };
 
-use crate::Adapter;
 use crate::dispatch;
+use crate::error::{Error, Result};
 use crate::interfaces::AnyComponent;
+use crate::{Adapter, Change};
+
+/// How often the adapter is asked for changes when nothing else happens.
+const CHANGE_POLL: Duration = Duration::from_millis(250);
+/// How long a privileged operation may take (it may wait for the user's password).
+const PRIVILEGED_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// Runs the adapter on stdin/stdout until the host sends `shutdown` or closes stdin.
 pub fn run<A: Adapter>(adapter: A) -> ExitCode {
@@ -45,6 +52,62 @@ pub fn run<A: Adapter>(adapter: A) -> ExitCode {
     }
 }
 
+/// Incoming message, or a read error description. `Ok(None)` is end of stream.
+pub type Incoming = std::result::Result<Option<Message>, String>;
+
+/// The way back to the host while handling a request, e.g. to run a privileged operation of
+/// the plugin's driver during [`Component::save`](crate::Component::save).
+pub struct HostLink<'a> {
+    rx: &'a Receiver<Incoming>,
+    out: &'a mut dyn Write,
+    next_id: &'a mut u64,
+    backlog: &'a mut VecDeque<Incoming>,
+}
+
+impl HostLink<'_> {
+    /// Asks the host to run `operation`, declared in the plugin's `driver.toml`, with `args`.
+    /// The host may ask the user for a password; returns what the operation printed.
+    pub fn privileged(&mut self, operation: &str, args: &[(&str, &str)]) -> Result<String> {
+        let id = *self.next_id;
+        *self.next_id += 1;
+        let args: BTreeMap<String, String> = args
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        let request = PrivilegedRequest {
+            operation: operation.into(),
+            args,
+        };
+        write_message(self.out, &Message::request(id, method::PRIVILEGED, request))
+            .map_err(|e| Error::failed(e.to_string()))?;
+        let deadline = Instant::now() + PRIVILEGED_TIMEOUT;
+        loop {
+            let incoming = self
+                .rx
+                .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                .map_err(|_| Error::failed("no answer from the host"))?;
+            match incoming {
+                Ok(Some(m)) if m.is_response() && m.id == Some(id) => {
+                    if let Some(e) = m.error {
+                        return Err(match e.code {
+                            code::DENIED => Error::Failed(format!("not authorized: {}", e.message)),
+                            _ => Error::Failed(e.message),
+                        });
+                    }
+                    let result: PrivilegedResult = m
+                        .result
+                        .and_then(|r| serde_json::from_value(r).ok())
+                        .ok_or_else(|| Error::failed("invalid answer from the host"))?;
+                    return Ok(result.output);
+                }
+                Ok(None) => return Err(Error::failed("the host went away")),
+                // Anything else is handled after the current request.
+                other => self.backlog.push_back(other),
+            }
+        }
+    }
+}
+
 struct Attached {
     device: String,
     component: AnyComponent,
@@ -59,22 +122,28 @@ struct Subscription {
 /// directly with [`Server::serve`].
 pub struct Server<A: Adapter> {
     adapter: A,
+    devices: Vec<String>,
     components: Vec<Attached>,
     subscriptions: HashMap<String, Subscription>,
+    /// Virtual devices last reported to the host, once it asked for them.
+    discovered: Option<Vec<DeviceInfo>>,
+    backlog: VecDeque<Incoming>,
+    next_id: u64,
     initialized: bool,
 }
 
-type Reply = Result<Json, RpcError>;
-
-/// Incoming message, or a read error description. `Ok(None)` is end of stream.
-pub type Incoming = Result<Option<Message>, String>;
+type Reply = std::result::Result<Json, RpcError>;
 
 impl<A: Adapter> Server<A> {
     pub fn new(adapter: A) -> Self {
         Self {
             adapter,
+            devices: Vec::new(),
             components: Vec::new(),
             subscriptions: HashMap::new(),
+            discovered: None,
+            backlog: VecDeque::new(),
+            next_id: 1,
             initialized: false,
         }
     }
@@ -82,18 +151,19 @@ impl<A: Adapter> Server<A> {
     /// Serves messages from `rx` until shutdown or end of stream.
     pub fn serve(&mut self, rx: Receiver<Incoming>, out: &mut impl Write) -> io::Result<()> {
         loop {
-            let incoming = match self.next_tick() {
-                Some(deadline) => {
+            let incoming = match self.backlog.pop_front() {
+                Some(m) => Some(m),
+                None => {
+                    let deadline = self
+                        .next_tick()
+                        .unwrap_or(Instant::now() + CHANGE_POLL)
+                        .min(Instant::now() + CHANGE_POLL);
                     match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
                         Ok(m) => Some(m),
                         Err(RecvTimeoutError::Timeout) => None,
                         Err(RecvTimeoutError::Disconnected) => return Ok(()),
                     }
                 }
-                None => match rx.recv() {
-                    Ok(m) => Some(m),
-                    Err(_) => return Ok(()),
-                },
             };
             match incoming {
                 None => self.send_due_states(out)?,
@@ -103,25 +173,33 @@ impl<A: Adapter> Server<A> {
                     write_message(out, &Message::error_response(None, error))?;
                 }
                 Some(Ok(Some(message))) => {
-                    if !self.handle(message, out)? {
+                    if !self.handle(message, &rx, out)? {
                         return Ok(());
                     }
                 }
+            }
+            if self.initialized {
+                self.flush_changes(out)?;
             }
         }
     }
 
     /// Handles one message; returns `false` after `shutdown`.
-    fn handle(&mut self, message: Message, out: &mut impl Write) -> io::Result<bool> {
+    fn handle(
+        &mut self,
+        message: Message,
+        rx: &Receiver<Incoming>,
+        out: &mut impl Write,
+    ) -> io::Result<bool> {
         let Some(name) = message.method.clone() else {
-            return Ok(true); // the host does not answer us; ignore stray responses
+            return Ok(true); // a stray response: nothing waits for it
         };
         let params = message.params.unwrap_or(Json::Null);
         let component = params
             .get("component")
             .and_then(Json::as_str)
             .map(str::to_owned);
-        let reply = self.dispatch(&name, params);
+        let reply = self.dispatch(&name, params, rx, out);
         if let Some(id) = message.id {
             let response = match &reply {
                 Ok(result) => Message::response(id, result),
@@ -135,7 +213,13 @@ impl<A: Adapter> Server<A> {
         // Setting a value or running an action may change which items are available (e.g.
         // `DependsOn`): send the fresh description so the UI stays live.
         if reply.is_ok()
-            && [method::STD_SET, method::CUSTOM_SET, method::ACTION_RUN].contains(&name.as_str())
+            && [
+                method::STD_SET,
+                method::CUSTOM_SET,
+                method::ACTION_RUN,
+                method::SAVE,
+            ]
+            .contains(&name.as_str())
         {
             if let Some(id) = component {
                 self.notify_params_changed(&id, out)?;
@@ -144,10 +228,17 @@ impl<A: Adapter> Server<A> {
         Ok(true)
     }
 
-    fn dispatch(&mut self, name: &str, params: Json) -> Reply {
+    fn dispatch(
+        &mut self,
+        name: &str,
+        params: Json,
+        rx: &Receiver<Incoming>,
+        out: &mut impl Write,
+    ) -> Reply {
         if !self.initialized && name != method::INITIALIZE {
             return Err(RpcError::new(code::INVALID_REQUEST, "not initialized"));
         }
+        let rpc = |e: Error| e.to_rpc();
         match name {
             method::INITIALIZE => {
                 let p: InitializeParams = parse(params)?;
@@ -164,9 +255,11 @@ impl<A: Adapter> Server<A> {
                     plugin: self.adapter.info(),
                 })
             }
-            method::DISCOVER => reply(DiscoverResult {
-                devices: self.adapter.discover(),
-            }),
+            method::DISCOVER => {
+                let devices = self.adapter.discover();
+                self.discovered = Some(devices.clone());
+                reply(DiscoverResult { devices })
+            }
             method::ATTACH => {
                 let p: AttachParams = parse(params)?;
                 self.attach(p.device)
@@ -183,29 +276,47 @@ impl<A: Adapter> Server<A> {
             method::STD_GET => {
                 let p: ItemParams = parse(params)?;
                 let c = self.component(&p.component)?;
-                reply(dispatch::get_param(c, &p.item).map_err(|e| e.to_rpc())?)
+                reply(dispatch::get_param(c, &p.item).map_err(rpc)?)
             }
             method::STD_SET => {
                 let p: SetParams = parse(params)?;
                 let c = self.component(&p.component)?;
-                dispatch::set_param(c, &p.item, &p.value).map_err(|e| e.to_rpc())?;
+                dispatch::set_param(c, &p.item, &p.value).map_err(rpc)?;
                 reply(())
             }
             method::CUSTOM_SET => {
                 let p: SetParams = parse(params)?;
                 let c = self.component(&p.component)?;
-                dispatch::set_custom(c, &p.item, &p.value).map_err(|e| e.to_rpc())?;
+                dispatch::set_custom(c, &p.item, &p.value).map_err(rpc)?;
+                reply(())
+            }
+            method::SAVE => {
+                let p: ItemParams = parse(params)?;
+                let Server {
+                    components,
+                    backlog,
+                    next_id,
+                    ..
+                } = self;
+                let c = find(components, &p.component)?;
+                let mut link = HostLink {
+                    rx,
+                    out,
+                    next_id,
+                    backlog,
+                };
+                dispatch::save(c, &p.item, &mut link).map_err(rpc)?;
                 reply(())
             }
             method::ACTION_RUN => {
                 let p: ActionParams = parse(params)?;
                 let c = self.component(&p.component)?;
-                reply(dispatch::run_action(c, &p.item, &p.args).map_err(|e| e.to_rpc())?)
+                reply(dispatch::run_action(c, &p.item, &p.args).map_err(rpc)?)
             }
             method::OUTPUT_WRITE => {
                 let p: SetParams = parse(params)?;
                 let c = self.component(&p.component)?;
-                dispatch::write_output(c, &p.item, &p.value).map_err(|e| e.to_rpc())?;
+                dispatch::write_output(c, &p.item, &p.value).map_err(rpc)?;
                 reply(())
             }
             method::INPUT_READ => {
@@ -251,14 +362,19 @@ impl<A: Adapter> Server<A> {
     fn attach(&mut self, device: DeviceInfo) -> Reply {
         self.detach(&device.id);
         let mut components = self.adapter.attach(&device).map_err(|e| e.to_rpc())?;
-        for c in &components {
+        for (i, c) in components.iter().enumerate() {
             let id = c.id();
-            if self.components.iter().any(|a| a.component.id() == id) {
-                let msg = format!("duplicate component id '{id}'");
-                return Err(RpcError::new(code::INTERNAL, msg));
+            let duplicate = components[..i].iter().any(|o| o.id() == id)
+                || self.components.iter().any(|a| a.component.id() == id);
+            if duplicate {
+                return Err(RpcError::new(
+                    code::INTERNAL,
+                    format!("duplicate component id '{id}'"),
+                ));
             }
         }
         let descriptions = components.iter_mut().map(dispatch::describe).collect();
+        self.devices.push(device.id.clone());
         self.components
             .extend(components.into_iter().map(|component| Attached {
                 device: device.id.clone(),
@@ -270,21 +386,71 @@ impl<A: Adapter> Server<A> {
     }
 
     fn detach(&mut self, device: &str) {
-        let before = self.components.len();
-        self.components.retain(|a| a.device != device);
-        if self.components.len() != before {
+        if let Some(i) = self.devices.iter().position(|d| d == device) {
+            self.devices.remove(i);
+            self.components.retain(|a| a.device != device);
             self.adapter.detach(device);
         }
         let live: Vec<String> = self.components.iter().map(|a| a.component.id()).collect();
         self.subscriptions.retain(|id, _| live.contains(id));
     }
 
-    fn component(&mut self, id: &str) -> Result<&mut AnyComponent, RpcError> {
-        self.components
-            .iter_mut()
-            .find(|a| a.component.id() == id)
-            .map(|a| &mut a.component)
-            .ok_or_else(|| RpcError::new(code::NOT_FOUND, format!("unknown component '{id}'")))
+    fn component(&mut self, id: &str) -> std::result::Result<&mut AnyComponent, RpcError> {
+        find(&mut self.components, id)
+    }
+
+    /// Applies the adapter's own changes and tells the host.
+    fn flush_changes(&mut self, out: &mut impl Write) -> io::Result<()> {
+        if let Some(previous) = &self.discovered {
+            let devices = self.adapter.discover();
+            if &devices != previous {
+                self.discovered = Some(devices.clone());
+                write_message(
+                    out,
+                    &Message::notification(method::DEVICES_CHANGED, DevicesChanged { devices }),
+                )?;
+            }
+        }
+        let mut touched: Vec<String> = Vec::new();
+        for change in self.adapter.take_changes() {
+            match change {
+                Change::ComponentAdded { device, component } => {
+                    if !self.devices.contains(&device) {
+                        continue;
+                    }
+                    let id = component.id();
+                    self.components.retain(|a| a.component.id() != id);
+                    touched.push(device.clone());
+                    self.components.push(Attached { device, component });
+                }
+                Change::ComponentRemoved { component } => {
+                    if let Some(i) = self
+                        .components
+                        .iter()
+                        .position(|a| a.component.id() == component)
+                    {
+                        touched.push(self.components.remove(i).device);
+                        self.subscriptions.remove(&component);
+                    }
+                }
+            }
+        }
+        touched.sort();
+        touched.dedup();
+        for device in touched {
+            let components = self
+                .components
+                .iter_mut()
+                .filter(|a| a.device == device)
+                .map(|a| dispatch::describe(&mut a.component))
+                .collect();
+            let changed = ComponentsChanged { device, components };
+            write_message(
+                out,
+                &Message::notification(method::COMPONENTS_CHANGED, changed),
+            )?;
+        }
+        Ok(())
     }
 
     fn next_tick(&self) -> Option<Instant> {
@@ -326,7 +492,18 @@ impl<A: Adapter> Server<A> {
     }
 }
 
-fn parse<T: DeserializeOwned>(params: Json) -> Result<T, RpcError> {
+fn find<'a>(
+    components: &'a mut [Attached],
+    id: &str,
+) -> std::result::Result<&'a mut AnyComponent, RpcError> {
+    components
+        .iter_mut()
+        .find(|a| a.component.id() == id)
+        .map(|a| &mut a.component)
+        .ok_or_else(|| RpcError::new(code::NOT_FOUND, format!("unknown component '{id}'")))
+}
+
+fn parse<T: DeserializeOwned>(params: Json) -> std::result::Result<T, RpcError> {
     serde_json::from_value(params).map_err(|e| RpcError::new(code::INVALID_PARAMS, e.to_string()))
 }
 
@@ -351,6 +528,14 @@ mod tests {
         fn name(&self) -> String {
             "Test base".into()
         }
+        fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
+            let output = host.privileged(
+                "save-setting",
+                &[("key", item), ("value", &value.to_text())],
+            )?;
+            assert_eq!(output, "saved");
+            Ok(())
+        }
     }
 
     impl WheelBase for Base {
@@ -359,8 +544,11 @@ mod tests {
         }
         fn param(&mut self, param: WheelBaseParam) -> Support<ParamSpec> {
             match param {
-                WheelBaseParam::Rotation => {
-                    Support::Supported(ParamSpec::float(self.rotation, 90.0, 1080.0, 10.0))
+                WheelBaseParam::Rotation => Support::Supported(
+                    ParamSpec::float(self.rotation, 90.0, 1080.0, 10.0).persistent(),
+                ),
+                WheelBaseParam::FfbStrength => {
+                    Support::Supported(ParamSpec::float(50.0, 0.0, 100.0, 1.0))
                 }
                 WheelBaseParam::NaturalInertia => Support::not_in_hardware("No inertia filter."),
                 _ => Support::not_in_driver(),
@@ -435,7 +623,7 @@ mod tests {
         assert_eq!(reason("rotation"), None);
         assert_eq!(reason("angle"), None);
         assert_eq!(reason("natural_inertia"), Some(Reason::NotInHardware));
-        assert_eq!(reason("ffb_strength"), Some(Reason::NotInDriver));
+        assert_eq!(reason("spring_strength"), Some(Reason::NotInDriver));
         assert_eq!(reason("stop_force"), Some(Reason::NotInDriver));
     }
 
@@ -464,6 +652,44 @@ mod tests {
             }
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    #[test]
+    fn save_goes_through_the_host() {
+        let save = |id, item: &str| {
+            Message::request(
+                id,
+                method::SAVE,
+                ItemParams {
+                    component: "base".into(),
+                    item: item.into(),
+                },
+            )
+        };
+        // The host's answer to the plugin's privileged request (the plugin's first request id).
+        let granted = Message::response(
+            1,
+            PrivilegedResult {
+                output: "saved".into(),
+            },
+        );
+        let replies = exchange(vec![
+            init(),
+            attach(),
+            save(3, "rotation"),
+            granted,
+            save(4, "ffb_strength"),
+        ]);
+        let request = &replies[2];
+        assert_eq!(request.method.as_deref(), Some(method::PRIVILEGED));
+        let request: PrivilegedRequest =
+            serde_json::from_value(request.params.clone().unwrap()).unwrap();
+        assert_eq!(request.args["value"], "900");
+        assert_eq!(replies[3].id, Some(3));
+        assert!(replies[3].error.is_none(), "{:?}", replies[3].error);
+        // ffb_strength is volatile: it cannot be saved
+        let refused = replies.iter().find(|m| m.id == Some(4)).unwrap();
+        assert_eq!(refused.error.as_ref().unwrap().code, code::INVALID_VALUE);
     }
 
     #[test]

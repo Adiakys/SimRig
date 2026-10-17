@@ -104,6 +104,8 @@ pub enum Reason {
     NeedsComponent { what: String },
     /// Available only when another item of the same component has a given value.
     DependsOn { item: String, value: Value },
+    /// The device's driver must be installed first.
+    NeedsDriver,
     /// Temporarily unavailable (device busy, reconnecting…).
     Unavailable,
 }
@@ -116,6 +118,7 @@ impl Reason {
             Reason::NeedsFirmware { min } => format!("Requires firmware {min} or later."),
             Reason::NeedsComponent { what } => format!("Requires {what}."),
             Reason::DependsOn { item, value } => format!("Available when {item} is {value}."),
+            Reason::NeedsDriver => "Requires the driver to be installed.".into(),
             Reason::Unavailable => "Temporarily unavailable.".into(),
         }
     }

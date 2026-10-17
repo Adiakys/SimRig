@@ -1,0 +1,17 @@
+[package]
+name = "simrig-driver"
+description = "simrig driver contract: driver.toml, hooks, installation registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true

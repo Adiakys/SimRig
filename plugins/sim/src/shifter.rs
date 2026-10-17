@@ -75,7 +75,7 @@ impl SimShifter {
 
 impl Component for SimShifter {
     fn id(&self) -> String {
-        format!("{}/shifter", crate::DEVICE_ID)
+        format!("{}/shifter", crate::SHIFTER)
     }
 
     fn name(&self) -> String {
@@ -84,6 +84,9 @@ impl Component for SimShifter {
 
     fn model(&self) -> Option<String> {
         Some("sim/shifter".into())
+    }
+    fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
+        self.shared.save(&self.id(), item, value, host)
     }
 }
 

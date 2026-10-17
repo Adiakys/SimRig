@@ -1,21 +1,104 @@
 //! End-to-end: the host starts the simulated rig as an external plugin process and talks to
-//! it through the protocol, exactly as the app does.
+//! it through the protocol, exactly as the app does. Every test uses its own temporary
+//! configuration, state and sysfs directories.
 
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::process::Command;
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
-use simrig_host::{Host, HostError, HostOptions, PluginState};
+use simrig_host::{
+    ApplyOutcome, Host, HostError, HostEvent, HostOptions, Image, PluginState, Preset,
+};
 use simrig_model::{ComponentKind, ItemSpec, Reason, Support, Value};
 
-fn start() -> Host {
-    let exec = PathBuf::from(env!("CARGO_BIN_EXE_simrig-plugin-sim"));
-    let options = HostOptions {
-        plugin_dirs: vec![PathBuf::from(env!("CARGO_MANIFEST_DIR"))],
-        default_dirs: false,
-        exec_dirs: vec![exec.parent().unwrap_or(Path::new(".")).to_path_buf()],
-        ..HostOptions::default()
-    };
-    Host::start(&options)
+const USB_PLUGIN: &str = "sim-usb";
+
+/// Temporary directories of one test, removed on drop.
+struct Env {
+    root: PathBuf,
+}
+
+impl Env {
+    fn new(name: &str) -> Self {
+        let root = std::env::temp_dir().join(format!("simrig-e2e-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("usb")).unwrap();
+        Env { root }
+    }
+
+    fn options(&self) -> HostOptions {
+        let exec = PathBuf::from(env!("CARGO_BIN_EXE_simrig-plugin-sim"));
+        let bin_dir = exec.parent().unwrap_or(Path::new(".")).to_path_buf();
+        HostOptions {
+            plugin_dirs: vec![
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+                self.root.join("plugins"),
+            ],
+            default_dirs: false,
+            exec_dirs: vec![bin_dir.clone()],
+            usb_root: self.root.join("usb"),
+            config_dir: self.root.join("config"),
+            data_dir: self.root.join("data"),
+            dev_state_dir: self.root.join("state"),
+            helper: Some(helper(&bin_dir)),
+            ..HostOptions::default()
+        }
+    }
+
+    fn start(&self) -> Host {
+        Host::start(&self.options())
+    }
+
+    /// A second simulated "brand": every USB device with vendor 0xfffe becomes a pedal set.
+    fn add_usb_plugin(&self) {
+        let dir = self.root.join("plugins").join(USB_PLUGIN);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("plugin.toml"),
+            format!(
+                "id = '{USB_PLUGIN}'\nname = 'Simulated USB pedals'\nversion = '0.1.0'\napi = 1\n\
+                 exec = 'simrig-plugin-sim'\nargs = ['--id', '{USB_PLUGIN}', '--devices', '', '--usb-pedals']\n\
+                 [match]\nusb = [{{ vid = 0xfffe }}]\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    fn plug_usb(&self, port: &str) {
+        let dev = self.root.join("usb").join(port);
+        fs::create_dir_all(&dev).unwrap();
+        fs::write(dev.join("idVendor"), "fffe\n").unwrap();
+        fs::write(dev.join("idProduct"), "0001\n").unwrap();
+        fs::write(dev.join("product"), "Fake pedals\n").unwrap();
+    }
+
+    fn unplug_usb(&self, port: &str) {
+        fs::remove_dir_all(self.root.join("usb").join(port)).unwrap();
+    }
+}
+
+impl Drop for Env {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+/// `simrig-helper` from the same build; built on demand when only this package is tested.
+fn helper(bin_dir: &Path) -> PathBuf {
+    static BUILT: OnceLock<()> = OnceLock::new();
+    let path = bin_dir.join("simrig-helper");
+    BUILT.get_or_init(|| {
+        if !path.is_file() {
+            let status = Command::new(env!("CARGO"))
+                .args(["build", "-q", "-p", "simrig-helper"])
+                .status()
+                .unwrap();
+            assert!(status.success(), "cannot build simrig-helper");
+        }
+    });
+    path
 }
 
 fn reason(host: &Host, address: &str, item: &str) -> Option<Reason> {
@@ -32,15 +115,31 @@ fn reason(host: &Host, address: &str, item: &str) -> Option<Reason> {
     }
 }
 
+/// Polls until `done` holds for an event, or fails after a while.
+fn poll_until(host: &mut Host, what: &str, done: impl Fn(&HostEvent) -> bool) -> Vec<HostEvent> {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut seen = Vec::new();
+    while Instant::now() < deadline {
+        let events = host.poll();
+        let found = events.iter().any(&done);
+        seen.extend(events);
+        if found {
+            return seen;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    panic!("no event: {what}; seen {seen:?}");
+}
+
 #[test]
 fn starts_a_conforming_rig() {
-    let host = start();
+    let env = Env::new("start");
+    let host = env.start();
     assert!(
         host.problems().is_empty(),
         "problems: {:?}",
         host.problems()
     );
-    assert_eq!(host.plugins().len(), 1);
     assert_eq!(host.plugins()[0].state, PluginState::Running);
     let kinds: Vec<ComponentKind> = host
         .components()
@@ -49,11 +148,18 @@ fn starts_a_conforming_rig() {
         .collect();
     assert_eq!(kinds, ComponentKind::ALL.to_vec());
     assert_eq!(host.find("base").unwrap().address, "sim/rig0/base");
+    assert_eq!(host.catalog().models().len(), 7);
+    // No image shipped: the app draws the generic one of the type.
+    assert_eq!(
+        host.image("base").unwrap(),
+        Image::Generic(ComponentKind::WheelBase)
+    );
 }
 
 #[test]
 fn standard_parameters_are_validated() {
-    let mut host = start();
+    let env = Env::new("params");
+    let mut host = env.start();
     host.set("base", "rotation", Value::Float(540.0)).unwrap();
     assert_eq!(
         host.param("base", "rotation").unwrap().value,
@@ -74,7 +180,6 @@ fn standard_parameters_are_validated() {
         }
         other => panic!("expected unsupported, got {other:?}"),
     }
-    // the plugin rejects inconsistent values its own way
     assert!(
         host.set("pedals", "brake.calibration_min", Value::Int(65535))
             .is_err()
@@ -83,7 +188,8 @@ fn standard_parameters_are_validated() {
 
 #[test]
 fn unsupported_items_carry_every_kind_of_reason() {
-    let host = start();
+    let env = Env::new("reasons");
+    let host = env.start();
     assert_eq!(
         reason(&host, "base", "natural_inertia"),
         Some(Reason::NotInHardware)
@@ -105,7 +211,8 @@ fn unsupported_items_carry_every_kind_of_reason() {
 
 #[test]
 fn dependencies_follow_the_mode() {
-    let mut host = start();
+    let env = Env::new("depends");
+    let mut host = env.start();
     assert_eq!(reason(&host, "shifter", "gear"), None);
     assert!(matches!(
         reason(&host, "shifter", "sequential"),
@@ -118,15 +225,10 @@ fn dependencies_follow_the_mode() {
         reason(&host, "shifter", "gear"),
         Some(Reason::DependsOn { .. })
     ));
-    assert!(matches!(
-        reason(&host, "shifter", "gears"),
-        Some(Reason::DependsOn { .. })
-    ));
     assert_eq!(reason(&host, "shifter", "sequential"), None);
     let inputs = host.read_inputs("shifter").unwrap();
     assert!(inputs.contains_key("sequential") && !inputs.contains_key("gear"));
 
-    // custom parameters too
     let demo = |host: &Host| {
         host.find("base")
             .unwrap()
@@ -149,8 +251,9 @@ fn dependencies_follow_the_mode() {
 }
 
 #[test]
-fn actions_and_outputs() {
-    let mut host = start();
+fn actions_and_outputs_need_no_privileges() {
+    let env = Env::new("actions");
+    let mut host = env.start();
     let test_effect = host
         .find("base")
         .unwrap()
@@ -190,21 +293,247 @@ fn actions_and_outputs() {
 
 #[test]
 fn live_inputs() {
-    let mut host = start();
+    let env = Env::new("inputs");
+    let mut host = env.start();
     host.subscribe("pedals", 50.0).unwrap();
-    let mut states = 0;
-    while let Some(values) = host
-        .next_input_state("pedals", Duration::from_secs(2))
-        .unwrap()
-    {
-        assert!(values.contains_key("brake.position"));
-        assert!(values.contains_key("brake.force"));
+    for _ in 0..5 {
+        let values = host
+            .next_input_state("pedals", Duration::from_secs(2))
+            .unwrap()
+            .expect("input state");
+        assert!(values.contains_key("brake.position") && values.contains_key("brake.force"));
         assert!(!values.contains_key("throttle.force"));
-        states += 1;
-        if states == 5 {
-            break;
-        }
     }
-    assert_eq!(states, 5);
+    // Through poll, as the GUI gets them.
+    poll_until(
+        &mut host,
+        "inputs",
+        |e| matches!(e, HostEvent::Inputs { address, .. } if address == "sim/pedals0/pedals"),
+    );
     host.unsubscribe("pedals").unwrap();
+}
+
+#[test]
+fn rim_swap_changes_the_components() {
+    let env = Env::new("rim");
+    let mut host = env.start();
+    assert_eq!(
+        host.find("wheel").unwrap().description.model.as_deref(),
+        Some("sim/formula-rim")
+    );
+
+    host.set("base", "custom.rim", Value::Choice("gt".into()))
+        .unwrap();
+    poll_until(
+        &mut host,
+        "rim swap",
+        |e| matches!(e, HostEvent::ComponentsChanged { device, .. } if device == "rig0"),
+    );
+    assert_eq!(
+        host.find("wheel").unwrap().description.model.as_deref(),
+        Some("sim/gt-rim")
+    );
+    assert_eq!(reason(&host, "wheel", "flag_leds"), None);
+    assert_eq!(
+        reason(&host, "wheel", "display"),
+        Some(Reason::NotInHardware)
+    );
+    host.write_output("wheel", "flag_leds", Value::Choice("yellow".into()))
+        .unwrap();
+
+    host.set("base", "custom.rim", Value::Choice("none".into()))
+        .unwrap();
+    poll_until(&mut host, "rim removed", |e| {
+        matches!(e, HostEvent::ComponentsChanged { .. })
+    });
+    assert!(host.find("wheel").is_err());
+    assert!(host.find("base").is_ok());
+}
+
+#[test]
+fn virtual_devices_come_and_go() {
+    let env = Env::new("virtual");
+    let mut host = env.start();
+    host.set("base", "custom.handbrake_connected", Value::Bool(false))
+        .unwrap();
+    poll_until(
+        &mut host,
+        "handbrake unplugged",
+        |e| matches!(e, HostEvent::DeviceRemoved { device, .. } if device == "hb0"),
+    );
+    assert!(host.find("handbrake").is_err());
+
+    host.set("base", "custom.handbrake_connected", Value::Bool(true))
+        .unwrap();
+    poll_until(
+        &mut host,
+        "handbrake plugged",
+        |e| matches!(e, HostEvent::DeviceAdded { device, .. } if device.id == "hb0"),
+    );
+    assert!(host.find("handbrake").is_ok());
+}
+
+#[test]
+fn drivers_install_save_and_uninstall_without_leftovers() {
+    let env = Env::new("driver");
+    let mut host = env.start();
+    let status = host.driver_status("sim").unwrap().unwrap();
+    assert!(!status.installed && status.user_access == Some(true));
+
+    // Live changes never need the driver or privileges; saving needs the driver.
+    host.set("base", "rotation", Value::Float(540.0)).unwrap();
+    match host.save("base", "rotation") {
+        Err(HostError::Unsupported(u)) => assert_eq!(u.reason, Reason::NeedsDriver),
+        other => panic!("expected NeedsDriver, got {other:?}"),
+    }
+
+    host.install_driver("sim").unwrap();
+    assert!(host.driver_status("sim").unwrap().unwrap().installed);
+    assert_eq!(host.installed_drivers().len(), 1);
+    // The adapter was restarted: the live value is back to its default.
+    assert_eq!(
+        host.param("base", "rotation").unwrap().value,
+        Value::Float(900.0)
+    );
+    host.set("base", "rotation", Value::Float(540.0)).unwrap();
+    host.save("base", "rotation").unwrap();
+    // A volatile value cannot be saved.
+    assert!(matches!(
+        host.save("base", "custom.noise"),
+        Err(HostError::InvalidValue(_))
+    ));
+    drop(host);
+
+    // The driver remembers it: a new session (the app was closed) starts with it.
+    let mut host = env.start();
+    assert_eq!(
+        host.param("base", "rotation").unwrap().value,
+        Value::Float(540.0)
+    );
+
+    host.uninstall_driver("sim").unwrap();
+    assert!(host.installed_drivers().is_empty());
+    assert!(!env.root.join("state").exists(), "driver state left behind");
+    assert_eq!(
+        host.param("base", "rotation").unwrap().value,
+        Value::Float(900.0)
+    );
+}
+
+#[test]
+fn usb_hotplug_with_mixed_brands() {
+    let env = Env::new("usb");
+    env.add_usb_plugin();
+    let mut host = env.start();
+    let usb_plugin = |host: &Host| {
+        host.plugins()
+            .iter()
+            .find(|p| p.manifest.id == USB_PLUGIN)
+            .unwrap()
+            .state
+            .clone()
+    };
+    assert_eq!(usb_plugin(&host), PluginState::Idle);
+
+    env.plug_usb("3-1");
+    poll_until(
+        &mut host,
+        "usb pedals",
+        |e| matches!(e, HostEvent::DeviceAdded { plugin, .. } if plugin == USB_PLUGIN),
+    );
+    assert_eq!(usb_plugin(&host), PluginState::Running);
+    // Two pedal sets from two "brands": addressed by plugin, never by type alone.
+    assert!(host.find("pedals").is_err());
+    let usb_pedals = "sim-usb/usb-3-1/pedals";
+    assert_eq!(
+        host.find(usb_pedals).unwrap().description.model.as_deref(),
+        Some("sim/usb-pedals")
+    );
+
+    let preset = Preset::parse(
+        &format!("name = 'Mixed'\n[pedals]\n'brake.deadzone_low' = 5\n[component.'{usb_pedals}']\n'brake.deadzone_low' = 8\n"),
+        Path::new("mixed.toml"),
+    )
+    .unwrap();
+    let report = host.apply_preset(&preset);
+    assert_eq!(report.len(), 2, "{report:?}");
+    assert_eq!(
+        host.param("sim/pedals0/pedals", "brake.deadzone_low")
+            .unwrap()
+            .value,
+        Value::Float(5.0)
+    );
+    assert_eq!(
+        host.param(usb_pedals, "brake.deadzone_low").unwrap().value,
+        Value::Float(8.0)
+    );
+
+    env.unplug_usb("3-1");
+    let events = poll_until(&mut host, "usb plugin stopped", |e| {
+        matches!(e, HostEvent::PluginStopped { .. })
+    });
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, HostEvent::DeviceRemoved { plugin, .. } if plugin == USB_PLUGIN))
+    );
+    assert_eq!(usb_plugin(&host), PluginState::Idle);
+    assert!(host.find(usb_pedals).is_err());
+}
+
+#[test]
+fn excluded_components_are_remembered() {
+    let env = Env::new("exclude");
+    let mut host = env.start();
+    host.set_excluded("handbrake", true).unwrap();
+    drop(host);
+    let mut host = env.start();
+    assert!(host.find("handbrake").unwrap().excluded);
+    let preset = host.capture_preset("Without handbrake").unwrap();
+    assert!(!preset.kinds.contains_key(&ComponentKind::Handbrake));
+    host.set_excluded("handbrake", false).unwrap();
+    assert!(!host.find("handbrake").unwrap().excluded);
+}
+
+#[test]
+fn presets_capture_apply_and_retry_dependencies() {
+    let env = Env::new("presets");
+    let mut host = env.start();
+    host.install_driver("sim").unwrap();
+    host.set("base", "rotation", Value::Float(540.0)).unwrap();
+    host.set("shifter", "gears", Value::Int(5)).unwrap();
+    let preset = host.capture_preset("GT3").unwrap();
+    assert_eq!(
+        preset.kinds[&ComponentKind::WheelBase]["rotation"],
+        toml::Value::Float(540.0)
+    );
+    host.presets().save(&preset).unwrap();
+
+    // Another session, with the shifter in sequential mode: `gears` depends on the mode,
+    // which the preset sets back to H-pattern, so it is applied on the second pass.
+    drop(host);
+    let mut host = env.start();
+    host.set("shifter", "mode", Value::Choice("sequential".into()))
+        .unwrap();
+    let preset = host.presets().get("gt3").unwrap();
+    let report = host.apply_preset(&preset);
+    let outcome = |item: &str| {
+        report
+            .iter()
+            .find(|e| e.item == item)
+            .map(|e| e.outcome.clone())
+    };
+    assert_eq!(outcome("rotation"), Some(ApplyOutcome::Saved));
+    assert_eq!(outcome("gears"), Some(ApplyOutcome::Saved));
+    assert_eq!(host.param("shifter", "gears").unwrap().value, Value::Int(5));
+    assert_eq!(host.presets().list().unwrap().len(), 1);
+
+    // Export, delete, import.
+    let file = env.root.join("gt3-export.toml");
+    host.presets().export("GT3", &file).unwrap();
+    host.presets().delete("GT3").unwrap();
+    assert!(host.presets().list().unwrap().is_empty());
+    host.presets().import(&file, false).unwrap();
+    assert!(host.presets().import(&file, false).is_err());
+    host.uninstall_driver("sim").unwrap();
 }

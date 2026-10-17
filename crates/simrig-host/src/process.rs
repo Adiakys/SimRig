@@ -11,9 +11,28 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use simrig_protocol::{Message, method, read_message, write_message};
+use simrig_protocol::{
+    Message, PrivilegedRequest, PrivilegedResult, RpcError, code, method, read_message,
+    write_message,
+};
 
+use crate::drivers::PrivilegedRunner;
 use crate::error::HostError;
+
+/// Slice of time a call waits for its response before checking the plugin's own requests.
+const SLICE: Duration = Duration::from_millis(10);
+
+/// How to start an adapter.
+pub(crate) struct Spawn<'a> {
+    pub plugin: &'a str,
+    pub exec: &'a Path,
+    pub args: &'a [String],
+    pub dir: &'a Path,
+    pub env: Vec<(String, std::ffi::OsString)>,
+    pub timeout: Duration,
+    /// Runs the plugin's privileged requests; `None` refuses them.
+    pub privileged: Option<PrivilegedRunner>,
+}
 
 const STDERR_LINES: usize = 200;
 
@@ -26,18 +45,26 @@ pub(crate) struct PluginProcess {
     next_id: u64,
     pending: Pending,
     notifications: Receiver<Message>,
+    requests: Receiver<Message>,
     stderr: Arc<Mutex<VecDeque<String>>>,
     timeout: Duration,
+    privileged: Option<PrivilegedRunner>,
 }
 
 impl PluginProcess {
-    pub(crate) fn spawn(
-        plugin: &str,
-        exec: &Path,
-        dir: &Path,
-        timeout: Duration,
-    ) -> io::Result<Self> {
+    pub(crate) fn spawn(spec: Spawn<'_>) -> io::Result<Self> {
+        let Spawn {
+            plugin,
+            exec,
+            args,
+            dir,
+            env,
+            timeout,
+            privileged,
+        } = spec;
         let mut child = Command::new(exec)
+            .args(args)
+            .envs(env)
             .current_dir(dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -58,6 +85,7 @@ impl PluginProcess {
 
         let pending: Pending = Arc::default();
         let (notify_tx, notifications) = channel();
+        let (request_tx, requests) = channel();
         let routes = Arc::clone(&pending);
         thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
@@ -67,6 +95,8 @@ impl PluginProcess {
                     if let Some(sender) = sender {
                         let _ = sender.send(message);
                     }
+                } else if message.is_request() {
+                    let _ = request_tx.send(message);
                 } else if message.is_notification() && notify_tx.send(message).is_err() {
                     break;
                 }
@@ -102,9 +132,53 @@ impl PluginProcess {
             next_id: 1,
             pending,
             notifications,
+            requests,
             stderr: log,
             timeout,
+            privileged,
         })
+    }
+
+    /// Whether the adapter process has exited.
+    pub(crate) fn has_exited(&mut self) -> bool {
+        !matches!(self.child.try_wait(), Ok(None))
+    }
+
+    /// Answers a request the plugin sent us (a privileged operation of its driver).
+    fn answer(&mut self, request: Message) {
+        let Some(id) = request.id else { return };
+        let result = match (request.method.as_deref(), &self.privileged) {
+            (Some(method::PRIVILEGED), Some(runner)) => {
+                match request
+                    .params
+                    .clone()
+                    .map(serde_json::from_value::<PrivilegedRequest>)
+                {
+                    Some(Ok(req)) => match runner.privileged(&req.operation, &req.args) {
+                        Ok(output) => Ok(PrivilegedResult { output }),
+                        Err(HostError::Denied(m)) => Err(RpcError::new(code::DENIED, m)),
+                        Err(e) => Err(RpcError::new(code::FAILED, e.to_string())),
+                    },
+                    _ => Err(RpcError::new(
+                        code::INVALID_PARAMS,
+                        "invalid privileged request",
+                    )),
+                }
+            }
+            (Some(method::PRIVILEGED), None) => Err(RpcError::new(
+                code::DENIED,
+                "this plugin may not run privileged operations",
+            )),
+            (other, _) => Err(RpcError::new(
+                code::METHOD_NOT_FOUND,
+                format!("unknown method {other:?}"),
+            )),
+        };
+        let response = match result {
+            Ok(r) => Message::response(id, r),
+            Err(e) => Message::error_response(Some(id), e),
+        };
+        let _ = write_message(&mut self.stdin, &response);
     }
 
     pub(crate) fn call<P: Serialize, R: DeserializeOwned>(
@@ -122,19 +196,32 @@ impl PluginProcess {
         if write_message(&mut self.stdin, &Message::request(id, name, params)).is_err() {
             return Err(HostError::PluginExited(self.plugin.clone()));
         }
-        let response = match rx.recv_timeout(self.timeout) {
-            Ok(response) => response,
-            Err(RecvTimeoutError::Timeout) => {
-                if let Ok(mut pending) = self.pending.lock() {
-                    pending.remove(&id);
+        let mut deadline = Instant::now() + self.timeout;
+        let response = loop {
+            match rx.recv_timeout(SLICE) {
+                Ok(response) => break response,
+                Err(RecvTimeoutError::Timeout) => {
+                    // While we wait, the plugin may need us (e.g. to save a setting).
+                    let requests: Vec<Message> = self.requests.try_iter().collect();
+                    if !requests.is_empty() {
+                        for request in requests {
+                            self.answer(request);
+                        }
+                        deadline = Instant::now() + self.timeout;
+                    }
+                    if Instant::now() >= deadline {
+                        if let Ok(mut pending) = self.pending.lock() {
+                            pending.remove(&id);
+                        }
+                        return Err(HostError::Timeout {
+                            plugin: self.plugin.clone(),
+                            method: name.into(),
+                        });
+                    }
                 }
-                return Err(HostError::Timeout {
-                    plugin: self.plugin.clone(),
-                    method: name.into(),
-                });
-            }
-            Err(RecvTimeoutError::Disconnected) => {
-                return Err(HostError::PluginExited(self.plugin.clone()));
+                Err(RecvTimeoutError::Disconnected) => {
+                    return Err(HostError::PluginExited(self.plugin.clone()));
+                }
             }
         };
         if let Some(error) = response.error {

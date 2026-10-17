@@ -1,0 +1,7 @@
+# Pedals on a fake USB vendor id: used by the tests with a fake sysfs tree.
+id = "sim/usb-pedals"
+vendor = "SimRig"
+name = "Simulated USB pedals"
+kind = "pedals"
+usb = [{ vid = 0xfffe }]
+provides = ["pedals"]

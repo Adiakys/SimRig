@@ -1,0 +1,8 @@
+id = "sim/dd-base"
+vendor = "SimRig"
+name = "Simulated direct-drive base"
+kind = "wheel_base"
+provides = ["wheel_base", "steering_wheel?"]
+
+[overlay]
+rotation_center = [0.5, 0.46]

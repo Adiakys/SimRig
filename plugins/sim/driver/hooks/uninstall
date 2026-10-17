@@ -1,0 +1,5 @@
+#!/bin/sh
+# Removes everything the simulated driver created.
+set -eu
+rm -f "$SIMRIG_DRIVER_DATA/installed" "$SIMRIG_DRIVER_DATA/settings"
+echo "simulated driver removed"

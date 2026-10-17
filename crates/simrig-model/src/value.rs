@@ -72,6 +72,23 @@ impl Value {
         }
     }
 
+    /// Canonical text form, the inverse of [`ParamType::parse`](crate::ParamType::parse) for
+    /// parameter values.
+    pub fn to_text(&self) -> String {
+        match self {
+            Value::Bool(v) => v.to_string(),
+            Value::Int(v) => v.to_string(),
+            Value::Float(v) => v.to_string(),
+            Value::Text(v) | Value::Choice(v) => v.clone(),
+            Value::Curve(points) => {
+                let points: Vec<String> =
+                    points.iter().map(|p| format!("{}:{}", p.x, p.y)).collect();
+                points.join(",")
+            }
+            other => other.to_string(),
+        }
+    }
+
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Value::Text(v) | Value::Choice(v) => Some(v),
@@ -169,6 +186,41 @@ mod tests {
         for v in values {
             let json = serde_json::to_string(&v).unwrap();
             assert_eq!(serde_json::from_str::<Value>(&json).unwrap(), v);
+        }
+    }
+
+    #[test]
+    fn text_roundtrip() {
+        use crate::ParamType;
+        let cases = [
+            (
+                ParamType::Float {
+                    min: 0.0,
+                    max: 2520.0,
+                    step: 0.5,
+                },
+                Value::Float(540.5),
+            ),
+            (
+                ParamType::Int {
+                    min: 0,
+                    max: 10,
+                    step: 1,
+                },
+                Value::Int(7),
+            ),
+            (ParamType::Bool, Value::Bool(true)),
+            (
+                ParamType::Curve { max_points: 4 },
+                Value::Curve(vec![CurvePoint::new(0.0, 0.0), CurvePoint::new(1.0, 0.75)]),
+            ),
+            (
+                ParamType::Text { max_len: 16 },
+                Value::Text("P1 +0.4".into()),
+            ),
+        ];
+        for (ty, value) in cases {
+            assert_eq!(ty.parse(&value.to_text()).unwrap(), value);
         }
     }
 

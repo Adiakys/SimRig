@@ -1,0 +1,8 @@
+#!/bin/sh
+# Runs as the user. The simulated devices are always accessible.
+set -eu
+if [ -f "$SIMRIG_DRIVER_DATA/installed" ]; then
+    echo '{"installed": true, "active": true, "version": "1.0", "user_access": true}'
+else
+    echo '{"installed": false, "user_access": true, "message": "Install the simulated driver to save settings."}'
+fi

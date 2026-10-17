@@ -1,0 +1,9 @@
+#!/bin/sh
+# Saves one setting (SIMRIG_ARG_KEY=SIMRIG_ARG_VALUE), validated by simrig-helper.
+set -eu
+file="$SIMRIG_DRIVER_DATA/settings"
+touch "$file"
+awk -F= -v k="$SIMRIG_ARG_KEY" '$1 != k' "$file" > "$file.tmp"
+printf '%s=%s\n' "$SIMRIG_ARG_KEY" "$SIMRIG_ARG_VALUE" >> "$file.tmp"
+mv "$file.tmp" "$file"
+echo "saved $SIMRIG_ARG_KEY"

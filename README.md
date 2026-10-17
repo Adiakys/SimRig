@@ -3,8 +3,9 @@
 Configure your sim-racing rig on Linux — wheel base, steering wheel, pedals, shifter and
 handbrake — whatever the brand, from one polished app.
 
-> **Status: early development.** Milestone M0 (core model, plugin protocol and SDK, simulated
-> rig, CLI) is done. The GUI comes next. Nothing here talks to real hardware yet.
+> **Status: early development.** The core (M0) is done and tested on a simulated rig: plugins,
+> hotplug, drivers with a privileged helper, saved settings, rig composition, presets, catalog.
+> The GUI comes next, then the first real hardware (Fanatec).
 
 ## How it works
 
@@ -16,7 +17,10 @@ handbrake — whatever the brand, from one polished app.
   report anything their hardware cannot do as *unsupported, with a reason*: the app shows it
   disabled with the explanation, never hides it.
 - **Brand support comes from plugins**: external processes speaking a versioned JSON-RPC
-  protocol, which may add their own self-described custom parameters.
+  protocol, which may add their own self-described custom parameters. Any mix of brands works.
+- **No root at runtime.** Changing settings, testing force feedback and applying presets never
+  need privileges; the app asks for your password only to install or remove a driver, or when a
+  driver keeps a saved setting in a system file.
 
 Read more in [docs/requirements.md](docs/requirements.md) and
 [docs/architecture.md](docs/architecture.md).
@@ -29,18 +33,29 @@ Requires a recent stable Rust toolchain (1.86+).
 cargo build --workspace
 alias simrig-cli='./target/debug/simrig-cli --plugin-dir plugins --no-default-dirs'
 
+simrig-cli system                                 # what the setup wizard checks
 simrig-cli list                                   # the simulated rig
 simrig-cli show base                              # every item, unsupported ones with their reason
-simrig-cli set base rotation 540
 simrig-cli set shifter mode sequential            # watch `gear` become unavailable
-simrig-cli show shifter
 simrig-cli watch pedals                           # live inputs, Ctrl+C to stop
 simrig-cli run base test_effect                   # asks for confirmation
-simrig-cli check                                  # plugin conformance problems
+
+simrig-cli driver status                          # the simulated driver is not installed
+simrig-cli driver install sim                     # development plugin: no password needed
+simrig-cli set base rotation 540 --save           # restored by the driver next time
+simrig-cli get base rotation
+simrig-cli preset capture GT3 && simrig-cli preset show GT3
+simrig-cli exclude handbrake && simrig-cli list
+simrig-cli monitor                                # rig changes as they happen
+simrig-cli driver uninstall sim                   # leaves nothing behind
 ```
 
-Each command starts the plugins, talks to them and stops them: the simulated rig keeps its
-settings only for the duration of a command.
+Each command starts the plugins, talks to them and stops them. The simulated devices live inside
+the plugin process, so a value set by one command is gone in the next unless saved (`--save`):
+real devices keep it.
+
+To experiment without touching your real configuration, set `XDG_CONFIG_HOME` and
+`XDG_STATE_HOME` to a temporary directory.
 
 ## Repository layout
 
@@ -49,9 +64,12 @@ settings only for the duration of a command.
 | `crates/simrig-model` | Domain model: component interfaces, parameters, unsupported reasons, custom parameters |
 | `crates/simrig-protocol` | App ↔ plugin protocol (JSON-RPC 2.0 over stdio) |
 | `crates/simrig-plugin-sdk` | SDK to write plugin adapters in Rust |
-| `crates/simrig-host` | Plugin discovery and processes, rig model, USB scan, conformance checks |
+| `crates/simrig-driver` | Driver contract (`driver.toml`), hooks, installation registry |
+| `crates/simrig-helper` | Privileged helper, run through `pkexec` only for driver operations |
+| `crates/simrig-host` | The app core: plugins, rig, events, drivers, presets, catalog, system check |
 | `crates/simrig-cli` | Command-line interface |
-| `plugins/sim` | Simulated rig plugin and end-to-end tests |
+| `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
+| `packaging/polkit` | polkit action of the helper |
 
 ## Development
 

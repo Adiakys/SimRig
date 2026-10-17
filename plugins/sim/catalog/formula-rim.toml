@@ -1,0 +1,5 @@
+id = "sim/formula-rim"
+vendor = "SimRig"
+name = "Simulated formula rim"
+kind = "steering_wheel"
+provides = ["steering_wheel"]

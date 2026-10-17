@@ -20,6 +20,9 @@ pub struct Manifest {
     pub api: u32,
     /// Adapter executable, relative to the plugin directory.
     pub exec: String,
+    /// Arguments passed to the adapter.
+    #[serde(default)]
+    pub args: Vec<String>,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default, rename = "match")]
@@ -74,9 +77,13 @@ impl Match {
 /// product over vendor only); on a tie, the plugin found first (explicit, then user, then
 /// system directories). Plugins of different brands never compete, so any mix of brands works.
 /// Returns the devices of each plugin, in the order of `manifests`, and the ties found.
+///
+/// `overrides` maps a device key ([`UsbDevice::keys`]) to the plugin the user chose for it; the
+/// choice wins as long as that plugin claims the device at all.
 pub fn assign_usb(
     manifests: &[&Manifest],
     devices: &[UsbDevice],
+    overrides: &std::collections::BTreeMap<String, String>,
 ) -> (Vec<Vec<UsbDevice>>, Vec<String>) {
     let mut assigned = vec![Vec::new(); manifests.len()];
     let mut problems = Vec::new();
@@ -86,6 +93,17 @@ pub fn assign_usb(
             .enumerate()
             .filter_map(|(i, m)| m.matching.usb_claim(device.vid, device.pid).map(|s| (i, s)))
             .collect();
+        let chosen = device.keys().iter().find_map(|k| overrides.get(k).cloned());
+        let chosen = chosen.and_then(|p| {
+            claims
+                .iter()
+                .find(|(i, _)| manifests[*i].id == p)
+                .map(|(i, _)| *i)
+        });
+        if let Some(i) = chosen {
+            assigned[i].push(device.clone());
+            continue;
+        }
         let Some(best) = claims.iter().map(|(_, s)| *s).max() else {
             continue;
         };
@@ -121,7 +139,7 @@ pub enum PluginLocation {
 
 impl Manifest {
     pub fn load(path: &Path) -> Result<Self, HostError> {
-        let invalid = |message: String| HostError::Manifest {
+        let invalid = |message: String| HostError::Invalid {
             path: path.to_path_buf(),
             message,
         };
@@ -158,11 +176,8 @@ pub struct Found {
 /// Default plugin directories, user first, then system.
 pub fn default_dirs() -> Vec<(PathBuf, PluginLocation)> {
     let mut dirs = Vec::new();
-    let data_home = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")));
-    if let Some(data_home) = data_home {
-        dirs.push((data_home.join("simrig/plugins"), PluginLocation::User));
+    if let Some(data) = crate::paths::data_dir() {
+        dirs.push((data.join("plugins"), PluginLocation::User));
     }
     dirs.push((
         PathBuf::from("/usr/local/lib/simrig/plugins"),
@@ -246,6 +261,7 @@ mod tests {
             version: "1".into(),
             api: 1,
             exec: id.into(),
+            args: Vec::new(),
             description: None,
             matching: Match {
                 usb,
@@ -294,7 +310,8 @@ mod tests {
             device(0x346e, 0x1000),
             device(0x1234, 1),
         ];
-        let (assigned, problems) = assign_usb(&[&fanatec, &moza, &generic], &devices);
+        let (assigned, problems) =
+            assign_usb(&[&fanatec, &moza, &generic], &devices, &Default::default());
         assert!(problems.is_empty());
         assert_eq!(assigned[0], vec![devices[0].clone()]);
         assert_eq!(assigned[1], vec![devices[1].clone()]);
@@ -318,9 +335,15 @@ mod tests {
                 pid: None,
             }],
         );
-        let (assigned, problems) = assign_usb(&[&a, &b], &[device(0x0eb7, 0x0020)]);
+        let (assigned, problems) =
+            assign_usb(&[&a, &b], &[device(0x0eb7, 0x0020)], &Default::default());
         assert_eq!((assigned[0].len(), assigned[1].len()), (1, 0));
         assert_eq!(problems.len(), 1);
+        // the user's choice wins, and removes the ambiguity
+        let overrides = [("usb:0eb7:0020".to_string(), "b".to_string())].into();
+        let (assigned, problems) = assign_usb(&[&a, &b], &[device(0x0eb7, 0x0020)], &overrides);
+        assert_eq!((assigned[0].len(), assigned[1].len()), (0, 1));
+        assert!(problems.is_empty());
     }
 
     #[test]

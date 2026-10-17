@@ -41,7 +41,7 @@ impl SimHandbrake {
 
 impl Component for SimHandbrake {
     fn id(&self) -> String {
-        format!("{}/handbrake", crate::DEVICE_ID)
+        format!("{}/handbrake", crate::HANDBRAKE)
     }
 
     fn name(&self) -> String {
@@ -50,6 +50,9 @@ impl Component for SimHandbrake {
 
     fn model(&self) -> Option<String> {
         Some("sim/handbrake".into())
+    }
+    fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
+        self.shared.save(&self.id(), item, value, host)
     }
 }
 

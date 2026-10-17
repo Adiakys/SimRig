@@ -1,0 +1,20 @@
+[package]
+name = "simrig-helper"
+description = "simrig privileged helper: runs the hooks declared by installed plugins' drivers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "simrig-helper"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+simrig-driver.workspace = true
+simrig-host.workspace = true
+
+[lints]
+workspace = true

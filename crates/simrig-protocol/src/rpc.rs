@@ -133,7 +133,7 @@ pub fn read_message(reader: &mut impl BufRead) -> io::Result<Option<Message>> {
 }
 
 /// Writes one message as a single line and flushes.
-pub fn write_message(writer: &mut impl Write, message: &Message) -> io::Result<()> {
+pub fn write_message<W: Write + ?Sized>(writer: &mut W, message: &Message) -> io::Result<()> {
     let mut line = serde_json::to_string(message).map_err(io::Error::other)?;
     line.push('\n');
     writer.write_all(line.as_bytes())?;

@@ -12,6 +12,7 @@ simrig-plugin-sdk.workspace = true
 [dev-dependencies]
 simrig-host.workspace = true
 simrig-model.workspace = true
+toml.workspace = true
 
 [lints]
 workspace = true

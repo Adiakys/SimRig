@@ -10,12 +10,14 @@ rust-version = "1.86"
 
 [workspace.dependencies]
 anyhow = "1"
+regex = "1"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 toml = "0.8"
 
+simrig-driver = { path = "crates/simrig-driver" }
 simrig-host = { path = "crates/simrig-host" }
 simrig-model = { path = "crates/simrig-model" }
 simrig-plugin-sdk = { path = "crates/simrig-plugin-sdk" }

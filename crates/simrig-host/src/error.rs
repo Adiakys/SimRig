@@ -8,8 +8,8 @@ use simrig_protocol::{RpcError, code};
 pub enum HostError {
     #[error(transparent)]
     Io(#[from] io::Error),
-    #[error("invalid plugin manifest {}: {message}", path.display())]
-    Manifest { path: PathBuf, message: String },
+    #[error("invalid {}: {message}", path.display())]
+    Invalid { path: PathBuf, message: String },
     #[error("{}", .0.explain())]
     Unsupported(Unsupported),
     #[error("invalid value: {0}")]
@@ -24,6 +24,11 @@ pub enum HostError {
     PluginExited(String),
     #[error("plugin '{plugin}': {error}")]
     Plugin { plugin: String, error: RpcError },
+    /// The user dismissed the authorization, or the operation is not allowed.
+    #[error("not authorized: {0}")]
+    Denied(String),
+    #[error("driver: {0}")]
+    Driver(String),
 }
 
 impl HostError {
@@ -42,10 +47,17 @@ impl HostError {
             },
             code::INVALID_VALUE => HostError::InvalidValue(error.message),
             code::NOT_FOUND => HostError::NotFound(error.message),
+            code::DENIED => HostError::Denied(error.message),
             _ => HostError::Plugin {
                 plugin: plugin.into(),
                 error,
             },
         }
+    }
+}
+
+impl From<simrig_driver::DriverError> for HostError {
+    fn from(e: simrig_driver::DriverError) -> Self {
+        HostError::Driver(e.to_string())
     }
 }

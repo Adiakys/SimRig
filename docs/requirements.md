@@ -1,6 +1,6 @@
 # simrig — Requirements
 
-> Working project name. Status: draft 0.6 (2026-10-17). See also [architecture.md](architecture.md).
+> Working project name. Status: draft 0.7 (2026-10-17). See also [architecture.md](architecture.md).
 
 ## 1. Vision
 
@@ -129,6 +129,8 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
   removed.
 - **FR-53** Detect an equivalent driver already present (in-kernel or a distro package) and install
   nothing in that case.
+- **FR-53b** Drivers grant the user access to their devices at install (e.g. udev `uaccess`
+  rules), and their status reports whether the user has it; the app warns when it is missing.
 - **FR-54** Check driver status every time the app is opened and report problems (e.g. module not
   built for the running kernel).
 - **FR-55** Every driver is independent: it chooses its technology, structure and any background
@@ -166,8 +168,11 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 
 - **NFR-01 Portability**: all major distros and all desktops, Wayland and X11. Reached gradually
   (see roadmap), but no choice may tie the project to Ubuntu or GNOME.
-- **NFR-02 Privileges**: the app always runs as the user. Privileged operations go through a helper
-  with a closed set of actions, authorized via polkit.
+- **NFR-02 Privileges**: the app is started and runs as a normal user. Reading inputs, changing
+  settings (rotation, force feedback…), running force-feedback tests and applying presets live
+  never need privileges. Authorization is asked only when needed: installing or removing drivers,
+  and saving a setting when the driver keeps it in a system file. Privileged operations go through
+  a helper with a closed set of actions, authorized via polkit.
 - **NFR-03 No app background processes**: with the app closed, nothing from simrig runs (no agents,
   no services). Drivers are free to have their own processes: they are not part of the app.
 - **NFR-04 Physical safety**: direct-drive bases can hurt. Test effects ramp in and need explicit
@@ -206,12 +211,11 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 
 | Phase | Content | Done when |
 |---|---|---|
-| **M0** ✅ | Domain model, plugin protocol + SDK, "simulated rig" plugin, CLI, tests | `simrig-cli` lists and reads the simulated rig running as an external plugin; CI green |
-| **M1** | GUI on the simulated rig: rig view, live inputs, parameters, wizard | Full wizard works on the simulated rig |
-| **M2** | Fanatec plugin: `hid-fanatecff` + DKMS install + udev rules | From scratch: install the package, the wizard installs the driver and configures the CSL DD; after a reboot, with the app closed, the saved rotation is applied |
-| **M3** | Presets (create, apply, import/export), clean uninstall | Switching preset in the app changes the base's behaviour, also after closing the app and replugging |
-| **M4** | Catalog-driven generic HID, Logitech, Moza… | Each brand has at least one tester with the hardware; a mixed-brand rig (e.g. Fanatec base + Moza pedals) works end to end |
-| **M5** | Multi-distro packages (AUR, OBS, COPR) | Installation verified on Ubuntu, Fedora, Arch |
+| **M0** ✅ | Core: domain model, plugin protocol and SDK, host (hotplug and events, driver contract and privileged helper, persistence, rig composition, presets, catalog, system check), CLI, simulated rig with fake driver, end-to-end tests | Everything the GUI needs works from `simrig-cli` on the simulated rig; CI green |
+| **M1** | GUI on the core: rig view, live inputs, parameters, wizard, presets | Full wizard and daily use work on the simulated rig |
+| **M2** | Fanatec plugin: `hid-fanatecff` + driver recipes (DKMS, udev) + PackageKit prerequisites | From scratch: install the package, the wizard installs the driver and configures the CSL DD; after a reboot, with the app closed, the saved rotation is applied |
+| **M3** | Catalog-driven generic HID, Logitech, Moza… | Each brand has at least one tester with the hardware; a mixed-brand rig (e.g. Fanatec base + Moza pedals) works end to end |
+| **M4** | Multi-distro packages (AUR, OBS, COPR), in-app uninstall | Installation verified on Ubuntu, Fedora, Arch |
 
 ## 8. Open questions
 

@@ -35,7 +35,7 @@ pub use error::{Error, Result};
 pub use interfaces::{
     AnyComponent, Component, Handbrake, Pedals, Shifter, SteeringWheel, WheelBase,
 };
-pub use server::{Server, run};
+pub use server::{HostLink, Server, run};
 pub use simrig_model as model;
 pub use simrig_protocol::PluginInfo;
 
@@ -54,6 +54,24 @@ pub trait Adapter {
 
     /// A device went away. Its components are dropped by the SDK.
     fn detach(&mut self, _device_id: &str) {}
+
+    /// Changes the adapter noticed on its own (e.g. a rim swap). Called after every request and
+    /// periodically; the SDK applies them and notifies the host. Changes of virtual devices are
+    /// detected by calling [`Adapter::discover`] again.
+    fn take_changes(&mut self) -> Vec<Change> {
+        Vec::new()
+    }
+}
+
+/// A change of an attached device's components.
+pub enum Change {
+    /// A new component, e.g. a rim that was mounted.
+    ComponentAdded {
+        device: String,
+        component: AnyComponent,
+    },
+    /// A component that went away, by id.
+    ComponentRemoved { component: String },
 }
 
 /// Everything a plugin author usually needs.
@@ -66,7 +84,7 @@ pub mod prelude {
         Unsupported, Value, WheelBaseAction, WheelBaseParam,
     };
     pub use crate::{
-        Adapter, AnyComponent, Component, Error, Handbrake, Pedals, PluginInfo, Result, Shifter,
-        SteeringWheel, WheelBase,
+        Adapter, AnyComponent, Change, Component, Error, Handbrake, HostLink, Pedals, PluginInfo,
+        Result, Shifter, SteeringWheel, WheelBase,
     };
 }

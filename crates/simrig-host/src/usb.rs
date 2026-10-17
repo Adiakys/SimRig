@@ -17,6 +17,16 @@ pub struct UsbDevice {
 }
 
 impl UsbDevice {
+    /// Stable keys of the device for user choices, most specific first:
+    /// `usb:vvvv:pppp:serial` (when it has a serial) and `usb:vvvv:pppp`.
+    pub fn keys(&self) -> Vec<String> {
+        let base = format!("usb:{:04x}:{:04x}", self.vid, self.pid);
+        match &self.serial {
+            Some(serial) => vec![format!("{base}:{serial}"), base],
+            None => vec![base],
+        }
+    }
+
     pub fn device_info(&self) -> DeviceInfo {
         let port = self
             .sysfs
@@ -36,12 +46,15 @@ impl UsbDevice {
     }
 }
 
+pub const DEFAULT_ROOT: &str = SYSFS_USB;
+
 /// Connected USB devices (not interfaces, not hubs' ports).
 pub fn scan() -> Vec<UsbDevice> {
     scan_dir(Path::new(SYSFS_USB))
 }
 
-fn scan_dir(root: &Path) -> Vec<UsbDevice> {
+/// Same as [`scan`] on another sysfs tree (tests use a fake one).
+pub fn scan_dir(root: &Path) -> Vec<UsbDevice> {
     let Ok(entries) = fs::read_dir(root) else {
         return Vec::new();
     };

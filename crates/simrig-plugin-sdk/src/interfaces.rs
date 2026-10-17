@@ -8,6 +8,7 @@ use simrig_model::{
 };
 
 use crate::error::{Error, Result};
+use crate::server::HostLink;
 
 /// Shared by all component types.
 pub trait Component {
@@ -28,6 +29,13 @@ pub trait Component {
 
     /// Called with a value already validated against the parameter's type and range.
     fn set_custom(&mut self, _id: &str, _value: &Value) -> Result<()> {
+        Err(Error::unsupported())
+    }
+
+    /// Makes `value`, the current value of a persistent item (a standard item id or
+    /// `custom.<id>`), the one the driver restores when the device is plugged in. How is up to
+    /// the driver: device memory, a file, a privileged operation through `host`…
+    fn save(&mut self, _item: &str, _value: &Value, _host: &mut HostLink<'_>) -> Result<()> {
         Err(Error::unsupported())
     }
 }
@@ -222,5 +230,11 @@ impl AnyComponent {
             AnyComponent::Pedals(p) => p.pedals(),
             _ => Vec::new(),
         }
+    }
+
+    /// Parses `text` with the item's current type, validates it and sets it. Items are standard
+    /// parameter ids or `custom.<id>`. Plugins use it to restore saved settings.
+    pub fn apply_text(&mut self, item: &str, text: &str) -> Result<()> {
+        crate::dispatch::apply_text(self, item, text)
     }
 }

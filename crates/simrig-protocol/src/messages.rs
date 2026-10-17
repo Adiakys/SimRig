@@ -99,3 +99,23 @@ pub struct ComponentsChanged {
 pub struct ParamsChanged {
     pub component: ComponentDescription,
 }
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DevicesChanged {
+    /// The full list of the plugin's virtual devices.
+    pub devices: Vec<DeviceInfo>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PrivilegedRequest {
+    /// Operation name declared in the driver's `driver.toml`.
+    pub operation: String,
+    /// Arguments, validated by the helper against the patterns in `driver.toml`.
+    pub args: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PrivilegedResult {
+    /// What the operation printed on stdout.
+    pub output: String,
+}

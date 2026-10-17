@@ -1,6 +1,7 @@
 //! `simrig-cli`: the simrig rig from the terminal. Same core as the GUI; it runs only while a
 //! command runs and leaves nothing behind.
 
+mod commands;
 mod format;
 
 use std::io::{self, BufRead, IsTerminal, Write};
@@ -24,6 +25,10 @@ struct Cli {
     #[arg(long, global = true)]
     no_default_dirs: bool,
 
+    /// Rig composition and presets (default: ~/.config/simrig).
+    #[arg(long, global = true)]
+    config_dir: Option<PathBuf>,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -46,6 +51,9 @@ enum Command {
         component: String,
         item: String,
         value: String,
+        /// Also save it into the driver, so it is restored at plug-in.
+        #[arg(long)]
+        save: bool,
     },
     /// Run an action.
     Run {
@@ -67,6 +75,43 @@ enum Command {
         /// Updates per second.
         #[arg(long, default_value_t = 10.0)]
         rate: f64,
+        /// Stop after this many seconds (default: until Ctrl+C).
+        #[arg(long)]
+        seconds: Option<f64>,
+    },
+    /// Save the current value of a parameter into the driver, so it is restored at plug-in.
+    Save { component: String, item: String },
+    /// Exclude a component from the rig (e.g. pedal inputs of a base when other pedals are used).
+    Exclude { component: String },
+    /// Include an excluded component back.
+    Include { component: String },
+    /// Connected USB devices and the plugin handling each.
+    Devices,
+    /// Choose the plugin of a device (key from `devices`); without plugin, clear the choice.
+    Choose {
+        device: String,
+        plugin: Option<String>,
+    },
+    /// Device models known to the installed plugins.
+    Catalog,
+    /// Add a catalog model to the rig before plugging it in (`--remove` to undo).
+    Plan {
+        model: String,
+        #[arg(long)]
+        remove: bool,
+    },
+    /// Where the picture of a component comes from.
+    Image { component: String },
+    /// Drivers of plugins.
+    #[command(subcommand)]
+    Driver(commands::DriverCommand),
+    /// Presets.
+    #[command(subcommand)]
+    Preset(commands::PresetCommand),
+    /// What the setup wizard checks: distribution, kernel, Secure Boot, session.
+    System,
+    /// Print rig changes (devices plugged and unplugged, rim swaps…) as they happen.
+    Monitor {
         /// Stop after this many seconds (default: until Ctrl+C).
         #[arg(long)]
         seconds: Option<f64>,
@@ -94,11 +139,14 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<ExitCode> {
-    let options = HostOptions {
+    let mut options = HostOptions {
         plugin_dirs: cli.plugin_dirs,
         default_dirs: !cli.no_default_dirs,
         ..HostOptions::default()
     };
+    if let Some(dir) = cli.config_dir {
+        options.config_dir = dir;
+    }
     let mut host = Host::start(&options);
     let problems = host.problems().len();
     if problems > 0 && !matches!(cli.command, Command::Check) {
@@ -142,12 +190,18 @@ fn run(cli: Cli) -> Result<ExitCode> {
             component,
             item,
             value,
+            save,
         } => {
             let address = host.find(&component)?.address.clone();
             let ty = param_type(&mut host, &address, &item)?;
             let value = ty.parse(&value).map_err(|e| anyhow::anyhow!("{e}"))?;
             host.set(&address, &item, value)?;
-            println!("{item} set");
+            if save {
+                host.save(&address, &item)?;
+                println!("{item} set and saved");
+            } else {
+                println!("{item} set");
+            }
         }
         Command::Run {
             component,
@@ -194,6 +248,41 @@ fn run(cli: Cli) -> Result<ExitCode> {
             rate,
             seconds,
         } => watch(&mut host, &component, rate, seconds)?,
+        Command::Save { component, item } => {
+            let address = host.find(&component)?.address.clone();
+            host.save(&address, &item)?;
+            println!("{item} saved: restored when the device is plugged in");
+        }
+        Command::Exclude { component } => {
+            host.set_excluded(&component, true)?;
+            println!("{component} excluded from the rig");
+        }
+        Command::Include { component } => {
+            host.set_excluded(&component, false)?;
+            println!("{component} included in the rig");
+        }
+        Command::Devices => commands::devices(&host),
+        Command::Choose { device, plugin } => {
+            host.choose_plugin(&device, plugin.as_deref())?;
+            println!("saved: takes effect when the device is plugged in again");
+        }
+        Command::Catalog => commands::catalog(&host),
+        Command::Plan { model, remove } => {
+            host.set_planned(&model, !remove)?;
+            println!(
+                "{model} {}",
+                if remove {
+                    "removed from the rig"
+                } else {
+                    "added to the rig"
+                }
+            );
+        }
+        Command::Image { component } => commands::image(&host, &component)?,
+        Command::Driver(command) => return commands::driver(&mut host, command),
+        Command::Preset(command) => commands::preset(&mut host, command)?,
+        Command::System => commands::system(&host),
+        Command::Monitor { seconds } => commands::monitor(&mut host, seconds)?,
         Command::Check => {
             if host.problems().is_empty() {
                 println!("no problems");
@@ -240,12 +329,13 @@ fn print_list(host: &Host) {
         let d = &c.description;
         let supported = d.items.iter().filter(|i| i.support.is_supported()).count();
         println!(
-            "  {:<24} {:<15} {:<34} {supported}/{} standard, {} custom",
+            "  {:<24} {:<15} {:<34} {supported}/{} standard, {} custom{}",
             c.address,
             d.kind.label(),
             d.name,
             d.items.len(),
-            d.custom.len()
+            d.custom.len(),
+            if c.excluded { "  (excluded)" } else { "" }
         );
     }
 }

@@ -1,0 +1,5 @@
+id = "sim/gt-rim"
+vendor = "SimRig"
+name = "Simulated GT rim"
+kind = "steering_wheel"
+provides = ["steering_wheel"]

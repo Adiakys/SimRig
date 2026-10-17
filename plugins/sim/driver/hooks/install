@@ -1,0 +1,6 @@
+#!/bin/sh
+# Installs the simulated driver: just marks it installed in its data directory.
+set -eu
+mkdir -p "$SIMRIG_DRIVER_DATA"
+touch "$SIMRIG_DRIVER_DATA/installed"
+echo "simulated driver installed"
