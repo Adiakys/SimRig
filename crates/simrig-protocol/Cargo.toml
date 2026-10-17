@@ -1,0 +1,15 @@
+[package]
+name = "simrig-protocol"
+description = "Versioned JSON-RPC protocol between the simrig app and plugin adapters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+simrig-model.workspace = true
+
+[lints]
+workspace = true

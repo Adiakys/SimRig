@@ -1,0 +1,20 @@
+[package]
+name = "simrig-cli"
+description = "Command-line interface of simrig"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "simrig-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+simrig-host.workspace = true
+simrig-model.workspace = true
+
+[lints]
+workspace = true

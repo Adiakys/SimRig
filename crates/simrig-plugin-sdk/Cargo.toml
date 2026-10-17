@@ -1,0 +1,16 @@
+[package]
+name = "simrig-plugin-sdk"
+description = "SDK to write simrig plugin adapters in Rust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+simrig-model.workspace = true
+simrig-protocol.workspace = true
+
+[lints]
+workspace = true

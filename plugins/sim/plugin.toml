@@ -1,0 +1,9 @@
+id = "sim"
+name = "Simulated rig"
+version = "0.1.0"
+api = 1
+exec = "simrig-plugin-sim"
+description = "A complete simulated rig (base, wheel, pedals, shifter, handbrake) for development and tests."
+
+[match]
+virtual = true
