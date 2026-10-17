@@ -4611,6 +4611,8 @@ version = "0.1.0"
 dependencies = [
  "evdev",
  "serde",
+ "serde_json",
+ "simrig-driver",
  "simrig-host",
  "simrig-model",
  "simrig-plugin-sdk",
