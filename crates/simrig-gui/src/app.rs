@@ -593,6 +593,17 @@ impl App {
                 device.has_pull = true;
                 self.handbrake_drawing(&mut device, pull);
             }
+            ComponentKind::Pedals => {
+                // The full set: the pedal asked for is named in the step's title.
+                let hinges = self.geometry.pedal_hinges(&["clutch", "brake", "throttle"]);
+                let at = |role: &str| hinges.get(role).copied().unwrap_or_default();
+                [device.clutch_x, device.clutch_y] = at("clutch");
+                [device.brake_x, device.brake_y] = at("brake");
+                [device.throttle_x, device.throttle_y] = at("throttle");
+                device.has_clutch = true;
+                device.has_brake = true;
+                device.has_throttle = true;
+            }
             _ => {}
         }
         device

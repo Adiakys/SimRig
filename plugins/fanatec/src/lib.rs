@@ -1,0 +1,21 @@
+//! The Fanatec plugin: Fanatec wheel bases, rims and pedals on the hid-fanatecff driver, which
+//! its driver (`driver/`) bundles and builds with DKMS. The adapter talks to the driver like a
+//! game: sysfs attributes for settings, the event node for inputs and force feedback.
+
+pub mod adapter;
+pub mod components;
+pub mod device;
+pub mod input;
+pub mod models;
+pub mod sysfs;
+pub mod tuning;
+
+use simrig_plugin_sdk::prelude::PedalRole;
+
+pub fn role_label(role: PedalRole) -> &'static str {
+    match role {
+        PedalRole::Throttle => "Throttle",
+        PedalRole::Brake => "Brake",
+        PedalRole::Clutch => "Clutch",
+    }
+}

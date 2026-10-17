@@ -1,0 +1,25 @@
+id = "fanatec"
+name = "Fanatec"
+version = "0.1.0"
+api = 1
+exec = "simrig-plugin-fanatec"
+driver = "driver/driver.toml"
+description = "Fanatec wheel bases, steering wheels and pedals, on the open source hid-fanatecff driver."
+
+# The devices hid-fanatecff drives (hid-ftec.h); a test keeps this list in step with it.
+[match]
+usb = [
+    { vid = 0x0eb7, pid = 0x0001 },
+    { vid = 0x0eb7, pid = 0x0004 },
+    { vid = 0x0eb7, pid = 0x0005 },
+    { vid = 0x0eb7, pid = 0x0006 },
+    { vid = 0x0eb7, pid = 0x0007 },
+    { vid = 0x0eb7, pid = 0x0011 },
+    { vid = 0x0eb7, pid = 0x0020 },
+    { vid = 0x0eb7, pid = 0x0197 },
+    { vid = 0x0eb7, pid = 0x0e03 },
+    { vid = 0x0eb7, pid = 0x183b },
+    { vid = 0x0eb7, pid = 0x6204 },
+    { vid = 0x0eb7, pid = 0x6205 },
+    { vid = 0x0eb7, pid = 0x6206 },
+]

@@ -8,7 +8,8 @@ handbrake — whatever the brand, from one polished app.
 > guided procedures defined by plugins, generic plugins for unbranded devices. The desktop app
 > (M1, Slint) runs on it: live rig, settings, guided procedures, adding a device, plugins and
 > drivers, presets, first run. The generic USB plugin (M2) sets up any USB device as a shifter
-> or a handbrake; next comes the first branded hardware.
+> or a handbrake. The Fanatec plugin (M3) builds the bundled hid-fanatecff driver and handles
+> bases, rims and pedals.
 
 ## How it works
 
@@ -121,7 +122,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `crates/simrig-gui` | The desktop app (`simrig`, Slint) |
 | `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
 | `plugins/generic-usb` | Generic USB plugin: any USB device as a shifter or a handbrake, with its driver service |
-| `plugins/fanatec` | Fanatec plugin (in progress): bundles [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) as a submodule, built with DKMS |
+| `plugins/fanatec` | Fanatec plugin: bases, rims and pedals; bundles [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) as a submodule, built with DKMS |
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
 | `docs/design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
 | `scripts` | Development helpers |

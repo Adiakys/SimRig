@@ -1,0 +1,17 @@
+# Installed by the SimRig Fanatec driver: access to Fanatec devices without a password. Bound
+# to "bind" too, so the rules apply again whenever the driver binds to a device.
+ACTION!="add|change|bind", GOTO="simrig_fanatec_end"
+
+# Raw HID, for games that use the Fanatec SDK through Proton: the user at the seat only.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0eb7", TAG+="uaccess"
+
+# The driver's settings, writable by local users: rotation, display, pedal load cell, rumble.
+SUBSYSTEM=="hid", DRIVER=="fanatec", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w range display load rumble || true'"
+
+# The base's tuning menu.
+SUBSYSTEM=="ftec_tuning", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w advanced_mode RESET SLOT SEN FF SHO BLI FFS DRI FOR SPR DPR NDP NFR brF FEI ACP INT NIN FUL || true'"
+
+# LEDs of the base and of the wheel rims.
+SUBSYSTEM=="leds", DRIVERS=="fanatec", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w brightness multi_intensity || true'"
+
+LABEL="simrig_fanatec_end"

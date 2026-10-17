@@ -1,0 +1,14 @@
+#!/bin/sh
+# Saves the rotation hid-fanatec applies when a base is plugged in: its `init_range` module
+# option. Applies to every base; the driver keeps it within each base's limits.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+if [ "$(id -u)" != 0 ]; then
+    echo "$SIMRIG_ARG_DEGREES" > "$DATA/init_range"
+    echo "development install: rotation kept in $DATA"
+    exit 0
+fi
+mkdir -p "$ROOT/etc/modprobe.d"
+printf '# Written by SimRig: the rotation applied when a Fanatec base is plugged in.\noptions hid_fanatec init_range=%s\n' \
+    "$SIMRIG_ARG_DEGREES" > "$ROOT/etc/modprobe.d/simrig-fanatec.conf"
+echo "rotation $SIMRIG_ARG_DEGREES saved"

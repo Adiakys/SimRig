@@ -1,6 +1,7 @@
 # simrig — Architecture
 
-> Draft 0.9 (2026-10-17). Core (M0) and app (M1) implemented; generic USB plugin (M2) in progress. Companion to [requirements.md](requirements.md).
+> Draft 0.10 (2026-10-17). Core (M0) and app (M1) implemented; generic USB plugin (M2) and Fanatec
+> plugin (M3) implemented, to be verified on more hardware. Companion to [requirements.md](requirements.md).
 
 ## 1. Principles
 
@@ -766,19 +767,51 @@ Driver recipes (dkms, udev, hid-bpf, systemd) come with the first real driver (M
 
 ## 11. Example: adding Fanatec
 
-- **New**: `plugins/fanatec/` (adapter, catalog, images, labels) and `plugins/fanatec/driver/`
-  (`hid-fanatecff` as a pinned submodule, hooks built on the `dkms`, `udev` and
-  `udev-attr-settings` recipes).
-- **New**: `simrig-plugin-fanatec` package.
+- **New**: `plugins/fanatec/` (adapter, catalog, images, labels) and `plugins/fanatec/driver/`.
 - **Core**: nothing. Brand features that are not in the standard interfaces become custom parameters.
 
-Mapping of `hid-fanatecff` (`dd78ef4`) sysfs attributes:
+**The driver** (implemented):
+
+| Piece | What it does |
+|---|---|
+| `hid-fanatecff/` | upstream sources, a git submodule pinned to a tested commit; its DKMS version in `hid-fanatecff.version` |
+| `hooks/install` | refuses nothing it does not own: with a `hid-fanatec` installed by other means (another DKMS version, a package, a module built by hand) it does nothing. Otherwise checks the prerequisites (dkms, make, gcc, kernel headers; names the packages per distribution when missing), removes an older version SimRig installed, builds and installs the module with the `dkms` recipe for every kernel with headers, installs SimRig's udev rules and loads the module. Devices already plugged in are rebound from `hid-generic` to `fanatec`. When Secure Boot refuses the module, asks the firmware to enroll DKMS's signing key with a one-time password the user types at the next boot |
+| `hooks/status` | ours (version, loaded, waiting for the key to be enrolled, an update available), someone else's (*provided by the system*, with its version), or not installed |
+| `hooks/uninstall` | removes only SimRig's DKMS version and udev rules |
+| `udev/71-simrig-fanatec.rules` | raw HID with `uaccess` (Fanatec SDK games under Proton), and the driver's settings (rotation, display, tuning menu, LEDs) writable by local users, re-applied at every `bind`: no password for live settings. A test checks that every tuning attribute of the bundled driver is covered |
+
+A `hid-fanatec` installed by other means is kept as it is: `install` then adds only SimRig's
+udev rules (and the saved rotation), and `uninstall` removes only those. Without root
+(development plugins) nothing is built. The hooks are tested for real against stub system
+commands and a fake `/sys`.
+
+**The adapter** (implemented) talks to the driver like a game: it finds the HID device the
+`fanatec` driver is bound to (a base has several; the one with its settings and inputs), reads
+and writes its sysfs attributes, and reads its event node on request (axes and buttons) and
+uploads force feedback effects for the test. Components:
+
+| Device | Components |
+|---|---|
+| A base | wheel base (angle from the steering axis and the rotation, firmware, rotation, the tuning menu, force feedback test, reset); steering wheel when a rim is mounted (name, rim shape from `wheel_id`, buttons, display, paddle mode, vibration), swapped live; pedals plugged into the base, once mapped |
+| A USB pedal set | pedals, once mapped |
+
+Which axis is which pedal is not in the driver: the plugin's **Map the pedals** procedure (on
+the base, and on unmapped pedal sets, which show up as devices to set up) detects the axis that
+moves as each pedal is pressed, and keeps it in the user's configuration (`fanatec.toml`). The
+tuning menu lives in the base's memory; the rotation is saved as the driver's `init_range`
+option (`save-range`, a privileged operation writing `/etc/modprobe.d/simrig-fanatec.conf`).
+What the driver does not expose (a tuning entry an older driver lacks, centering, pedal dead
+zones and curves) stays visible, unsupported, with the reason. Tested end to end on a fake
+CSL DD in sysfs, and checked read-only on a real CSL DD.
+
+Mapping of `hid-fanatecff` (`bc2601b`) sysfs attributes (tuning attributes live under the
+`ftec_tuning` class device):
 
 | `hid-fanatecff` sysfs | simrig | Kind | How the Fanatec driver persists it |
 |---|---|---|---|
-| `range` | `wheel_base.rotation` | standard | generated udev rule (`udev-attr-settings`) |
+| `range` | `wheel_base.rotation` | standard | the module's `init_range` option (a modprobe.d file written by a privileged operation), or a generated udev rule |
 | `tuning_menu/FF` | `wheel_base.ffb_strength` | standard | base memory (tuning slot) |
-| `tuning_menu/NDP`, `NFR` | `wheel_base.natural_damper`, `natural_friction` | standard | base memory |
+| `tuning_menu/NDP`, `NFR`, `NIN` | `wheel_base.natural_damper`, `natural_friction`, `natural_inertia` | standard | base memory |
 | `tuning_menu/SPR`, `DPR` | `wheel_base.spring_strength`, `damper_strength` | standard | base memory |
 | `tuning_menu/SHO` | `steering_wheel.vibration` | standard | base memory |
 | `tuning_menu/ACP` | `steering_wheel.analog_paddle_mode` | standard | base memory |
@@ -795,8 +828,7 @@ Mapping of `hid-fanatecff` (`dd78ef4`) sysfs attributes:
 | `fw_version` | `wheel_base.firmware` | standard input | — |
 | `rumble`, `advanced_mode` | to be verified | — | — |
 
-Unsupported with this driver, shown disabled with their reason: e.g. `wheel_base.natural_inertia`
-(`NotInDriver`), `pedals.force` on pedals without a load cell (`NotInHardware`, detail: "add the
+Unsupported with this driver, shown disabled with their reason: e.g. `pedals.force` on pedals without a load cell (`NotInHardware`, detail: "add the
 Load Cell Kit"), `steering_wheel.display` on rims without a display (`NotInHardware`).
 
 Whether the tuning menu really persists in the base's memory must be **verified on hardware**.

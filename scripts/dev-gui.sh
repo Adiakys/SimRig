@@ -7,6 +7,9 @@
 #   scripts/dev-gui.sh report 00 04 move it: its current raw report, in hex
 #   scripts/dev-gui.sh unplug       unplug it
 #   scripts/dev-gui.sh reset        forget the rig, the presets, the drivers and the first run
+#
+# SIMRIG_USB_ROOT=/sys/bus/usb/devices scripts/dev-gui.sh uses the real USB devices instead
+# (e.g. a Fanatec base with hid-fanatec installed).
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 dev="$root/target/dev"
@@ -40,10 +43,11 @@ run)
     exec "$root/target/debug/simrig" \
         --plugin-dir "$root/plugins/sim" \
         --plugin-dir "$root/plugins/generic-usb" \
+        --plugin-dir "$root/plugins/fanatec" \
         --no-default-dirs \
         --config-dir "$dev/config" \
         --state-dir "$dev/state" \
-        --usb-root "$usb"
+        --usb-root "${SIMRIG_USB_ROOT:-$usb}"
     ;;
 *)
     echo "usage: $0 [run|plug|unplug|reset]" >&2

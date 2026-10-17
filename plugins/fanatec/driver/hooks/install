@@ -1,0 +1,79 @@
+#!/bin/sh
+# Builds and installs hid-fanatecff with DKMS, then SimRig's udev rules. Upgrades a version
+# SimRig installed before; leaves a hid-fanatec installed by other means alone.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA"
+
+if [ "$(id -u)" != 0 ]; then
+    echo "$VERSION" > "$DATA/dev-installed"
+    echo "development install: hid-fanatecff is not built (needs root)"
+    exit 0
+fi
+
+# A hid-fanatec installed by other means is used as it is: only SimRig's udev rules are added
+# (access without a password, settings saved at plug-in), the module is never touched.
+if other=$(foreign); then
+    udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
+    udev_apply hid hidraw leds ftec_tuning
+    echo "$other" > "$DATA/integration"
+    echo "hid-fanatec $other is installed, not by SimRig: it is used as it is, with SimRig's access rules"
+    exit 0
+fi
+
+missing=$(missing_commands dkms make gcc | tr '\n' ' ')
+kernel=$(uname -r)
+kernel_headers_present "$kernel" || missing="${missing}kernel headers for $kernel"
+if [ -n "$(echo "$missing" | tr -d ' ')" ]; then
+    echo "Missing to build the driver: $missing" >&2
+    echo "Debian, Ubuntu: apt install dkms build-essential linux-headers-$kernel" >&2
+    echo "Fedora: dnf install dkms gcc make kernel-devel-$kernel" >&2
+    echo "Arch: pacman -S dkms base-devel linux-headers" >&2
+    exit 1
+fi
+
+previous=$(ours)
+if [ -n "$previous" ] && [ "$previous" != "$VERSION" ]; then
+    modprobe -r "$MODULE" 2>/dev/null || true
+    dkms_remove "$NAME" "$previous"
+fi
+
+dkms_install "$NAME" "$VERSION" "$SOURCE"
+udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
+echo "$VERSION" > "$DATA/installed"
+
+set +e
+module_load "$MODULE"
+rc=$?
+set -e
+case $rc in
+0)
+    rm -f "$DATA/mok-pending"
+    rebind
+    udev_apply hid hidraw leds ftec_tuning
+    echo "hid-fanatec $VERSION installed"
+    ;;
+2)
+    # Secure Boot refuses the module until the key DKMS signed it with is enrolled.
+    udev_apply hidraw
+    key=$(sb_key) || {
+        echo "Secure Boot refuses the driver and DKMS has no signing key on this system." >&2
+        exit 1
+    }
+    if sb_key_enrolled "$key"; then
+        echo "Secure Boot refuses the driver although its signing key is enrolled." >&2
+        exit 1
+    fi
+    password=$(sb_request_enrollment "$key") || {
+        echo "cannot ask the firmware to enroll the signing key" >&2
+        exit 1
+    }
+    echo "$password" > "$DATA/mok-pending"
+    chmod 0644 "$DATA/mok-pending"
+    echo "hid-fanatec $VERSION installed: restart, choose \"Enroll MOK\" and type $password"
+    ;;
+*)
+    echo "hid-fanatec $VERSION was built but cannot be loaded" >&2
+    exit 1
+    ;;
+esac

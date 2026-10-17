@@ -193,13 +193,9 @@ impl DriverManager {
         let contract = Self::contract(manifest, dir)?.ok_or_else(|| {
             HostError::NotFound(format!("plugin '{}' has no driver", manifest.id))
         })?;
-        if !contract.requires.is_empty() {
-            // Prerequisites go through PackageKit; not implemented yet.
-            return Err(HostError::Driver(format!(
-                "install these packages first: {}",
-                contract.requires.join(", ")
-            )));
-        }
+        // Prerequisites (`contract.requires`) will be installed through PackageKit; until then
+        // the driver's install hook checks them and names the packages that are missing.
+        let _ = &contract.requires;
         self.runner(&manifest.id, location)?
             .run(&["install".into(), manifest.id.clone()])
     }

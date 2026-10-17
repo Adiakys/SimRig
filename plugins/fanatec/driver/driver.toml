@@ -1,0 +1,21 @@
+# The Fanatec driver: hid-fanatecff (bundled as a git submodule, pinned to a version tested with
+# the adapter), built for the running kernel and kept rebuilt on kernel upgrades by DKMS, plus
+# SimRig's udev rules. A hid-fanatec installed by other means (distribution package, by hand,
+# another version) is used as it is and never touched.
+id = "hid-fanatec"
+version = "0.2.3-11-gbc2601b"
+summary = "hid-fanatecff kernel driver, built with DKMS, and udev rules for access without a password"
+license = "GPL-2.0 (hid-fanatecff), GPL-3.0-or-later (SimRig's hooks)"
+
+install = "hooks/install"
+uninstall = "hooks/uninstall"
+status = "hooks/status"
+
+# Installed by the app before `install` (abstract names, mapped per distribution).
+requires = ["dkms", "kernel-headers", "build-tools"]
+
+# Saves the rotation the driver applies when a base is plugged in (its `init_range` option).
+[[privileged]]
+name = "save-range"
+exec = "hooks/save-range"
+args = { degrees = "[0-9]{2,4}" }

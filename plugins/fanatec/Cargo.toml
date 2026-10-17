@@ -1,0 +1,26 @@
+[package]
+name = "simrig-plugin-fanatec"
+description = "simrig plugin for Fanatec devices, on the hid-fanatecff driver (bundled, built with DKMS)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "simrig-plugin-fanatec"
+path = "src/bin/adapter.rs"
+
+[dependencies]
+evdev = "0.13"
+serde.workspace = true
+simrig-plugin-sdk.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+simrig-driver.workspace = true
+simrig-host.workspace = true
+simrig-model.workspace = true
+
+[lints]
+workspace = true

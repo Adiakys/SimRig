@@ -1,6 +1,7 @@
 #!/bin/sh
-# Installs simrig-helper, its polkit action and the generic USB plugin system-wide, to try real
-# hardware before packages exist (M5). Everything installed is owned by root.
+# Installs simrig-helper, its polkit action and the official plugins (generic USB, Fanatec)
+# system-wide, to try real hardware before packages exist (M5). Everything installed is owned
+# by root.
 #
 #   cargo build --release
 #   sudo scripts/install-system.sh           install, or update
@@ -19,7 +20,7 @@ plugins=/usr/local/lib/simrig/plugins
 
 case "${1:-install}" in
 install)
-    for b in simrig-helper simrig-plugin-generic-usb simrig-generic-usb-service; do
+    for b in simrig-helper simrig-plugin-generic-usb simrig-generic-usb-service simrig-plugin-fanatec; do
         [ -x "$bin/$b" ] || { echo "$bin/$b missing: run cargo build --release first" >&2; exit 1; }
     done
     install -D -o root -g root -m 0755 "$bin/simrig-helper" "$helper"
@@ -33,10 +34,24 @@ install)
     cp -r "$root/plugins/generic-usb/driver" "$dest/driver"
     chown -R root:root "$dest/driver"
     chmod -R go-w "$dest"
-    echo "installed: $helper, $policy, $dest"
+
+    # Fanatec: the adapter and the driver, with the bundled hid-fanatecff sources.
+    [ -f "$root/plugins/fanatec/driver/hid-fanatecff/Kbuild" ] || {
+        echo "plugins/fanatec/driver/hid-fanatecff is empty: git submodule update --init" >&2
+        exit 1
+    }
+    fanatec="$plugins/fanatec"
+    rm -rf "$fanatec"
+    install -d -o root -g root -m 0755 "$fanatec"
+    install -o root -g root -m 0644 "$root/plugins/fanatec/plugin.toml" "$fanatec/"
+    install -o root -g root -m 0755 "$bin/simrig-plugin-fanatec" "$fanatec/"
+    (cd "$root/plugins/fanatec" && tar cf - --exclude=.git driver) | (cd "$fanatec" && tar xf -)
+    chown -R root:root "$fanatec"
+    chmod -R go-w "$fanatec"
+    echo "installed: $helper, $policy, $dest, $fanatec"
     ;;
 remove)
-    rm -rf "$plugins/generic-usb"
+    rm -rf "$plugins/generic-usb" "$plugins/fanatec"
     rmdir "$plugins" /usr/local/lib/simrig 2>/dev/null || true
     rm -f "$helper" "$policy"
     rmdir /usr/libexec/simrig 2>/dev/null || true
