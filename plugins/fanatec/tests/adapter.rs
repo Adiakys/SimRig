@@ -363,20 +363,19 @@ fn what_the_driver_creates_later_shows_up() {
     env.input(
         "abs 0 49151 0 65535\nabs 1 65535 0 65535\nabs 2 65535 0 65535\nabs 5 65535 0 65535\n",
     );
+    // The plugin notices each change at one of its polls: wait for both.
     until(&mut host, "rotation and inputs", |h| {
-        h.find("base").is_ok_and(|c| {
+        let rotation = h.find("base").is_ok_and(|c| {
             matches!(
                 c.description.item("rotation").map(|i| &i.support),
                 Some(simrig_model::Support::Supported(_))
             )
-        })
+        });
+        let angle = h.read_inputs(&base).is_ok_and(|inputs| {
+            matches!(inputs.get("angle"), Some(Value::Float(a)) if (a - 225.0).abs() < 0.1)
+        });
+        rotation && angle
     });
-    let base = host.find("base").unwrap().address.clone();
-    let inputs = host.read_inputs(&base).unwrap();
-    assert!(
-        matches!(inputs.get("angle"), Some(Value::Float(a)) if (a - 225.0).abs() < 0.1),
-        "{inputs:?}"
-    );
 }
 
 /// SimRig gets the tuning menu by itself: it switches the menu's mode (the base answers with the
