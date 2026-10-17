@@ -62,6 +62,10 @@ sudo pacman -U ./simrig-*-x86_64.pkg.tar.zst
 tar xzf simrig-*-x86_64-linux.tar.gz && sudo ./simrig-*-x86_64-linux/install.sh
 ```
 
+The same files are in [GitHub Packages](https://github.com/Adiakys/SimRig/pkgs/container/simrig),
+as an OCI artifact (not a container image, so `docker pull` does not apply): download them
+with [ORAS](https://oras.land), `oras pull ghcr.io/adiakys/simrig:<version>`.
+
 Then open **SimRig** from your applications and follow the first setup: it checks your system,
 finds your devices and installs what they need.
 
