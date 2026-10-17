@@ -1,163 +1,109 @@
 # SimRig
 
-Configure your sim-racing rig on Linux — wheel base, steering wheel, pedals, shifter and
-handbrake — whatever the brand, from one polished app.
+**Set up your sim-racing rig on Linux, whatever the brand.** Wheel base, steering wheel, pedals,
+shifter and handbrake in one app: SimRig installs the drivers your devices need, shows every
+device moving live, lets you tune and calibrate them and save presets, then gets out of the way.
+Your devices keep working in every game with SimRig closed.
 
-> **Status: early development.** The core (M0) is done and tested on a simulated rig: plugins,
-> hotplug, drivers with a privileged helper, saved settings, rig composition, presets, catalog,
-> guided procedures defined by plugins, generic plugins for unbranded devices. The desktop app
-> (M1, Slint) runs on it: live rig, settings, guided procedures, adding a device, plugins and
-> drivers, presets, first run. The generic USB plugin (M2) sets up any USB device as a shifter
-> or a handbrake. The Fanatec plugin (M3) builds the bundled hid-fanatecff driver and handles
-> bases, rims and pedals.
+![SimRig: the rig live, a wheel base's settings, setting up a shifter, adding a device, plugins and drivers, first run](docs/images/simrig.gif)
+
+- **Plug in, see it move.** Every device is drawn as it stands on your rig and moves as you
+  use it: the wheel turns, the gear engages, the handbrake pulls.
+- **Drivers without the terminal.** When a device needs a driver, SimRig installs it (one
+  password) and it keeps working with the app closed, after updates and reboots.
+- **Any mix of brands.** A base from one brand, pedals from another, a no-name USB shifter:
+  they all sit in the same rig.
+- **No root, no background process.** SimRig runs as you, asks for the password only to install
+  a driver, and leaves nothing running when you close it.
+- **Honest about your hardware.** What a device or its driver cannot do is shown greyed out
+  with the reason, never hidden.
+
+> **Early development.** SimRig works, but most devices have not been tested on real hardware
+> yet: see the table below, and please report what works and what doesn't.
+
+## Supported devices
+
+| Brand | Devices | Driver | Status |
+|---|---|---|---|
+| **Fanatec** | Wheel bases: CSL DD / GT DD Pro / ClubSport DD, CSL Elite, ClubSport V2 and V2.5, Podium DD1 and DD2, CSR Elite, Porsche 911 Turbo S. Their steering wheels. Pedals on the base, CSL Elite and CSL load cell pedals, ClubSport V3 | [hid-fanatecff](https://github.com/gotzl/hid-fanatecff), installed by SimRig (or yours, if you have it) | **Partial**: tested on a CSL DD (live inputs, rotation, tuning menu); other models untested |
+| **Any USB device** | Shifters (H-pattern, sequential) and handbrakes without a brand, or whose descriptor is useless: mapped by moving them | SimRig's generic USB driver | **Untested** on real hardware (works on simulated devices) |
+| **Moza** | Wheel bases, wheels, pedals, shifters, handbrakes | in the kernel (6.15+) | Planned |
+| **Logitech** | G29, G920, G923, G Pro and others | in the kernel, improved drivers available | Planned |
+| **Thrustmaster** | T300RS, T248, TX, T-GT II, T818 and others | hid-tmff2 | Planned |
+
+**Full**: tested on the hardware · **Partial**: tested on some models or some features ·
+**Untested**: works in tests, not tried on real hardware yet · **Planned**: not supported yet
+
+Features depend on the device and its driver: SimRig shows, for every setting, whether your
+hardware supports it.
+
+## Install
+
+Download the package for your distribution from the
+[latest release](https://github.com/Adiakys/SimRig/releases/latest) and install it:
+
+```sh
+# Debian, Ubuntu, Linux Mint, Pop!_OS
+sudo apt install ./simrig_*_amd64.deb
+
+# Fedora, openSUSE
+sudo dnf install ./simrig-*.x86_64.rpm
+
+# Arch, Manjaro, EndeavourOS
+sudo pacman -U ./simrig-*-x86_64.pkg.tar.zst
+
+# Any other distribution
+tar xzf simrig-*-x86_64-linux.tar.gz && sudo ./simrig-*-x86_64-linux/install.sh
+```
+
+Then open **SimRig** from your applications and follow the first setup: it checks your system,
+finds your devices and installs what they need.
+
+**Requirements**: an x86-64 Linux with polkit (`pkexec`). Drivers built for your kernel (like
+Fanatec's) also need DKMS, a compiler and your kernel's headers: SimRig tells you what is
+missing.
+
+**Uninstall**: remove the package as usual. The drivers SimRig installed are kept, so your
+devices keep working; remove them first from **Plugins** in the app, or afterwards with
+`sudo /var/lib/simrig/remove-drivers --all` (on Debian and Ubuntu, `apt purge simrig` does it).
 
 ## How it works
 
-- **The app is a client of the drivers, just like a game.** It is never in the data path, and
-  when it is closed it leaves no process running.
-- **Drivers are independent.** They make devices work with the app closed, are installed when
-  you add a device that needs them, and decide for themselves how they work.
-- **The core defines standard interfaces** for each component type. Plugins implement them and
-  report anything their hardware cannot do as *unsupported, with a reason*: the app shows it
-  disabled with the explanation, never hides it.
-- **Brand support comes from plugins**: external processes speaking a versioned JSON-RPC
-  protocol, which may add their own self-described custom parameters. Any mix of brands works.
-- **No root at runtime.** Changing settings, testing force feedback and applying presets never
-  need privileges; the app asks for your password only to install or remove a driver, or when a
-  driver keeps a saved setting in a system file.
+SimRig is a client of your drivers, like a game. Each brand is supported by a **plugin** that
+knows its devices and, when needed, ships a **driver**: SimRig installs the driver when you add
+the device, and the driver does the work, in every game, with SimRig closed. The app only reads
+and changes settings through the same interfaces games use, so it never adds latency and never
+needs to run in the background.
 
-Read more in [docs/requirements.md](docs/requirements.md) and
-[docs/architecture.md](docs/architecture.md).
-
-## Try it
-
-Clone with the bundled third-party drivers (git submodules):
-
-```sh
-git clone --recursive https://github.com/Adiakys/SimRig.git
-# or, in an existing clone: git submodule update --init
-```
-
-Requires a recent stable Rust toolchain (1.92+ for the app, 1.86+ for the rest) and, to build
-the app, the fontconfig and xkbcommon development files (`libfontconfig1-dev libxkbcommon-dev`
-on Debian and Ubuntu, `fontconfig-devel libxkbcommon-devel` on Fedora).
-
-### The app
-
-```sh
-scripts/dev-gui.sh              # the app on the simulated rig, in throwaway directories
-scripts/dev-gui.sh plug         # while it runs: plug a fake USB device, then "Add device"
-scripts/dev-gui.sh report 00 01 # move it (its raw report, in hex) while setting it up
-scripts/dev-gui.sh reset        # forget the rig, the presets, the drivers and the first run
-```
-
-Everything lives under `target/dev`: your real configuration is not touched. Without a display
-(or to check a screen), the app can draw itself into a PNG:
-
-```sh
-./target/debug/simrig --plugin-dir plugins/sim --no-default-dirs --config-dir target/shots/cfg \
-    --screenshot target/shots/home.png --theme dark --screen component:pedals
-```
-
-`--screen` takes `home`, `component:<component>`, `procedure:<component>/<id>`, `plugins`,
-`settings`, `add`, `first:<step>`, and can chain actions with `;` (see `src/main.rs`).
-
-### Real hardware (generic USB plugin)
-
-Until packages exist, `scripts/install-system.sh` stands in for them: it installs `simrig-helper`,
-its polkit action and the generic USB plugin system-wide (root-owned), so the app can install
-the plugin's driver with your password like it will from a package. The driver itself is
-installed by the app when a device is set up.
-
-```sh
-cargo build --release
-sudo scripts/install-system.sh          # sudo scripts/install-system.sh remove to undo
-./target/release/simrig                 # Add device → Set up as generic
-```
-
-### The command line
-
-```sh
-cargo build --workspace
-alias simrig-cli='./target/debug/simrig-cli --plugin-dir plugins --no-default-dirs'
-
-simrig-cli system                                 # what the setup wizard checks
-simrig-cli list                                   # the simulated rig
-simrig-cli show base                              # every item, unsupported ones with their reason
-simrig-cli set shifter mode sequential            # watch `gear` become unavailable
-simrig-cli watch pedals                           # live inputs, Ctrl+C to stop
-simrig-cli run base test_effect                   # asks for confirmation
-
-simrig-cli driver status                          # the simulated driver is not installed
-simrig-cli driver install sim                     # development plugin: no password needed
-simrig-cli set base rotation 540 --save           # restored by the driver next time
-simrig-cli get base rotation
-simrig-cli preset capture GT3 && simrig-cli preset show GT3
-simrig-cli exclude handbrake && simrig-cli list
-simrig-cli configure pedals calibrate-brake       # a guided procedure defined by the plugin
-simrig-cli devices                                # generic0 has no components yet…
-simrig-cli configure sim/generic0 setup           # …until its setup procedure maps it
-simrig-cli monitor                                # rig changes as they happen
-simrig-cli driver uninstall sim                   # leaves nothing behind
-```
-
-Each command starts the plugins, talks to them and stops them. The simulated devices live inside
-the plugin process, so a value set by one command is gone in the next unless saved (`--save`):
-real devices keep it.
-
-To experiment without touching your real configuration, set `XDG_CONFIG_HOME` and
-`XDG_STATE_HOME` to a temporary directory.
+Settings you change apply at once. **Save as default** stores them in the driver or in the
+device, so they come back every time you plug it in. **Presets** save the whole rig and switch
+it in one click.
 
 ## Drivers
 
-SimRig builds on open source drivers maintained by their own communities. They are bundled as
-git submodules pinned to a tested version, installed on your machine by the app when you add a
-device, and credited with their licenses in [THIRD-PARTY.md](THIRD-PARTY.md).
+SimRig builds on open source drivers maintained by their own communities. They are bundled
+pinned to a tested version, installed on your machine by the app when you add a device, and
+credited with their licenses in [THIRD-PARTY.md](THIRD-PARTY.md).
 
 | Plugin | Driver | Upstream | License |
 |---|---|---|---|
-| Fanatec | hid-fanatecff, kernel module (FFB, tuning menu, LEDs, display), built with DKMS | [github.com/gotzl/hid-fanatecff](https://github.com/gotzl/hid-fanatecff) | GPL-2.0 |
+| Fanatec | hid-fanatecff, kernel module (force feedback, tuning menu, LEDs, display), built with DKMS | [github.com/gotzl/hid-fanatecff](https://github.com/gotzl/hid-fanatecff) | GPL-2.0 |
 | Generic USB | SimRig's own userspace service (hidraw in, uinput out) | this repository | GPL-3.0-or-later |
 
 A driver you installed yourself (a distribution package, a newer version built by hand) is
 kept as it is: SimRig only adds its access rules next to it.
 
-## Repository layout
+## Contributing
 
-| Path | What |
-|---|---|
-| `crates/simrig-model` | Domain model: component interfaces, parameters, unsupported reasons, custom parameters |
-| `crates/simrig-protocol` | App ↔ plugin protocol (JSON-RPC 2.0 over stdio) |
-| `crates/simrig-plugin-sdk` | SDK to write plugin adapters in Rust |
-| `crates/simrig-driver` | Driver contract (`driver.toml`), hooks, installation registry, recipes for drivers (`recipes/`: DKMS, Secure Boot, udev) |
-| `crates/simrig-helper` | Privileged helper, run through `pkexec` only for driver operations |
-| `crates/simrig-host` | The app core: plugins, rig, events, drivers, presets, catalog, system check |
-| `crates/simrig-cli` | Command-line interface |
-| `crates/simrig-gui` | The desktop app (`simrig`, Slint) |
-| `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
-| `plugins/generic-usb` | Generic USB plugin: any USB device as a shifter or a handbrake, with its driver service |
-| `plugins/fanatec` | Fanatec plugin: bases, rims and pedals; bundles [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) as a submodule, built with DKMS |
-| `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
-| `docs/design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
-| `scripts` | Development helpers |
-| `packaging/polkit` | polkit action of the helper |
-
-## Development
-
-```sh
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-```
-
-Set `SIMRIG_PLUGIN_LOG=1` to see plugins' stderr.
+Bug reports, tests on your hardware and plugins for new brands are welcome. To build and run
+SimRig from the sources, see [docs/development.md](docs/development.md); for its design,
+[docs/architecture.md](docs/architecture.md).
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE). Bundled third-party components (the
-[hid-fanatecff](https://github.com/gotzl/hid-fanatecff) driver, fonts) keep their own licenses:
-see [THIRD-PARTY.md](THIRD-PARTY.md).
+GPL-3.0-or-later. See [LICENSE](LICENSE). Bundled third-party components (drivers, fonts) keep
+their own licenses: see [THIRD-PARTY.md](THIRD-PARTY.md).
 
-Product and brand names (Fanatec, Moza, Simagic, Logitech…) belong to their owners and are used
-only to say which hardware SimRig works with. SimRig is not affiliated with, endorsed by or
+Product and brand names (Fanatec, Moza, Logitech, Thrustmaster…) belong to their owners and are
+used only to say which hardware SimRig works with. SimRig is not affiliated with, endorsed by or
 sponsored by any of them.
