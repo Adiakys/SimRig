@@ -4,3 +4,9 @@
 [submodule "plugins/moza/driver/universal-pidff"]
 	path = plugins/moza/driver/universal-pidff
 	url = https://github.com/JacKeTUs/universal-pidff
+[submodule "plugins/logitech/driver/new-lg4ff"]
+	path = plugins/logitech/driver/new-lg4ff
+	url = https://github.com/berarma/new-lg4ff
+[submodule "plugins/logitech/driver/logitech-trueforce"]
+	path = plugins/logitech/driver/logitech-trueforce
+	url = https://github.com/mescon/logitech-trueforce-linux-driver

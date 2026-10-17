@@ -45,6 +45,7 @@ run)
         --plugin-dir "$root/plugins/generic-usb" \
         --plugin-dir "$root/plugins/fanatec" \
         --plugin-dir "$root/plugins/moza" \
+        --plugin-dir "$root/plugins/logitech" \
         --no-default-dirs \
         --config-dir "$dev/config" \
         --state-dir "$dev/state" \

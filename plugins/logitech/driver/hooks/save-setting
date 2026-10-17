@@ -1,0 +1,29 @@
+#!/bin/sh
+# Saves a setting of a wheel model for the next time it is plugged in: a udev rule that writes
+# the driver's attribute when it binds to the wheel. One line per model and attribute.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+pid=$(echo "$SIMRIG_ARG_PID" | tr '[:lower:]' '[:upper:]')
+attr="$SIMRIG_ARG_ATTR"
+value="$SIMRIG_ARG_VALUE"
+match="KERNEL==\"0003:046D:$pid.*\", ATTR{$attr}="
+line="ACTION==\"bind\", SUBSYSTEM==\"hid\", $match\"$value\""
+
+if [ "$(id -u)" = 0 ]; then
+    file="$(udev_rules_dir)/$SETTINGS"
+    mkdir -p "$(udev_rules_dir)"
+else
+    # Development: kept in the driver's data.
+    mkdir -p "$DATA"
+    file="$DATA/settings"
+fi
+{
+    echo "# Written by SimRig: Logitech wheel settings applied when the wheel is plugged in."
+    grep -vF "$match" "$file" 2>/dev/null | grep -v '^#' || true
+    echo "$line"
+} > "$file.new"
+mv "$file.new" "$file"
+if [ "$(id -u)" = 0 ]; then
+    udevadm control --reload
+fi
+echo "$attr $value saved"

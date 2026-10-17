@@ -1,0 +1,20 @@
+#!/bin/sh
+# Removes what SimRig installed: its DKMS builds of new-lg4ff and of the TrueForce driver, its
+# udev rules and saved settings. Never modules installed by other means. Works on partial
+# installs.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+
+if [ "$(id -u)" = 0 ]; then
+    mod_remove "$LG4FF_PACKAGE" "$LG4FF_MODULE"
+    mod_remove "$TF_PACKAGE" "$TF_MODULE"
+    # The kernel's own driver takes the wheels back.
+    modprobe "$LG4FF_MODULE" 2>/dev/null || true
+    udev_remove "$RULES"
+    udev_remove "$SETTINGS"
+    udev_apply hid hidraw
+fi
+for file in "$LG4FF_PACKAGE.installed" "$TF_PACKAGE.installed" mok-pending dev-installed rules settings; do
+    rm -f "${DATA:?}/$file"
+done
+echo "SimRig's Logitech driver removed"

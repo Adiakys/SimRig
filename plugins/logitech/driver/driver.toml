@@ -1,0 +1,23 @@
+# The Logitech driver: SimRig's udev rules (the wheels' settings writable by the logged-in
+# user, settings saved for the next plug-in) and, for the wheels plugged in that need them,
+# kernel modules bundled as git submodules pinned to tested versions and built with DKMS:
+# new-lg4ff for the G29 family (more effects and settings than the kernel's driver) and the
+# TrueForce driver for the G PRO and RS50 (which the kernel does not drive). The G920 and the
+# G923 for Xbox use the kernel's driver. Modules installed by other means are used as they are.
+id = "logitech"
+version = "lg4ff-0.5.0+tf-0.42.5-2-g972274b"
+summary = "udev rules for Logitech wheel settings without a password; new-lg4ff and the TrueForce driver for the wheels that need them"
+license = "GPL-2.0 (new-lg4ff, logitech-trueforce-linux-driver), GPL-3.0-or-later (SimRig's hooks)"
+
+install = "hooks/install"
+uninstall = "hooks/uninstall"
+status = "hooks/status"
+
+# Needed only to build new-lg4ff or the TrueForce driver.
+requires = ["dkms", "kernel-headers", "build-tools"]
+
+# Saves a setting for the next time the wheel is plugged in (a udev rule).
+[[privileged]]
+name = "save-setting"
+exec = "hooks/save-setting"
+args = { pid = "[0-9a-f]{4}", attr = "range|gain|autocenter|spring_level|damper_level|friction_level|ffb_leds|wheel_range|wheel_strength|wheel_damping|wheel_trueforce|wheel_ffb_filter", value = "[0-9]{1,5}" }

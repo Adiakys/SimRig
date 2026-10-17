@@ -1,0 +1,24 @@
+[package]
+name = "simrig-plugin-logitech"
+description = "simrig plugin for Logitech wheels, on the kernel's drivers, new-lg4ff and the TrueForce driver (bundled, built with DKMS)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "simrig-plugin-logitech"
+path = "src/bin/adapter.rs"
+
+[dependencies]
+simrig-plugin-kit.workspace = true
+simrig-plugin-sdk.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+simrig-driver = { workspace = true, features = ["testing"] }
+simrig-host = { workspace = true, features = ["testing"] }
+simrig-model.workspace = true
+
+[lints]
+workspace = true

@@ -873,6 +873,30 @@ still has inputs and settings, and says why forces are missing. The SR-P's axes 
 mapping); pedals plugged into a base are mapped by pressing them. Tested end to end on a fake R9
 whose fake serial port decodes requests and answers like the real one.
 
+### 11.2 Logitech
+
+Logitech wheels are spread over three kernel drivers, which decide what SimRig can show:
+
+| Family | Wheels | Driver | Settings |
+|---|---|---|---|
+| lg4ff | G29, G27, G25, Driving Force GT/Pro/EX, MOMO, Speed Force Wireless, G923 for PlayStation | the kernel's `hid-logitech`, replaced by the bundled [new-lg4ff](https://github.com/berarma/new-lg4ff) when one of these wheels is plugged in | rotation (kernel); force feedback gain, spring, damper and friction effect levels, autocenter, force feedback on the LEDs (new-lg4ff) |
+| hidpp | G920, G923 for Xbox | the kernel's `hid-logitech-hidpp` | rotation |
+| direct drive | G PRO (Xbox/PC, PlayStation), RS50 | the bundled [TrueForce driver](https://github.com/mescon/logitech-trueforce-linux-driver) (`hid-logitech-dd`), built when one of them is plugged in | rotation, strength, damping, TrueForce, force feedback filter, firmware, centering |
+
+**The driver** always installs SimRig's udev rules (the attributes above writable by local
+users, raw HID of the direct drive wheels for TrueForce through Proton), and builds each module
+only for the wheels plugged in that need it: `status` reports the driver as not installed while
+such a wheel is plugged in and its module is missing, so adding the wheel installs it. A module
+installed by other means is kept. The TrueForce driver also claims the G923; SimRig does not
+build it for a G923, which keeps the kernel's driver (or new-lg4ff). Settings are saved for the
+next plug-in by the `save-setting` privileged operation, as udev rules that write the attribute
+when the driver binds to that model (`72-simrig-logitech-settings.rules`).
+
+**The adapter** gives each wheel a wheel base, its rim (buttons) and, once mapped, the pedals
+plugged into it. What a family's driver lacks stays visible with the reason (new-lg4ff's
+settings on the kernel's driver say it is needed). Tested end to end on a fake G29 (with and
+without new-lg4ff) and a fake G PRO.
+
 ## 12. Decisions
 
 | # | Decision | Rationale |

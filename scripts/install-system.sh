@@ -39,6 +39,8 @@ install)
 
     # Brands: the adapters and the drivers, with the bundled driver sources.
     for brand in $BRANDS; do
+        # A fresh copy: nothing left over from the previous version.
+        rm -rf "${plugins:?}/$brand"
         brand_install "$root" "$bin" "$plugins" "$brand"
         chown -R root:root "$plugins/$brand"
         chmod -R go-w "$plugins/$brand"

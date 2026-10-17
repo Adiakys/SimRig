@@ -4628,6 +4628,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "simrig-plugin-logitech"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "simrig-driver",
+ "simrig-host",
+ "simrig-model",
+ "simrig-plugin-kit",
+ "simrig-plugin-sdk",
+]
+
+[[package]]
 name = "simrig-plugin-moza"
 version = "0.1.0"
 dependencies = [

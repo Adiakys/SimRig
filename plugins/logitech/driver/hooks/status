@@ -1,0 +1,48 @@
+#!/bin/sh
+# Runs as the user: the state of the Logitech driver, as JSON.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+
+if [ -f "$DATA/dev-installed" ]; then
+    status_json true false "$(cat "$DATA/dev-installed")" false false true "Development install: nothing is installed."
+    exit 0
+fi
+
+# What SimRig built, as the version shown.
+version=""
+for p in "$LG4FF_PACKAGE" "$TF_PACKAGE"; do
+    v=$(mod_ours "$p")
+    [ -n "$v" ] && version="${version:+$version, }$p $v"
+done
+
+lg4ff=$(mod_state "$LG4FF_PACKAGE" "$LG4FF_MODULE" "$LG4FF_VERSION")
+tf=$(mod_state "$TF_PACKAGE" "$TF_MODULE" "$TF_VERSION")
+case "$lg4ff $tf" in
+*pending*)
+    status_json true false "$version" true false true "To trust the key that signs the driver: $(mod_key_message)."
+    exit 0
+    ;;
+esac
+
+# A wheel plugged in that needs a module nobody provides: the driver must be installed (again).
+needs=""
+if missing "$LG4FF_PACKAGE" "$LG4FF_MODULE" "$LG4FF_VERSION" no $LG4FF_WHEELS; then
+    needs="new-lg4ff (more effects and settings)"
+fi
+if missing "$TF_PACKAGE" "$TF_MODULE" "$TF_VERSION" yes $TF_WHEELS; then
+    needs="${needs:+$needs and }the TrueForce driver (force feedback on the G PRO and RS50)"
+fi
+
+if ! rules_installed; then
+    status_json false false "" false false true \
+        "Adds access to the wheels' settings${needs:+ and builds $needs}. Asks for the password once."
+elif [ -n "$needs" ]; then
+    status_json false false "$version" false false true \
+        "The wheel plugged in needs $needs. Asks for the password once."
+else
+    case "$lg4ff $tf" in
+    *outdated*) message="A newer version of the modules SimRig built is available." ;;
+    *) message="" ;;
+    esac
+    status_json true true "$version" false false true "$message"
+fi

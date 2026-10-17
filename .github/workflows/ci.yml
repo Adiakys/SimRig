@@ -68,6 +68,9 @@ jobs:
           test -x /usr/libexec/simrig/simrig-helper
           test -f /usr/lib/simrig/plugins/fanatec/driver/hid-fanatecff/Kbuild
           test -f /usr/lib/simrig/plugins/moza/driver/universal-pidff/Kbuild
+          test -f /usr/lib/simrig/plugins/logitech/driver/new-lg4ff/Kbuild
+          test -f /usr/lib/simrig/plugins/logitech/driver/logitech-trueforce/mainline/dkms.conf
+          test ! -e /usr/lib/simrig/plugins/logitech/driver/logitech-trueforce/tools
           simrig-cli --version
           simrig-cli plugins
           sudo apt-get remove -y simrig

@@ -1,0 +1,18 @@
+# Installed by the SimRig Logitech driver: access to Logitech wheels without a password. Bound
+# to "bind" too, so the rules apply again whenever a driver binds to a wheel.
+ACTION!="add|change|bind", GOTO="simrig_logitech_end"
+
+# The G29 family (the kernel's hid-logitech or new-lg4ff): rotation, modes, levels, LEDs.
+SUBSYSTEM=="hid", DRIVER=="logitech", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w range alternate_modes combine_pedals gain autocenter spring_level damper_level friction_level ffb_leds peak_ffb_level || true'"
+
+# The G920 family (the kernel's hid-logitech-hidpp): rotation.
+SUBSYSTEM=="hid", DRIVER=="logitech-hidpp-device", ATTRS{idVendor}=="046d", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w range || true'"
+
+# G PRO and RS50 (the TrueForce driver): the settings SimRig shows, and centering.
+SUBSYSTEM=="hid", DRIVER=="logitech-dd", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w wheel_range wheel_strength wheel_damping wheel_trueforce wheel_ffb_filter wheel_calibrate_here || true'"
+
+# Raw HID of the direct drive wheels, for TrueForce in games through Proton: the user at the
+# seat only.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c268|c272|c276", TAG+="uaccess"
+
+LABEL="simrig_logitech_end"

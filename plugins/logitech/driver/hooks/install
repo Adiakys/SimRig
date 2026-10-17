@@ -1,0 +1,30 @@
+#!/bin/sh
+# Installs SimRig's udev rules, then new-lg4ff and the TrueForce driver if a wheel that needs
+# them is plugged in. Upgrades what SimRig installed before; leaves modules installed by other
+# means alone.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA"
+
+if [ "$(id -u)" != 0 ]; then
+    echo "lg4ff-$LG4FF_VERSION+tf-$TF_VERSION" > "$DATA/dev-installed"
+    echo "development install: nothing is installed (needs root)"
+    exit 0
+fi
+
+udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
+touch "$DATA/rules"
+
+lg4ff=0
+ensure "$LG4FF_PACKAGE" "$LG4FF_MODULE" "$LG4FF_VERSION" "$LG4FF_SOURCE" logitech no $LG4FF_WHEELS || lg4ff=$?
+[ "$lg4ff" = 1 ] && exit 1
+tf=0
+ensure "$TF_PACKAGE" "$TF_MODULE" "$TF_VERSION" "$TF_SOURCE" logitech-dd yes $TF_WHEELS || tf=$?
+[ "$tf" = 1 ] && exit 1
+
+udev_apply hid hidraw
+if [ "$lg4ff" = 3 ] || [ "$tf" = 3 ]; then
+    echo "Logitech driver installed: $(mod_key_message)"
+else
+    echo "Logitech driver installed"
+fi
