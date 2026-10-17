@@ -108,6 +108,20 @@ real devices keep it.
 To experiment without touching your real configuration, set `XDG_CONFIG_HOME` and
 `XDG_STATE_HOME` to a temporary directory.
 
+## Drivers
+
+SimRig builds on open source drivers maintained by their own communities. They are bundled as
+git submodules pinned to a tested version, installed on your machine by the app when you add a
+device, and credited with their licenses in [THIRD-PARTY.md](THIRD-PARTY.md).
+
+| Plugin | Driver | Upstream | License |
+|---|---|---|---|
+| Fanatec | hid-fanatecff, kernel module (FFB, tuning menu, LEDs, display), built with DKMS | [github.com/gotzl/hid-fanatecff](https://github.com/gotzl/hid-fanatecff) | GPL-2.0 |
+| Generic USB | SimRig's own userspace service (hidraw in, uinput out) | this repository | GPL-3.0-or-later |
+
+A driver you installed yourself (a distribution package, a newer version built by hand) is
+kept as it is: SimRig only adds its access rules next to it.
+
 ## Repository layout
 
 | Path | What |

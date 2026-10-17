@@ -1,0 +1,68 @@
+# SimRig packages, made by nfpm from the tree packaging/stage.sh lays out:
+#   SIMRIG_VERSION=1.2.3 nfpm package -f packaging/nfpm.yaml -p deb|rpm|archlinux -t dist/
+# The release workflow builds every format; see .github/workflows/release.yml.
+name: simrig
+arch: amd64
+platform: linux
+version: ${SIMRIG_VERSION}
+version_schema: semver
+release: "1"
+section: utils
+priority: optional
+maintainer: Adiakys <adiakys@users.noreply.github.com>
+vendor: Adiakys
+homepage: https://github.com/Adiakys/SimRig
+license: GPL-3.0-or-later
+description: |-
+  Configure a sim-racing rig on Linux: wheel bases, steering wheels, pedals, shifters and
+  handbrakes of any brand, from one app. SimRig installs the drivers a device needs, shows every
+  device live, calibrates and tunes them and keeps presets, then steps aside: the drivers keep
+  working with the app closed. Includes the generic USB plugin (any USB device as a shifter or a
+  handbrake) and the Fanatec plugin (with the hid-fanatecff driver, built with DKMS).
+
+contents:
+  - src: ./dist/root/usr/
+    dst: /usr/
+    type: tree
+
+scripts:
+  postremove: ./packaging/postremove.sh
+
+overrides:
+  deb:
+    depends:
+      - pkexec | policykit-1
+      - libfontconfig1
+      - libxkbcommon0
+    recommends:
+      # The Fanatec driver is built on the machine.
+      - dkms
+      - build-essential
+  rpm:
+    depends:
+      - polkit
+      - fontconfig
+      - libxkbcommon
+    recommends:
+      - dkms
+      - gcc
+      - make
+      - kernel-devel
+  archlinux:
+    depends:
+      - polkit
+      - fontconfig
+      - libxkbcommon
+    recommends:
+      - dkms
+      - base-devel
+      - linux-headers
+
+deb:
+  fields:
+    Bugs: https://github.com/Adiakys/SimRig/issues
+rpm:
+  group: Applications/System
+  summary: Configure a sim-racing rig on Linux
+archlinux:
+  packager: Adiakys <adiakys@users.noreply.github.com>

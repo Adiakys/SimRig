@@ -1,0 +1,129 @@
+# Build the packages on every published GitHub Release and publish them twice:
+#   - as assets of the release (.deb, .rpm, Arch .pkg.tar.zst, .tar.gz, SHA256SUMS);
+#   - in GitHub Packages, as one OCI artifact at ghcr.io/<owner>/simrig:<version> (GitHub
+#     Packages has no apt or rpm registry: OCI is how files show up under the repo's Packages
+#     tab). Fetch them with `oras pull ghcr.io/<owner>/simrig:<version>`.
+#
+# The release tag is the version: `v1.2.3` builds 1.2.3 (prereleases such as `v1.2.3-rc.1`
+# too). Stable releases also re-tag `latest` in GHCR; prereleases don't.
+#
+# No secrets needed: GHCR and the release use the built-in GITHUB_TOKEN.
+
+name: Release — build and publish packages
+
+on:
+  release:
+    types: [published]
+  # Manual trigger to rebuild a release already published (e.g. after a packaging fix).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build (e.g. v1.2.3)'
+        required: true
+
+permissions:
+  # Upload the release assets.
+  contents: write
+  # Push to ghcr.io via GITHUB_TOKEN.
+  packages: write
+
+env:
+  CARGO_TERM_COLOR: always
+  NFPM_VERSION: 2.47.0
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag and version
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+            prerelease=false
+          else
+            tag="${{ github.event.release.tag_name }}"
+            prerelease="${{ github.event.release.prerelease }}"
+          fi
+          version="${tag#v}"
+          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || {
+            echo "tag '$tag' is not a version (v1.2.3, v1.2.3-rc.1)" >&2
+            exit 1
+          }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.tag }}
+          # The Fanatec plugin bundles hid-fanatecff as a submodule.
+          submodules: recursive
+
+      - name: System libraries for the GUI (Slint)
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Stamp the version
+        # The binaries report the release version (`simrig --version`, the About section).
+        run: |
+          sed -i '/^\[workspace.package\]/,/^\[/ s/^version = ".*"/version = "${{ steps.ref.outputs.version }}"/' Cargo.toml
+          grep -A2 '^\[workspace.package\]' Cargo.toml
+
+      - name: Test
+        run: cargo test --workspace --release
+
+      - name: Build
+        run: cargo build --workspace --release
+
+      - name: Install nfpm
+        run: |
+          curl -sSfL -o nfpm.deb \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_amd64.deb"
+          sudo dpkg -i nfpm.deb
+
+      - name: Build the packages
+        run: packaging/build-packages.sh "${{ steps.ref.outputs.version }}"
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.ref.outputs.tag }}" dist/packages/* --clobber
+
+      - uses: oras-project/setup-oras@v2
+
+      - name: Publish to GitHub Packages (ghcr.io)
+        env:
+          VERSION: ${{ steps.ref.outputs.version }}
+        run: |
+          # GHCR rejects upper-case names.
+          image="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/simrig"
+          echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cd dist/packages
+          files=""
+          for f in *; do
+            case "$f" in
+              *.deb) type=application/vnd.debian.binary-package ;;
+              *.rpm) type=application/x-rpm ;;
+              *.pkg.tar.zst) type=application/zstd ;;
+              *.tar.gz) type=application/gzip ;;
+              *) type=text/plain ;;
+            esac
+            files="$files $f:$type"
+          done
+          tags="$VERSION"
+          if [ "${{ steps.ref.outputs.prerelease }}" != "true" ]; then
+            tags="$tags,latest"
+          fi
+          # The source annotation links the package to this repository.
+          # shellcheck disable=SC2086
+          oras push "$image:$tags" \
+            --artifact-type application/vnd.simrig.packages \
+            --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "org.opencontainers.image.description=SimRig packages (deb, rpm, Arch, tar.gz)" \
+            --annotation "org.opencontainers.image.licenses=GPL-3.0-or-later" \
+            --annotation "org.opencontainers.image.version=$VERSION" \
+            $files

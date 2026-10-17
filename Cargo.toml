@@ -39,3 +39,7 @@ opt-level = 3
 
 [profile.dev.package.usvg]
 opt-level = 3
+
+[profile.release]
+# Smaller packages: no debug symbols in the installed binaries.
+strip = "symbols"

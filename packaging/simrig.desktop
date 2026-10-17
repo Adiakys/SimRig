@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SimRig
+GenericName=Sim-racing rig settings
+Comment=Configure wheel bases, steering wheels, pedals, shifters and handbrakes
+Exec=simrig
+Icon=simrig
+Terminal=false
+Categories=Settings;HardwareSettings;Game;
+Keywords=wheel;steering;pedals;shifter;handbrake;force feedback;racing;sim racing;
+StartupWMClass=simrig

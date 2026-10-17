@@ -40,3 +40,38 @@ jobs:
         with:
           name: gui-screenshots
           path: target/shots/*.png
+
+  # The packages of every push, so a packaging error shows up before a release. Not published:
+  # kept as a workflow artifact for a week.
+  packages:
+    runs-on: ubuntu-latest
+    env:
+      NFPM_VERSION: 2.47.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: System libraries for the GUI (Slint)
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --release
+      - name: Install nfpm
+        run: |
+          curl -sSfL -o nfpm.deb \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_amd64.deb"
+          sudo dpkg -i nfpm.deb
+      - run: packaging/build-packages.sh "0.0.0-ci.${{ github.run_number }}"
+      - name: The .deb installs and the app starts
+        run: |
+          sudo apt-get install -y ./dist/packages/simrig_*_amd64.deb
+          test -x /usr/libexec/simrig/simrig-helper
+          test -f /usr/lib/simrig/plugins/fanatec/driver/hid-fanatecff/Kbuild
+          simrig-cli --version
+          simrig-cli plugins
+          sudo apt-get remove -y simrig
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: dist/packages/*
+          retention-days: 7
