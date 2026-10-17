@@ -1,0 +1,25 @@
+[package]
+name = "simrig-plugin-pxn"
+description = "simrig plugin for PXN wheel bases: forces through the kernel, VD settings over their control interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "simrig-plugin-pxn"
+path = "src/bin/adapter.rs"
+
+[dependencies]
+rustix = { version = "1", features = ["fs"] }
+simrig-plugin-kit.workspace = true
+simrig-plugin-sdk.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+simrig-driver = { workspace = true, features = ["testing"] }
+simrig-host = { workspace = true, features = ["testing"] }
+simrig-model.workspace = true
+
+[lints]
+workspace = true

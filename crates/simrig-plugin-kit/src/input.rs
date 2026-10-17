@@ -2,7 +2,7 @@
 //! and the force feedback test.
 //!
 //! Tests use a fake device: a HID directory outside `/sys` with a `simrig-fake-input` file of
-//! lines `abs <code> <value> <min> <max>` and `key <code> <0|1>`.
+//! lines `abs <code> <value> <min> <max>`, `key <code> <0|1>` and `ff` (force feedback).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -130,6 +130,17 @@ impl Inputs {
                 })
                 .collect(),
             Inputs::None(_) => Vec::new(),
+        }
+    }
+
+    /// The device takes force feedback effects (a driver handles them).
+    pub fn force_feedback(&self) -> bool {
+        match self {
+            Inputs::Device { device, .. } => device
+                .supported_ff()
+                .is_some_and(|ff| ff.iter().next().is_some()),
+            Inputs::Fake(path) => fake(path).iter().any(|l| words(l) == ["ff"]),
+            Inputs::None(_) => false,
         }
     }
 

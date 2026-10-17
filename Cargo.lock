@@ -4653,6 +4653,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "simrig-plugin-pxn"
+version = "0.1.0"
+dependencies = [
+ "rustix 1.1.5",
+ "serde_json",
+ "simrig-driver",
+ "simrig-host",
+ "simrig-model",
+ "simrig-plugin-kit",
+ "simrig-plugin-sdk",
+]
+
+[[package]]
 name = "simrig-plugin-sdk"
 version = "0.1.0"
 dependencies = [

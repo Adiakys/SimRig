@@ -1,0 +1,18 @@
+id = "pxn"
+name = "PXN"
+version = "0.1.0"
+api = 1
+exec = "simrig-plugin-pxn"
+driver = "driver/driver.toml"
+description = "PXN wheel bases: V10, V12, V12 Lite, VD6, with force feedback through the kernel; the VD series' settings too."
+
+# The bases of src/models.rs (hid-universal-pidff's); a test keeps them in step.
+[match]
+usb = [
+    { vid = 0x11ff, pid = 0x3245 }, # V10
+    { vid = 0x11ff, pid = 0x1212 }, # V12
+    { vid = 0x11ff, pid = 0x1112 }, # V12 Lite
+    { vid = 0x11ff, pid = 0x1211 }, # V12 Lite
+    { vid = 0x11ff, pid = 0x2141 }, # Lite Star GT987
+    { vid = 0x36e6, pid = 0x400f }, # VD6
+]

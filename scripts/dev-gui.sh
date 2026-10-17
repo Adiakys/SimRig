@@ -47,6 +47,7 @@ run)
         --plugin-dir "$root/plugins/moza" \
         --plugin-dir "$root/plugins/logitech" \
         --plugin-dir "$root/plugins/thrustmaster" \
+        --plugin-dir "$root/plugins/pxn" \
         --no-default-dirs \
         --config-dir "$dev/config" \
         --state-dir "$dev/state" \

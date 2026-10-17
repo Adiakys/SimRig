@@ -1,0 +1,8 @@
+# Installed by SimRig: PXN bases for the logged-in user, without a password.
+
+# The VD series' control interface (a hidraw node), where its settings are read and written.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="36e6", TAG+="uaccess"
+
+# Inputs and force feedback (usually given to the user already, as joysticks).
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="36e6", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="11ff", ATTRS{idProduct}=="3245|1212|1112|1211|2141", TAG+="uaccess"

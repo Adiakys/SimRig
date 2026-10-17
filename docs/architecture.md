@@ -916,6 +916,28 @@ damper and friction levels, force feedback test), its rim (buttons) and, once ma
 plugged into it. A wheel still starting up (hid-tminit's ids) is claimed without components, so
 adding it installs the driver. Tested end to end on a fake T300 RS.
 
+### 11.4 PXN
+
+PXN bases are direct drive bases with standard HID PID force feedback, like Moza's: the V10,
+V12 and GT987 (Lite Star's vendor id) are driven by `hid-universal-pidff`, in Linux from 6.15;
+the VD6 (PXN's own vendor id) by the kernel's generic PID force feedback from 6.15 too, and by
+the bundled universal-pidff on older kernels. The driver is Moza's, with SimRig's udev rules for
+PXN; both bundle the same universal-pidff, and a module one of them built is used as it is by
+the other.
+
+Settings exist for the VD series only: its vendor control interface (a hidraw node, usage page
+0xff00) speaks a protocol [Pitwall](https://github.com/unionyxx/pitwall) reverse engineered and
+verified on a VD6: a session handshake, then the 31-byte base settings block read and written
+whole (read, change, write, so fields SimRig does not show are kept), with the steering stream
+the base sends 100 times a second skipped. Rotation, force feedback strength, natural damper,
+friction and inertia and the spring and damper effect strengths are standard parameters;
+torque, speed, centering, end stops, road feel, filter, the other effect strengths, hands-off
+protection and reversed forces are custom ones. Whether the base keeps them when unplugged is
+not verified, so they are not offered as saved. The V10 and V12 families have no known settings
+protocol: their settings are shown as unavailable, with the reason. Force feedback is offered
+when the event node takes effects. Tested end to end on a fake VD6 whose control interface
+answers like the real one, and a fake V12.
+
 ## 12. Decisions
 
 | # | Decision | Rationale |

@@ -18,7 +18,7 @@ description: |-
   handbrakes of any brand, from one app. SimRig installs the drivers a device needs, shows every
   device live, calibrates and tunes them and keeps presets, then steps aside: the drivers keep
   working with the app closed. Includes the generic USB plugin (any USB device as a shifter or a
-  handbrake) and the Fanatec, Moza, Logitech and Thrustmaster plugins, with the open source
+  handbrake) and the Fanatec, Moza, Logitech, Thrustmaster and PXN plugins, with the open source
   kernel drivers they need (built with DKMS when a device needs them).
 
 contents:

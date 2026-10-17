@@ -103,6 +103,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `plugins/moza` | Moza plugin: bases, pedals, handbrake; settings over the serial port ([Boxflat](https://github.com/Lawstorant/boxflat)'s protocol); bundles [universal-pidff](https://github.com/JacKeTUs/universal-pidff) for kernels older than 6.15 |
 | `plugins/logitech` | Logitech plugin: G29 and G920 families, G PRO, RS50; bundles [new-lg4ff](https://github.com/berarma/new-lg4ff) and the [TrueForce driver](https://github.com/mescon/logitech-trueforce-linux-driver), built with DKMS for the wheels that need them |
 | `plugins/thrustmaster` | Thrustmaster plugin: T300 RS, T248, TX, TS-PC, TS-XW; bundles [hid-tmff2](https://github.com/Kimplul/hid-tmff2) as a submodule (with hid-tminit nested), built with DKMS |
+| `plugins/pxn` | PXN plugin: V10, V12, VD6; VD settings over the vendor control interface ([Pitwall](https://github.com/unionyxx/pitwall)'s protocol); bundles [universal-pidff](https://github.com/JacKeTUs/universal-pidff) for kernels older than 6.15 |
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
 | `design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
 | `scripts` | Development helpers |

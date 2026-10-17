@@ -1,0 +1,44 @@
+#!/bin/sh
+# Runs as the user: the state of the PXN driver, as JSON.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+
+installed=false
+rules_installed && installed=true
+active=false
+mod_loaded "$MODULE" && active=true
+set -- $(mod_state "$PACKAGE" "$MODULE" "$VERSION")
+case $1 in
+pending)
+    status_json true false "$2" true false true "To trust the key that signs the driver: $(mod_key_message)."
+    ;;
+outdated)
+    status_json true "$active" "$2" false false true "Version $VERSION of the driver is available."
+    ;;
+ours)
+    status_json true "$active" "$2" false false true ""
+    ;;
+*)
+    if [ -f "$DATA/dev-installed" ]; then
+        status_json true false "$VERSION" false false true "Development install: nothing is installed."
+    elif [ "$1" = kernel ]; then
+        if $installed; then
+            status_json true "$active" "" false false true "Force feedback through the kernel's hid-universal-pidff."
+        else
+            status_json false false "" false false true \
+                "Force feedback works through the kernel; SimRig adds access to the VD bases' settings. Asks for the password once."
+        fi
+    elif [ "$1" = foreign ]; then
+        if $installed; then
+            status_json true "$active" "$2" false false true \
+                "Uses hid-universal-pidff $2 installed by you or your distribution (SimRig is tested with $VERSION)."
+        else
+            status_json false false "$2" false false true \
+                "hid-universal-pidff $2 is installed (by you or your distribution): SimRig keeps it and adds access to the VD bases' settings. Asks for the password once."
+        fi
+    else
+        status_json false false "" false false true \
+            "Builds hid-universal-pidff for your kernel (older than 6.15) and adds access to the VD bases' settings. Asks for the password once."
+    fi
+    ;;
+esac

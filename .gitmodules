@@ -13,3 +13,6 @@
 [submodule "plugins/thrustmaster/driver/hid-tmff2"]
 	path = plugins/thrustmaster/driver/hid-tmff2
 	url = https://github.com/Kimplul/hid-tmff2
+[submodule "plugins/pxn/driver/universal-pidff"]
+	path = plugins/pxn/driver/universal-pidff
+	url = https://github.com/JacKeTUs/universal-pidff

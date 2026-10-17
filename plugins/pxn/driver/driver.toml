@@ -1,0 +1,16 @@
+# The PXN driver: SimRig's udev rules, which give the logged-in user the bases' inputs and the
+# VD series' control interface (their settings), and hid-universal-pidff for force feedback on
+# kernels older than 6.15 (bundled as a git submodule, pinned to a tested version, built with
+# DKMS). The kernel's own hid-universal-pidff, or one installed by other means (for example by
+# SimRig's Moza driver), is used as it is.
+id = "pxn"
+version = "0.2.2-6-gefd9b4a"
+summary = "udev rules for PXN settings without a password, and hid-universal-pidff for kernels older than 6.15"
+license = "GPL-2.0 (universal-pidff), GPL-3.0-or-later (SimRig's hooks)"
+
+install = "hooks/install"
+uninstall = "hooks/uninstall"
+status = "hooks/status"
+
+# Needed only to build hid-universal-pidff, on kernels older than 6.15.
+requires = ["dkms", "kernel-headers", "build-tools"]
