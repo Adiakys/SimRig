@@ -132,8 +132,10 @@ From **Plugins** in the top bar.
 From **Settings** in the top bar.
 
 - Theme (system, light, dark), language, units (degrees, percent), reduced motion.
-- Rig composition: excluded components (with **Include again**), which plugin handles a device,
-  devices added from the catalog before plugging them in.
+- Rig composition: excluded components (with **Include again**), devices added from the catalog
+  before plugging them in.
+- Devices: for each USB device, the plugin that handles it (**Automatic**, or one of the plugins
+  that can) and the procedures its plugin offers on it (set up again, forget the setup).
 - Presets: list, rename, import, export, delete.
 - Uninstall: the dialog that offers to remove the drivers too (see architecture §6.5).
 

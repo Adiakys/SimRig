@@ -27,8 +27,8 @@ pub use describe::{
 pub use device::{Bus, DeviceInfo};
 pub use param::{ChoiceOption, ParamSpec, ParamType, Persistence, ValueError};
 pub use procedure::{
-    ActionRole, Element, Level, ProcedureDescriptor, ProcedureState, ProcedureTarget, Step,
-    StepAction,
+    ActionRole, Element, Level, Preview, ProcedureDescriptor, ProcedureState, ProcedureTarget,
+    Step, StepAction,
 };
 pub use support::{Reason, Support, Unsupported};
 pub use value::{Axis, CurvePoint, Gear, Value, ValueKind};

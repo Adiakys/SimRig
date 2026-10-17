@@ -461,6 +461,10 @@ plugin can add any procedure without touching the core.
 
   A step can be **waiting**: the plugin moves on by itself (e.g. "move the lever to 3rd gear",
   then it detects the input) and notifies `procedure/update`.
+  A step can carry a **preview**: a component type with standard values (`gears`,
+  `reverse_position`, `mode`, `gear`, `position`) and a `target` (`3`, `R`, `+`). The app draws it
+  with the core's drawing of that type, the target marked (the gear to engage on the gate), so
+  a device with no components yet still shows what is asked.
 - The SDK keeps the sessions, validates the fields of the current step before the plugin sees
   them, and applies the values a finished procedure returns to its component (`apply`), validated
   like any change. During a step the plugin may run privileged operations of its driver (e.g. to
@@ -494,6 +498,7 @@ shifter (H-pattern or sequential) or a handbrake, whatever its HID descriptor sa
 | Driver | a small service (`simrig-generic-usb-service`), started by udev with each set-up device (`systemd` template unit `simrig-generic-usb@hidrawN`) and stopped when it is unplugged. It reads `hidraw` and drives a virtual joystick through `uinput`: one button per gear (and reverse), up/down, or the handbrake as an axis (`ABS_RX`) plus a button. The raw device is hidden from games (udev clears `ID_INPUT_JOYSTICK`), so they see only the joystick. |
 | udev rules | generated from the setups: read access (`uaccess`) to the device's `hidraw` while it is being set up and once set up, the service, and the raw device hidden. |
 | Components | the adapter decodes the same raw reports with the same setup, so the gear and the handbrake move live in the app; calibration, dead zone, curve and mode change at once in the app and reach games when saved. |
+| Forget | a device procedure (and a component one) that deletes the setup through the privileged `forget-device` operation: the service stops serving it and its components go away. |
 
 The driver needs systemd to start the service with the device; without it, `status` says so.
 Two identical devices (same vendor and product) without a serial number share one setup. In

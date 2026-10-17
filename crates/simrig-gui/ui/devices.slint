@@ -58,6 +58,10 @@ export struct Device {
     frame: image,
     knob-x: float,
     knob-y: float,
+    /// The gear a procedure asks for (`3`, `R`, `+`), marked on the gate; empty for none.
+    target: string,
+    target-x: float,
+    target-y: float,
 
     // Handbrake
     has-pull: bool,
@@ -207,8 +211,19 @@ export component LiveDevice {
                 width: 100%;
                 height: 100%;
             }
+            // The position a guided procedure asks for: an accent ring on its slot.
+            if root.device.target != "": Rectangle {
+                width: Geometry.knob-size * 0.62 * root.s * 1px;
+                height: self.width;
+                x: root.device.target-x * root.s * 1px - self.width / 2;
+                y: root.device.target-y * root.s * 1px - self.height / 2;
+                border-radius: self.width / 2;
+                border-width: 3px;
+                border-color: Theme.accent;
+                background: Theme.accent.with-alpha(0.18);
+            }
             for l in root.device.gate-labels: Text {
-                property <bool> on: l.text == root.device.gear;
+                property <bool> on: l.text == root.device.gear || l.text == root.device.target;
                 x: l.x * root.s * 1px - self.width / 2;
                 y: l.y * root.s * 1px - self.height / 2;
                 text: l.text;

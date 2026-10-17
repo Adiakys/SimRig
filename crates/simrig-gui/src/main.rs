@@ -277,6 +277,12 @@ mod callbacks {
             a.refresh_flows();
         });
         let a = app.clone();
+        api.on_choose_plugin(move |key, i| a.borrow_mut().choose_plugin(&key, i));
+        let a = app.clone();
+        api.on_start_device_procedure(move |plugin, device, id| {
+            a.borrow_mut().start_device_procedure(&plugin, &device, &id)
+        });
+        let a = app.clone();
         api.on_first_next(move || a.borrow_mut().first_next());
         let a = app.clone();
         api.on_first_back(move || a.borrow_mut().first_back());

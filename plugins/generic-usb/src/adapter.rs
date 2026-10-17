@@ -199,7 +199,12 @@ impl Adapter for GenericAdapter {
         let Some(state) = self.devices.get(device_id) else {
             return Vec::new();
         };
-        vec![setup_descriptor(state.borrow().saved.is_some())]
+        let set_up = state.borrow().saved.is_some();
+        let mut procedures = vec![setup_descriptor(set_up)];
+        if set_up {
+            procedures.push(forget_descriptor());
+        }
+        procedures
     }
 
     fn start_device_procedure(&mut self, device_id: &str, id: &str) -> Result<Box<dyn Procedure>> {
@@ -208,6 +213,9 @@ impl Adapter for GenericAdapter {
                 state.clone(),
                 Self::driver_installed(&self.data),
             ))),
+            (Some(state), "forget") => Ok(Box::new(Forget {
+                state: state.clone(),
+            })),
             _ => Err(Error::NotFound(format!("unknown procedure '{id}'"))),
         }
     }
@@ -258,4 +266,57 @@ pub fn joystick_name(config: &DeviceConfig) -> String {
         },
     };
     format!("SimRig {what}: {}", config.name)
+}
+
+pub fn forget_descriptor() -> ProcedureDescriptor {
+    ProcedureDescriptor::new("forget", "Forget the setup")
+        .help("The driver stops serving the device: games no longer see its joystick.")
+}
+
+/// Forgets a device's setup: the driver stops serving it and the device has no components
+/// until it is set up again.
+pub struct Forget {
+    pub state: Shared,
+}
+
+impl Procedure for Forget {
+    fn start(&mut self, _host: &mut HostLink<'_>) -> Result<Outcome> {
+        let name = self.state.borrow().name.clone();
+        let joystick = self
+            .state
+            .borrow()
+            .saved
+            .as_ref()
+            .map(joystick_name)
+            .unwrap_or_default();
+        Ok(Outcome::Step(
+            Step::new(&format!("Forget the setup of {name}?"))
+                .text(format!(
+                    "Games no longer see “{joystick}”, with SimRig closed too. The device can be \
+                     set up again at any time."
+                ))
+                .action(StepAction::new("forget", "Forget", ActionRole::Primary))
+                .action(StepAction::cancel()),
+        ))
+    }
+
+    fn submit(
+        &mut self,
+        action: &str,
+        _values: &BTreeMap<String, Value>,
+        host: &mut HostLink<'_>,
+    ) -> Result<Outcome> {
+        if action != "forget" {
+            return Ok(Outcome::Cancelled);
+        }
+        let file = self.state.borrow().file_stem();
+        host.privileged("forget-device", &[("file", &file)])?;
+        let mut s = self.state.borrow_mut();
+        s.saved = None;
+        s.draft = None;
+        Ok(Outcome::finished(format!(
+            "{} is no longer set up: it can be set up again from Add device.",
+            s.name
+        )))
+    }
 }

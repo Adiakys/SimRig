@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::component::ComponentKind;
 use crate::param::ParamType;
 use crate::support::Support;
 use crate::value::Value;
@@ -84,6 +85,44 @@ pub struct Step {
     /// Step `n` of `total`, when the plugin knows it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<[u32; 2]>,
+    /// A picture of the component being set up, drawn by the app with the core's drawing of
+    /// its type (e.g. the gate of a shifter with the gear to engage marked).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<Preview>,
+}
+
+/// What the app draws next to a step: a component of `kind` as `values` describe it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Preview {
+    pub kind: ComponentKind,
+    /// Standard item values that shape or move the drawing: parameters (`gears`,
+    /// `reverse_position`, `mode`) and inputs (`gear`, `position`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub values: BTreeMap<String, Value>,
+    /// The position the user is asked for, marked on the drawing: a gear (`1`, `R`) or a
+    /// sequential direction (`+`, `-`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+}
+
+impl Preview {
+    pub fn new(kind: ComponentKind) -> Self {
+        Self {
+            kind,
+            values: BTreeMap::new(),
+            target: None,
+        }
+    }
+
+    pub fn value(mut self, item: &str, value: Value) -> Self {
+        self.values.insert(item.into(), value);
+        self
+    }
+
+    pub fn target(mut self, target: impl Into<String>) -> Self {
+        self.target = Some(target.into());
+        self
+    }
 }
 
 impl Step {
@@ -116,6 +155,11 @@ impl Step {
 
     pub fn progress(mut self, n: u32, total: u32) -> Self {
         self.progress = Some([n, total]);
+        self
+    }
+
+    pub fn preview(mut self, preview: Preview) -> Self {
+        self.preview = Some(preview);
         self
     }
 

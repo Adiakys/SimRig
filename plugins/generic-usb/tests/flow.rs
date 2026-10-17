@@ -240,6 +240,36 @@ fn shifter_set_up_by_moving_it() {
     std::thread::sleep(Duration::from_millis(100));
     let inputs = host.read_inputs(&shifter).unwrap();
     assert_eq!(inputs.get("gear"), Some(&Value::Gear(Gear::Neutral)));
+
+    // The only plugin that can take it is the generic one.
+    let (usb, _) = host.usb_devices().into_iter().next().unwrap();
+    assert_eq!(host.candidate_plugins(&usb), ["generic-usb"]);
+
+    // Forgetting the setup: the shifter goes away, the driver no longer has it.
+    let target = Target::Device {
+        plugin: "generic-usb".into(),
+        device: device.clone(),
+    };
+    let ids: Vec<String> = host
+        .procedures(&target)
+        .unwrap()
+        .into_iter()
+        .map(|p| p.id)
+        .collect();
+    assert_eq!(ids, ["setup", "forget"]);
+    let (session, _) = host.start_procedure(&target, "forget").unwrap();
+    let state = submit(&mut host, &session, "forget", &[]);
+    assert!(
+        matches!(state, ProcedureState::Finished { .. }),
+        "{state:?}"
+    );
+    assert!(!env.data().join("devices/1234-0001.toml").exists());
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while host.find(&shifter).is_ok() {
+        assert!(Instant::now() < deadline, "the shifter is still there");
+        host.poll();
+        std::thread::sleep(Duration::from_millis(20));
+    }
 }
 
 #[test]

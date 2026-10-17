@@ -523,8 +523,61 @@ impl App {
                 excluded: c.component.excluded,
             })
             .collect();
+        let usb: Vec<ui::UsbRow> = self
+            .snapshot
+            .usb
+            .iter()
+            .filter(|u| u.plugin.is_some() || u.chosen.is_some())
+            .map(|u| {
+                let name = |id: &str| {
+                    self.snapshot
+                        .plugins
+                        .iter()
+                        .find(|p| p.id == id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_else(|| id.to_string())
+                };
+                let mut options = vec!["Automatic".to_string()];
+                options.extend(u.candidates.iter().map(|c| name(c)));
+                let selected = u
+                    .chosen
+                    .as_ref()
+                    .and_then(|c| u.candidates.iter().position(|x| x == c))
+                    .map(|i| i as i32 + 1)
+                    .unwrap_or(0);
+                let handled = match &u.plugin {
+                    Some(p) => format!("handled by {}", name(p)),
+                    None => "not handled".into(),
+                };
+                ui::UsbRow {
+                    key: u.key.clone().into(),
+                    name: u.name.clone().into(),
+                    detail: format!("USB {:04x}:{:04x} · {handled}", u.vid, u.pid).into(),
+                    plugin: u.plugin.clone().unwrap_or_default().into(),
+                    device: u.device.clone().into(),
+                    options: ModelRc::new(VecModel::from(
+                        options
+                            .into_iter()
+                            .map(Into::into)
+                            .collect::<Vec<slint::SharedString>>(),
+                    )),
+                    selected,
+                    procedures: ModelRc::new(VecModel::from(
+                        u.procedures
+                            .iter()
+                            .filter(|p| p.availability.is_supported())
+                            .map(|p| ui::DeviceProcedure {
+                                id: p.id.clone().into(),
+                                label: p.label.clone().into(),
+                            })
+                            .collect::<Vec<_>>(),
+                    )),
+                }
+            })
+            .collect();
         let window = self.window();
         let rig = window.global::<Rig>();
+        rig.set_usb_devices(ModelRc::new(VecModel::from(usb)));
         rig.set_composition(ModelRc::new(VecModel::from(rows)));
         rig.set_theme_index(self.settings.theme.index());
         rig.set_reduced_motion(self.settings.reduced_motion);
@@ -535,6 +588,30 @@ impl App {
             address: address.to_string(),
             excluded,
         });
+    }
+
+    /// Settings: which plugin handles a USB device (0 = automatic, then the candidates).
+    pub fn choose_plugin(&mut self, key: &str, index: i32) {
+        let Some(usb) = self.snapshot.usb.iter().find(|u| u.key == key) else {
+            return;
+        };
+        let plugin = usize::try_from(index - 1)
+            .ok()
+            .and_then(|i| usb.candidates.get(i).cloned());
+        self.send(Command::ChoosePlugin {
+            device: key.to_string(),
+            plugin,
+        });
+    }
+
+    pub fn start_device_procedure(&mut self, plugin: &str, device: &str, id: &str) {
+        self.start_procedure(
+            Target::Device {
+                plugin: plugin.to_string(),
+                device: device.to_string(),
+            },
+            id,
+        );
     }
 
     pub fn delete_preset(&mut self, name: &str) {

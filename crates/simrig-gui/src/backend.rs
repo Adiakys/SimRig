@@ -108,6 +108,12 @@ pub struct UsbView {
     pub vid: u16,
     pub pid: u16,
     pub plugin: Option<String>,
+    /// Plugins that can handle it, most specific first.
+    pub candidates: Vec<String>,
+    /// The plugin the user chose for it, if any (otherwise the most specific one handles it).
+    pub chosen: Option<String>,
+    /// Guided procedures its plugin offers on it (setup, forget…).
+    pub procedures: Vec<simrig_model::ProcedureDescriptor>,
 }
 
 pub enum Update {
@@ -371,18 +377,34 @@ fn snapshot(host: &mut Host, drivers: &BTreeMap<String, Option<DriverStatus>>) -
         });
     }
 
-    let usb = host
-        .usb_devices()
-        .into_iter()
-        .map(|(device, plugin)| UsbView {
-            key: device.keys().into_iter().next().unwrap_or_default(),
-            device: device.device_info().id,
+    let mut usb = Vec::new();
+    for (device, plugin) in host.usb_devices() {
+        let keys = device.keys();
+        let chosen = keys
+            .iter()
+            .find_map(|k| host.rig_config().device_plugins.get(k).cloned());
+        let id = device.device_info().id;
+        let procedures = match &plugin {
+            Some(p) => host
+                .procedures(&Target::Device {
+                    plugin: p.clone(),
+                    device: id.clone(),
+                })
+                .unwrap_or_default(),
+            None => Vec::new(),
+        };
+        usb.push(UsbView {
+            key: keys.into_iter().next().unwrap_or_default(),
+            device: id,
             name: device.name.clone(),
             vid: device.vid,
             pid: device.pid,
+            candidates: host.candidate_plugins(&device),
+            chosen,
+            procedures,
             plugin,
-        })
-        .collect();
+        });
+    }
 
     let presets = host
         .presets()

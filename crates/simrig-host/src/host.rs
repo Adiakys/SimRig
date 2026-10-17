@@ -973,6 +973,27 @@ impl Host {
     }
 
     /// USB devices currently connected, with the plugin handling each one.
+    /// Plugins that can handle a USB device, most specific first: those whose manifest matches
+    /// it, then generic ones (`on_request`).
+    pub fn candidate_plugins(&self, device: &UsbDevice) -> Vec<String> {
+        let mut claims: Vec<(u8, String)> = self
+            .plugins
+            .iter()
+            .filter_map(|p| {
+                let m = &p.manifest.matching;
+                let claim = m.usb_claim(device.vid, device.pid);
+                let rank = match (claim, m.on_request) {
+                    (Some(c), _) => c + 1,
+                    (None, true) => 0,
+                    (None, false) => return None,
+                };
+                Some((rank, p.manifest.id.clone()))
+            })
+            .collect();
+        claims.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+        claims.into_iter().map(|(_, id)| id).collect()
+    }
+
     pub fn usb_devices(&self) -> Vec<(UsbDevice, Option<String>)> {
         self.usb
             .iter()

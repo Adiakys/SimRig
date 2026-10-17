@@ -3,7 +3,7 @@
 
 import { ScrollView } from "std-widgets.slint";
 import { Theme, Icons } from "theme.slint";
-import { Rig, Api, FoundDevice, PluginRow, SystemCheck, ExcludedRow, PresetItem } from "api.slint";
+import { Rig, Api, FoundDevice, PluginRow, SystemCheck, ExcludedRow, PresetItem, UsbRow } from "api.slint";
 import { Device, LiveDevice } from "devices.slint";
 import { Button, ButtonKind, Chip, ChipTone, Segmented, Toggle, Eyebrow, Title, Heading, Body, Small, Hairline, BackRow, Notice, Steps } from "widgets.slint";
 
@@ -514,6 +514,7 @@ component SettingsLine inherits VerticalLayout {
         VerticalLayout {
             width: 300px;
             spacing: 4px;
+            alignment: start;
             Body { text: root.label; }
             if root.help != "": Small { text: root.help; }
         }
@@ -592,6 +593,37 @@ export component SettingsScreen inherits Rectangle {
                         Small {
                             text: c.excluded ? @tr("Excluded") : @tr("In the rig");
                             vertical-alignment: center;
+                        }
+                    }
+                }
+
+                SettingsSection {
+                    title: @tr("Devices");
+                    note: @tr("Each USB device is handled by the most specific plugin, unless another one is chosen here. Generic plugins handle a device only when chosen.");
+                    if Rig.usb-devices.length == 0: Small { text: @tr("No USB device handled by a plugin."); }
+                    for d in Rig.usb-devices: SettingsLine {
+                        label: d.name;
+                        help: d.detail;
+                        VerticalLayout {
+                            spacing: 10px;
+                            HorizontalLayout {
+                                alignment: start;
+                                Segmented {
+                                    options: d.options;
+                                    selected: d.selected;
+                                    label: @tr("Plugin of {}", d.name);
+                                    picked(i) => { Api.choose-plugin(d.key, i); }
+                                }
+                            }
+                            if d.procedures.length > 0: HorizontalLayout {
+                                alignment: start;
+                                spacing: 8px;
+                                for p in d.procedures: Button {
+                                    small: true;
+                                    text: p.label;
+                                    clicked => { Api.start-device-procedure(d.plugin, d.device, p.id); }
+                                }
+                            }
                         }
                     }
                 }

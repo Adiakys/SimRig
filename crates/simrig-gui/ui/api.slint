@@ -150,6 +150,25 @@ export struct SystemCheck {
     note: string,
 }
 
+/// A guided procedure offered on a device.
+export struct DeviceProcedure {
+    id: string,
+    label: string,
+}
+
+/// A USB device in Settings: which plugin handles it, and what can be done with it.
+export struct UsbRow {
+    key: string,
+    name: string,
+    detail: string,
+    plugin: string,
+    device: string,
+    /// "Automatic", then the plugins that can handle it.
+    options: [string],
+    selected: int,
+    procedures: [DeviceProcedure],
+}
+
 export struct ExcludedRow {
     address: string,
     label: string,
@@ -207,6 +226,7 @@ export global Rig {
     in property <[string]> problems;
     in property <[SystemCheck]> system;
     in property <[ExcludedRow]> composition;
+    in property <[UsbRow]> usb-devices;
     in property <int> drivers-missing;
     in property <int> theme-index;
     in property <bool> reduced-motion;
@@ -258,4 +278,6 @@ export global Api {
     callback add-show-all(bool);
     callback add-open-settings();
     callback dismiss-toast(int);
+    callback choose-plugin(string, int);
+    callback start-device-procedure(string, string, string);
 }

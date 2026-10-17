@@ -154,6 +154,7 @@ impl DeviceSetup {
                 .action(StepAction::next())
                 .action(StepAction::cancel()),
             Stage::Rest(_) => Step::new("Leave the device at rest")
+                .preview(self.preview(None))
                 .text(
                     "Hands off for a moment: the rest position is learned, and anything that \
                      moves by itself is ignored.",
@@ -168,14 +169,21 @@ impl DeviceSetup {
                     _ if name == "reverse" => "Engage reverse and hold it".into(),
                     _ => format!("Move the lever to {name} gear and hold it"),
                 };
+                let target = match self.kind.as_str() {
+                    "sequential" => if *i == 0 { "+" } else { "-" }.to_string(),
+                    _ if name == "reverse" => "R".to_string(),
+                    _ => (i + 1).to_string(),
+                };
                 Step::new(&title)
                     .text("The position is detected as soon as the lever stays still.")
+                    .preview(self.preview(Some(target)))
                     .element(self.table())
                     .waiting()
                     .progress(*i as u32 + 1, positions.len() as u32)
                     .action(StepAction::cancel())
             }
             Stage::Pull { .. } => Step::new("Pull the handbrake fully and hold it")
+                .preview(self.preview(Some("pulled".into())))
                 .text("Its travel is measured from the rest position to the furthest point.")
                 .waiting()
                 .action(StepAction::cancel()),
@@ -208,6 +216,42 @@ impl DeviceSetup {
             step = step.element(Element::notice(*level, text.clone()));
         }
         step
+    }
+
+    /// The component being set up, as the app draws it: the gate with the gear to engage, or
+    /// the handbrake pulled.
+    fn preview(&self, target: Option<String>) -> Preview {
+        match self.kind.as_str() {
+            "handbrake" => {
+                let pulled = target.is_some();
+                Preview::new(ComponentKind::Handbrake).value(
+                    "position",
+                    Value::Axis(Axis {
+                        raw: 0,
+                        value: if pulled { 1.0 } else { 0.0 },
+                    }),
+                )
+            }
+            kind => {
+                let mode = if kind == "sequential" {
+                    "sequential"
+                } else {
+                    "h_pattern"
+                };
+                let mut preview = Preview::new(ComponentKind::Shifter)
+                    .value("mode", Value::Choice(mode.into()))
+                    .value("gears", Value::Int(self.gears))
+                    .value(
+                        "reverse_position",
+                        Value::Choice(self.reverse_position.clone()),
+                    )
+                    .value("gear", Value::Gear(Gear::Neutral));
+                if let Some(target) = target {
+                    preview = preview.target(target);
+                }
+                preview
+            }
+        }
     }
 
     fn table(&self) -> Element {

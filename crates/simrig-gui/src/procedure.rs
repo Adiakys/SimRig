@@ -53,6 +53,10 @@ impl App {
             finished: false,
         };
         let has_device = matches!(target, Target::Component(_));
+        if let Target::Device { .. } = &target {
+            // Nothing live to draw but what the steps preview.
+            self.current = None;
+        }
         if let Target::Component(address) = &target {
             self.current = Some(address.clone());
             let device = self.device(address);
@@ -144,6 +148,12 @@ impl App {
             return;
         };
         let mut p = self.procedure_base();
+        if let Some(preview) = &step.preview {
+            let name = self.procedure.source.clone();
+            let device = self.preview_device(preview, &name);
+            self.window().global::<Rig>().set_current(device);
+            p.has_device = true;
+        }
         p.title = step.title.clone().into();
         p.text = step.text.clone().unwrap_or_default().into();
         p.waiting = step.waiting;

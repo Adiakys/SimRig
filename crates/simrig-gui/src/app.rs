@@ -466,19 +466,6 @@ impl App {
                     .and_then(|v| v.as_str().map(str::to_string))
                     .unwrap_or_else(|| "right_down".into());
                 let sequential = mode == "sequential";
-                let (layout, key) = if sequential {
-                    (GateLayout::sequential(), "sequential".to_string())
-                } else {
-                    (
-                        GateLayout::h_pattern(gears, &reverse),
-                        format!("h{gears}{reverse}"),
-                    )
-                };
-                device.layout_text = if sequential {
-                    "Sequential".into()
-                } else {
-                    format!("H {gears}+R").into()
-                };
                 let gear = if sequential {
                     match self.input(&c.address, "sequential") {
                         Some(Value::Buttons(b)) if b.first() == Some(&true) => "+".to_string(),
@@ -491,13 +478,7 @@ impl App {
                         _ => "N".to_string(),
                     }
                 };
-                let (gate, labels) = self.gate(&key, &layout);
-                device.gate = gate;
-                device.gate_labels = labels;
-                let (x, y) = self.geometry.knob(&layout, &gear);
-                device.knob_x = x;
-                device.knob_y = y;
-                device.gear = gear.into();
+                self.shifter_drawing(&mut device, &mode, gears, &reverse, gear, None);
             }
             ComponentKind::Handbrake => {
                 let pull = self
@@ -509,23 +490,109 @@ impl App {
                         _ => None,
                     });
                 device.has_pull = pull.is_some();
-                let pull = pull.unwrap_or(0.0);
-                device.pull = pull;
-                let lever = &self.geometry.handbrake.lever;
-                if let Some(raster) = &mut self.raster {
-                    device.frame = raster.lever(
-                        pull.clamp(0.0, 1.0) * lever.pulled_angle,
-                        (lever.pivot[0], lever.pivot[1]),
-                    );
-                }
-                device.pull_text = if pull < 0.02 {
-                    "Released".into()
-                } else if pull > 0.98 {
-                    "Fully pulled".into()
-                } else {
-                    "Pulled".into()
-                };
+                self.handbrake_drawing(&mut device, pull.unwrap_or(0.0));
             }
+        }
+        device
+    }
+
+    /// The gate of a shifter's configuration, the knob on `gear`, and `target` marked.
+    fn shifter_drawing(
+        &mut self,
+        device: &mut Device,
+        mode: &str,
+        gears: u8,
+        reverse: &str,
+        gear: String,
+        target: Option<&str>,
+    ) {
+        let sequential = mode == "sequential";
+        let (layout, key) = if sequential {
+            (GateLayout::sequential(), "sequential".to_string())
+        } else {
+            (
+                GateLayout::h_pattern(gears, reverse),
+                format!("h{gears}{reverse}"),
+            )
+        };
+        device.layout_text = if sequential {
+            "Sequential".into()
+        } else {
+            format!("H {gears}+R").into()
+        };
+        let (gate, labels) = self.gate(&key, &layout);
+        device.gate = gate;
+        device.gate_labels = labels;
+        let (x, y) = self.geometry.knob(&layout, &gear);
+        device.knob_x = x;
+        device.knob_y = y;
+        device.gear = gear.into();
+        if let Some(target) = target {
+            let (x, y) = self.geometry.knob(&layout, target);
+            device.target = target.into();
+            device.target_x = x;
+            device.target_y = y;
+        }
+    }
+
+    /// The handbrake lever pulled by `pull` (0..1).
+    fn handbrake_drawing(&mut self, device: &mut Device, pull: f32) {
+        device.pull = pull;
+        let lever = &self.geometry.handbrake.lever;
+        if let Some(raster) = &mut self.raster {
+            device.frame = raster.lever(
+                pull.clamp(0.0, 1.0) * lever.pulled_angle,
+                (lever.pivot[0], lever.pivot[1]),
+            );
+        }
+        device.pull_text = if pull < 0.02 {
+            "Released".into()
+        } else if pull > 0.98 {
+            "Fully pulled".into()
+        } else {
+            "Pulled".into()
+        };
+    }
+
+    /// The drawing a procedure step asks for: a component as its values describe it.
+    pub fn preview_device(&mut self, preview: &simrig_model::Preview, name: &str) -> Device {
+        let mut device = Device {
+            kind: preview.kind.key().into(),
+            kind_label: preview.kind.label().into(),
+            name: name.into(),
+            state: "ready".into(),
+            rim: "round".into(),
+            ..Device::default()
+        };
+        let text = |item: &str| {
+            preview
+                .values
+                .get(item)
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        };
+        match preview.kind {
+            ComponentKind::Shifter => {
+                let mode = text("mode").unwrap_or_else(|| "h_pattern".into());
+                let gears = preview
+                    .values
+                    .get("gears")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(6.0) as u8;
+                let reverse = text("reverse_position").unwrap_or_else(|| "right_down".into());
+                let gear = match preview.values.get("gear") {
+                    Some(Value::Gear(g)) => g.to_string(),
+                    _ => "N".into(),
+                };
+                let target = preview.target.clone();
+                self.shifter_drawing(&mut device, &mode, gears, &reverse, gear, target.as_deref());
+            }
+            ComponentKind::Handbrake => {
+                let pull = preview.values.get("position").and_then(axis).unwrap_or(0.0);
+                device.has_pull = true;
+                self.handbrake_drawing(&mut device, pull);
+            }
+            _ => {}
         }
         device
     }

@@ -25,10 +25,20 @@ fn unavailable<T>(state: &Shared) -> Option<Support<T>> {
 
 /// The setup procedure, offered on the component too.
 fn procedures(state: &Shared) -> Vec<ProcedureDescriptor> {
-    vec![setup_descriptor(state.borrow().saved.is_some())]
+    let set_up = state.borrow().saved.is_some();
+    let mut list = vec![setup_descriptor(set_up)];
+    if set_up {
+        list.push(crate::adapter::forget_descriptor());
+    }
+    list
 }
 
 fn start(state: &Shared, id: &str) -> Result<Box<dyn Procedure>> {
+    if id == "forget" {
+        return Ok(Box::new(crate::adapter::Forget {
+            state: state.clone(),
+        }));
+    }
     if id != "setup" {
         return Err(Error::NotFound(format!("unknown procedure '{id}'")));
     }
