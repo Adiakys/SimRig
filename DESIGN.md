@@ -267,6 +267,8 @@ turns Raised with a Rule border, to say "this opens".
   2 px outside the button (Chrome Ink in light, Chrome Yellow in dark). Active presses 1 px down.
 - **Secondary:** Raised fill, Ink text, 1 px Rule outline in the light theme.
 - **Quiet:** text only with an icon, for the top bar and inline actions; Raised on hover.
+- **Add actions:** never a bare "+" icon. The icon names what is added (a wheel for a device, a
+  list for a preset) with a small plus at its bottom right.
 - **Privileged:** a button that will ask for the password carries a small lock icon and, below
   it, one line saying why ("Asks for your password once to install the driver").
 
@@ -307,7 +309,7 @@ turns Raised with a Rule border, to say "this opens".
 
 ### The Live Device (signature component)
 The core's generic drawings (`assets/devices`), animated from live inputs: the rim turns with the
-steering angle, pedals shorten towards their hinge as they are pressed, the shifter knob sits on
+steering angle, the pedals stay still (their travel is in the pedal bars next to them), the shifter knob sits on
 the engaged slot of a gate drawn from the configuration (6+R, 7+R, sequential), the handbrake
 lever turns on its pivot. Only the pedals the component declares are drawn. Next to each drawing
 sits one **Live Value** (Label caption, Value L or XL) and at most two secondary values. A device

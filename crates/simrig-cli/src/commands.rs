@@ -269,7 +269,7 @@ pub fn monitor(host: &mut Host, seconds: Option<f64>) -> Result<()> {
     while end.is_none_or(|end| Instant::now() < end) {
         for event in host.poll() {
             match event {
-                HostEvent::Inputs { .. } => {}
+                HostEvent::Inputs { .. } | HostEvent::UsbChanged => {}
                 HostEvent::PluginStarted { plugin } => println!("plugin {plugin} started"),
                 HostEvent::PluginStopped { plugin } => {
                     println!("plugin {plugin} stopped (no devices)")

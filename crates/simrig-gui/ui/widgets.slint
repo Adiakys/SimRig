@@ -1,0 +1,725 @@
+// Basic controls of the SimRig interface. See DESIGN.md, Components.
+
+import { Theme, Icons } from "theme.slint";
+
+/// Caption over live values and group eyebrows: Label style, uppercase, three words at most.
+export component Eyebrow inherits Text {
+    font-family: Theme.sans;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.08px;
+    color: Theme.ink2;
+    vertical-alignment: center;
+}
+
+export component Title inherits Text {
+    font-family: Theme.sans;
+    font-size: 28px;
+    font-weight: 600;
+    color: Theme.ink;
+    wrap: word-wrap;
+}
+
+export component Heading inherits Text {
+    font-family: Theme.sans;
+    font-size: 20px;
+    font-weight: 600;
+    color: Theme.ink;
+    wrap: word-wrap;
+}
+
+export component Body inherits Text {
+    font-family: Theme.sans;
+    font-size: 16px;
+    color: Theme.ink;
+    wrap: word-wrap;
+}
+
+export component Small inherits Text {
+    font-family: Theme.sans;
+    font-size: 14px;
+    color: Theme.ink2;
+    wrap: word-wrap;
+}
+
+/// A value that comes from a device or goes to it, in Martian Mono. Degrees stay attached to
+/// the number at full size; other units are drawn smaller after it.
+export component LiveValue inherits HorizontalLayout {
+    in property <string> value;
+    in property <string> unit;
+    /// "xl" (the engaged gear), "l" (main value of a device) or "m" (secondary values).
+    in property <string> size: "l";
+    in property <color> color: Theme.ink;
+    in property <TextHorizontalAlignment> align: left;
+    property <length> px: size == "xl" ? 72px : size == "l" ? 40px : 20px;
+    property <bool> attached: unit == "°";
+    spacing: 0px;
+    alignment: align == right ? end : align == center ? center : start;
+    Text {
+        text: root.attached ? root.value + "°" : root.value;
+        font-family: Theme.mono;
+        font-size: root.px;
+        font-weight: root.size == "m" ? 500 : 600;
+        letter-spacing: root.size == "m" ? 0px : -0.02 * root.px;
+        color: root.color;
+        vertical-alignment: bottom;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.value + root.unit;
+    }
+    if !root.attached && root.unit != "": Text {
+        text: root.unit;
+        font-family: Theme.mono;
+        font-size: root.px * 0.5;
+        font-weight: 500;
+        color: Theme.ink2;
+        vertical-alignment: bottom;
+        // Sit on the baseline of the number.
+        y: parent.height - self.height - root.px * 0.06;
+    }
+}
+
+export enum ButtonKind { primary, secondary, quiet, outline }
+
+export component Button {
+    in property <string> text;
+    in property <image> icon;
+    in property <ButtonKind> kind: secondary;
+    in property <bool> enabled: true;
+    in property <bool> small: false;
+    /// The action asks for the password: draws a lock before the text.
+    in property <bool> privileged: false;
+    in property <bool> active: false;
+    callback clicked;
+
+    property <bool> compact: small || kind == ButtonKind.quiet || kind == ButtonKind.outline;
+    property <bool> hovered: touch.has-hover && enabled;
+    property <color> fg: !enabled ? Theme.ink3 : kind == ButtonKind.primary ? Theme.on-accent : Theme.ink;
+
+    forward-focus: focus;
+    accessible-role: AccessibleRole.button;
+    accessible-label: text;
+    accessible-enabled: enabled;
+    accessible-action-default => { if enabled { clicked(); } }
+    height: compact ? 32px : 40px;
+    min-width: layout.min-width;
+    preferred-width: layout.preferred-width;
+    // A button keeps its natural width inside layouts.
+    horizontal-stretch: 0;
+    max-width: self.preferred-width;
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+
+    ring := Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 9px;
+        border-width: focus.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+
+    bg := Rectangle {
+        y: touch.pressed ? 1px : 0px;
+        border-radius: 6px;
+        background: !root.enabled ? (root.kind == ButtonKind.quiet ? transparent : Theme.raised)
+            : root.kind == ButtonKind.primary ? (root.hovered ? Theme.accent-hover : Theme.accent)
+            : root.kind == ButtonKind.secondary ? (root.hovered ? Theme.line : (Theme.dark ? Theme.raised : Theme.surface))
+            : (root.hovered || root.active ? Theme.raised : transparent);
+        border-width: (root.kind == ButtonKind.primary && !Theme.dark && root.enabled)
+            || (root.kind == ButtonKind.secondary && !Theme.dark)
+            || root.kind == ButtonKind.outline ? 1px : 0px;
+        border-color: root.kind == ButtonKind.primary ? Theme.accent-edge
+            : root.kind == ButtonKind.outline ? Theme.quiet-outline : Theme.rule;
+        animate background { duration: Theme.fast; easing: cubic-bezier(0.25, 1, 0.5, 1); }
+
+        layout := HorizontalLayout {
+            padding-left: root.compact ? 10px : root.kind == ButtonKind.primary ? 18px : 16px;
+            padding-right: self.padding-left;
+            spacing: 8px;
+            alignment: center;
+            if root.privileged: Image {
+                source: Icons.lock;
+                colorize: root.fg;
+                width: 16px;
+                height: 16px;
+                y: (parent.height - self.height) / 2;
+            }
+            if !root.privileged && root.icon.width > 0: Image {
+                source: root.icon;
+                colorize: root.fg;
+                width: 20px;
+                height: 20px;
+                y: (parent.height - self.height) / 2;
+            }
+            Text {
+                text: root.text;
+                font-family: Theme.sans;
+                font-size: root.small ? 15px : 16px;
+                font-weight: root.kind == ButtonKind.primary ? 600 : 500;
+                color: root.fg;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            focus.focus();
+            root.clicked();
+        }
+    }
+}
+
+export enum ChipTone { neutral, success, warning, error, accent }
+
+/// Persistence and state chips. Selected filter chips use the accent; status chips never do.
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <ChipTone> tone: neutral;
+    in property <image> icon;
+    in property <bool> dot: false;
+    in property <bool> mono: false;
+    property <color> fg: tone == ChipTone.success ? Theme.success
+        : tone == ChipTone.warning ? Theme.warning
+        : tone == ChipTone.error ? Theme.error
+        : tone == ChipTone.accent ? Theme.on-accent : Theme.ink2;
+    height: 26px;
+    min-width: l.min-width;
+    preferred-width: l.preferred-width;
+    border-radius: 13px;
+    background: tone == ChipTone.accent ? Theme.accent : Theme.raised;
+    accessible-role: AccessibleRole.text;
+    accessible-label: text;
+    l := HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        alignment: center;
+        if root.dot: Rectangle {
+            width: 7px;
+            height: 7px;
+            y: (parent.height - 7px) / 2;
+            border-radius: 3.5px;
+            background: root.fg;
+        }
+        if root.icon.width > 0: Image {
+            source: root.icon;
+            colorize: root.fg;
+            width: 16px;
+            height: 16px;
+            y: (parent.height - 16px) / 2;
+        }
+        Text {
+            text: root.text;
+            font-family: root.mono ? Theme.mono : Theme.sans;
+            font-size: 13px;
+            font-weight: root.mono ? 600 : 500;
+            color: root.fg;
+            vertical-alignment: center;
+        }
+    }
+}
+
+/// A clickable chip, e.g. the quick values under the rotation slider.
+export component QuickChip {
+    in property <string> text;
+    in property <bool> selected;
+    in property <bool> enabled: true;
+    callback clicked;
+    height: 26px;
+    min-width: chip.min-width;
+    preferred-width: chip.preferred-width;
+    forward-focus: fs;
+    accessible-role: AccessibleRole.button;
+    accessible-label: text;
+    accessible-checked: selected;
+    accessible-action-default => { clicked(); }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: 16px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    chip := Chip {
+        width: 100%;
+        text: root.text;
+        mono: true;
+        tone: root.selected ? ChipTone.accent : ChipTone.neutral;
+        background: root.selected ? Theme.accent : t.has-hover && root.enabled ? Theme.line : Theme.raised;
+    }
+    t := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+/// A slider with its value at the right in Value M. `moved` fires while dragging, `released`
+/// at the end; the value shown follows the drag, then the device.
+export component Slider {
+    in property <float> value;
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in property <float> step: 1;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback moved(float);
+    callback released(float);
+
+    out property <bool> dragging: touch.pressed;
+    property <float> drag-value;
+    out property <float> shown: dragging ? drag-value : value;
+    property <float> span: max(maximum - minimum, 0.000001);
+    property <float> ratio: clamp((shown - minimum) / span, 0, 1);
+
+    height: 24px;
+    min-width: 120px;
+    forward-focus: fs;
+    accessible-role: AccessibleRole.slider;
+    accessible-label: label;
+    accessible-value: shown;
+    accessible-value-minimum: minimum;
+    accessible-value-maximum: maximum;
+    accessible-value-step: step;
+    accessible-enabled: enabled;
+    accessible-action-increment => { root.nudge(1); }
+    accessible-action-decrement => { root.nudge(-1); }
+
+    function snap(v: float) -> float {
+        clamp(round((v - minimum) / step) * step + minimum, minimum, maximum)
+    }
+
+    function nudge(times: int) {
+        let v = snap(value + times * step);
+        moved(v);
+        released(v);
+    }
+
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.RightArrow || e.text == Key.UpArrow {
+                root.nudge(e.modifiers.shift ? 10 : 1);
+                return accept;
+            }
+            if e.text == Key.LeftArrow || e.text == Key.DownArrow {
+                root.nudge(e.modifiers.shift ? -10 : -1);
+                return accept;
+            }
+            reject
+        }
+    }
+
+    track := Rectangle {
+        y: (parent.height - 4px) / 2;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.track;
+    }
+    Rectangle {
+        x: 0;
+        y: track.y;
+        height: 4px;
+        width: root.ratio * root.width;
+        border-radius: 2px;
+        background: root.enabled ? Theme.ink : Theme.rule;
+    }
+    thumb := Rectangle {
+        width: 18px;
+        height: 18px;
+        x: root.ratio * (root.width - self.width);
+        y: (parent.height - self.height) / 2;
+        border-radius: 9px;
+        background: Theme.surface;
+        border-width: 2px;
+        border-color: root.enabled ? Theme.ink : Theme.rule;
+    }
+    Rectangle {
+        x: thumb.x - 4px;
+        y: thumb.y - 4px;
+        width: thumb.width + 8px;
+        height: thumb.height + 8px;
+        border-radius: 13px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                fs.focus();
+                root.drag-value = root.snap(root.minimum + clamp(self.mouse-x / root.width, 0, 1) * root.span);
+                root.moved(root.drag-value);
+            }
+            if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                root.released(root.drag-value);
+            }
+        }
+        moved => {
+            if self.pressed {
+                let v = root.snap(root.minimum + clamp(self.mouse-x / root.width, 0, 1) * root.span);
+                if v != root.drag-value {
+                    root.drag-value = v;
+                    root.moved(v);
+                }
+            }
+        }
+    }
+}
+
+/// 2 to 6 exclusive choices (6+R / 7+R, Analog / Button).
+export component Segmented {
+    in property <[string]> options;
+    in property <int> selected;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback picked(int);
+    height: 36px;
+    min-width: row.min-width;
+    preferred-width: row.preferred-width;
+    forward-focus: fs;
+    accessible-role: AccessibleRole.tab-list;
+    accessible-label: label;
+    accessible-enabled: enabled;
+
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.RightArrow && root.selected < root.options.length - 1 {
+                root.picked(root.selected + 1);
+                return accept;
+            }
+            if e.text == Key.LeftArrow && root.selected > 0 {
+                root.picked(root.selected - 1);
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 10px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    Rectangle {
+        border-radius: 6px;
+        background: Theme.raised;
+        row := HorizontalLayout {
+            padding: 3px;
+            spacing: 2px;
+            for option[i] in root.options: Rectangle {
+                min-width: t.preferred-width + 30px;
+                border-radius: 4px;
+                background: i == root.selected ? (Theme.dark ? Theme.rule : Theme.surface) : ta.has-hover && root.enabled ? Theme.line : transparent;
+                border-width: i == root.selected && !Theme.dark ? 1px : 0px;
+                border-color: Theme.line;
+                accessible-role: AccessibleRole.tab;
+                accessible-label: option;
+                accessible-checked: i == root.selected;
+                accessible-action-default => { root.picked(i); }
+                t := Text {
+                    text: option;
+                    font-family: Theme.sans;
+                    font-size: 15px;
+                    font-weight: i == root.selected ? 600 : 400;
+                    color: !root.enabled ? Theme.ink3 : i == root.selected ? Theme.ink : Theme.ink2;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                ta := TouchArea {
+                    enabled: root.enabled;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        fs.focus();
+                        if i != root.selected { root.picked(i); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component Toggle {
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback toggled(bool);
+    width: 44px;
+    height: 24px;
+    forward-focus: fs;
+    accessible-role: AccessibleRole.switch;
+    accessible-label: label;
+    accessible-checked: checked;
+    accessible-enabled: enabled;
+    accessible-action-default => { toggled(!checked); }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" {
+                root.toggled(!root.checked);
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 16px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    Rectangle {
+        border-radius: 12px;
+        background: !root.enabled ? Theme.raised : root.checked ? Theme.ink : Theme.rule;
+        animate background { duration: Theme.fast; }
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            y: 3px;
+            x: root.checked ? parent.width - self.width - 3px : 3px;
+            border-radius: 9px;
+            background: root.enabled ? Theme.surface : Theme.line;
+            animate x { duration: Theme.fast; easing: cubic-bezier(0.25, 1, 0.5, 1); }
+        }
+    }
+    TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            fs.focus();
+            root.toggled(!root.checked);
+        }
+    }
+}
+
+/// A single-line text input on Sheet with a Rule outline.
+export component Field {
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <bool> enabled: true;
+    in property <string> label;
+    in property <bool> invalid: false;
+    callback edited(string);
+    callback accepted(string);
+    height: 40px;
+    min-width: 160px;
+    forward-focus: input;
+    accessible-role: AccessibleRole.text-input;
+    accessible-label: label;
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 9px;
+        border-width: input.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    Rectangle {
+        border-radius: 6px;
+        background: Theme.dark ? Theme.raised : Theme.surface;
+        border-width: 1px;
+        border-color: root.invalid ? Theme.error : Theme.dark ? Theme.raised : Theme.rule;
+        clip: true;
+        if input.text == "": Text {
+            x: 12px;
+            text: root.placeholder;
+            font-family: Theme.sans;
+            font-size: 16px;
+            color: Theme.ink3;
+            vertical-alignment: center;
+        }
+        input := TextInput {
+            x: 12px;
+            width: parent.width - 24px;
+            text <=> root.text;
+            enabled: root.enabled;
+            font-family: Theme.sans;
+            font-size: 16px;
+            color: root.enabled ? Theme.ink : Theme.ink3;
+            selection-background-color: Theme.accent;
+            selection-foreground-color: Theme.on-accent;
+            vertical-alignment: center;
+            single-line: true;
+            edited => { root.edited(self.text); }
+            accepted => { root.accepted(self.text); }
+        }
+    }
+}
+
+/// The Quiet Card: Sheet fill, 1 px Hairline, 14 px radius; Raised with a Rule border when
+/// hovered or focused, to say "this opens".
+export component Card inherits Rectangle {
+    in property <bool> interactive: false;
+    in property <string> label;
+    out property <bool> hovered: touch.has-hover;
+    callback activated;
+    border-radius: 14px;
+    background: interactive && (touch.has-hover || fs.has-focus) ? Theme.raised : Theme.surface;
+    border-width: 1px;
+    border-color: interactive && (touch.has-hover || fs.has-focus) ? Theme.rule : Theme.line;
+    animate background, border-color { duration: Theme.fast; easing: cubic-bezier(0.25, 1, 0.5, 1); }
+    accessible-role: AccessibleRole.button;
+    accessible-label: label;
+    accessible-action-default => { if interactive { activated(); } }
+    forward-focus: fs;
+    touch := TouchArea {
+        enabled: root.interactive;
+        mouse-cursor: root.interactive ? pointer : default;
+        clicked => { root.activated(); }
+    }
+    fs := FocusScope {
+        enabled: root.interactive;
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" {
+                root.activated();
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 18px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    @children
+}
+
+export component Hairline inherits Rectangle {
+    height: 1px;
+    background: Theme.line;
+}
+
+/// Inline message with its icon: never colour alone.
+export component Notice inherits HorizontalLayout {
+    in property <string> text;
+    /// "info", "success", "warning" or "error".
+    in property <string> level: "info";
+    property <color> fg: level == "success" ? Theme.success : level == "warning" ? Theme.warning
+        : level == "error" ? Theme.error : Theme.ink2;
+    spacing: 8px;
+    Image {
+        source: root.level == "success" ? Icons.check : root.level == "warning" ? Icons.warn
+            : root.level == "error" ? Icons.error : Icons.info;
+        colorize: root.fg;
+        width: 18px;
+        height: 18px;
+    }
+    Text {
+        text: root.text;
+        font-family: Theme.sans;
+        font-size: 14px;
+        color: root.level == "info" ? Theme.ink2 : root.fg;
+        wrap: word-wrap;
+        horizontal-stretch: 1;
+    }
+}
+
+/// The step indicator of flows: "1 Connect — 2 Driver — 3 Set up — 4 Done".
+export component Steps inherits HorizontalLayout {
+    in property <[string]> steps;
+    /// Index of the current step; earlier ones are done.
+    in property <int> current;
+    spacing: 10px;
+    alignment: end;
+    for step[i] in root.steps: HorizontalLayout {
+        spacing: 10px;
+        if i > 0: Rectangle {
+            width: 24px;
+            Rectangle {
+                height: 1px;
+                background: Theme.rule;
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            Rectangle {
+                width: 22px;
+                height: 22px;
+                y: (parent.height - 22px) / 2;
+                border-radius: 11px;
+                background: i == root.current ? Theme.accent : i < root.current ? Theme.ink2 : transparent;
+                border-width: i > root.current ? 1px : 0px;
+                border-color: Theme.rule;
+                if i < root.current: Image {
+                    source: Icons.check;
+                    colorize: Theme.bg;
+                    width: 14px;
+                    height: 14px;
+                }
+                if i >= root.current: Text {
+                    text: i + 1;
+                    font-family: Theme.mono;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: i == root.current ? Theme.on-accent : Theme.ink3;
+                }
+            }
+            Text {
+                text: step;
+                font-family: Theme.sans;
+                font-size: 14px;
+                font-weight: i == root.current ? 600 : 400;
+                color: i == root.current ? Theme.ink : Theme.ink3;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+/// The back row: always right under the top bar, its icon aligned with the logo.
+export component BackRow inherits HorizontalLayout {
+    in property <string> label;
+    callback back;
+    padding-left: 12px;
+    padding-right: 24px;
+    height: 56px;
+    alignment: space-between;
+    if root.label != "": Button {
+        y: 12px;
+        kind: ButtonKind.quiet;
+        icon: Icons.back;
+        text: root.label;
+        clicked => { root.back(); }
+    }
+    @children
+}

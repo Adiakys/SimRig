@@ -197,11 +197,11 @@ screens['add-1-connect'] = () => flow(1, 'Aggiungi un dispositivo', `
         <div style="position:absolute;inset:30px;border-radius:50%;border:1px solid var(--rule)"></div>
         <div style="position:absolute;inset:62px;border-radius:50%;background:var(--raised)"></div>
         <span style="position:relative;color:var(--ink)">${icon('usb').replace('class="icon ', 'style="width:40px;height:40px" class="icon ')}</span></div>
-      <p class="ink2" style="margin:0;max-width:40ch">Collega il dispositivo a una porta USB. Lo riconosciamo da soli; se nessun plugin lo conosce, puoi configurarlo come dispositivo generico.</p></div>
+      <p class="ink2" style="margin:0;max-width:40ch">Collegare il dispositivo a una porta USB. I dispositivi noti sono riconosciuti automaticamente; quelli che nessun plugin conosce si configurano come dispositivo generico.</p></div>
     <div><div class="label" style="margin-bottom:12px">Trovati ora</div>
       <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px 20px;align-items:center;padding:16px 0;border-top:1px solid var(--line)">
         ${thumb(dev.shifter(64, 6, 'right_down', 'N'))}
-        <div><div style="font-weight:500">Unknown shifter</div><div class="small">USB 1234:0001 · nessun plugin lo riconosce</div></div>
+        <div><div style="font-weight:500">USB Game Controller</div><div class="small">USB 1234:0001 · nessun plugin lo riconosce</div></div>
         <span class="btn primary">Configura come generico</span></div>
       <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px 20px;align-items:center;padding:16px 0;border-top:1px solid var(--line)">
         ${thumb(dev.pedals(84, { clutch: 0, brake: 0, throttle: 0 }))}
@@ -215,12 +215,12 @@ screens['add-2-driver'] = () => flow(2, 'Serve un piccolo driver', `
   <div style="display:grid;grid-template-columns:auto 1fr;gap:56px;align-items:start;padding-top:28px">
     ${thumb(dev.shifter(150, 6, 'right_down', 'N'), 220, 200)}
     <div style="max-width:60ch">
-      <p style="margin:0 0 20px">Il plugin <strong>USB generico</strong> installa un servizio che traduce i segnali di <strong>Unknown shifter</strong> in un joystick che tutti i giochi riconoscono.</p>
+      <p style="margin:0 0 20px">Il plugin <strong>USB generico</strong> installa un servizio che traduce i segnali di <strong>USB Game Controller</strong> in un joystick che tutti i giochi riconoscono.</p>
       <div style="display:grid;gap:14px;margin-bottom:24px">
         <div style="display:flex;gap:10px">${icon('check')}<span>Funziona anche con SimRig chiuso.</span></div>
         <div style="display:flex;gap:10px">${icon('check')}<span>Si avvia solo quando il dispositivo è collegato.</span></div>
         <div style="display:flex;gap:10px">${icon('check')}<span>Incluso nell'app: non si scarica nulla. Lo rimuovi quando vuoi.</span></div></div>
-      <div class="notice info">${icon('lock')}<span><strong>Ti chiediamo la password una volta</strong>, perché il driver si installa nel sistema. SimRig in sé non ha mai bisogno di privilegi.</span></div>
+      <div class="notice info">${icon('lock')}<span><strong>La password è richiesta una volta</strong>, perché il driver si installa nel sistema. SimRig in sé non ha mai bisogno di privilegi.</span></div>
     </div></div>`,
   `<span class="btn quiet">Non ora</span><div style="margin-left:auto"><span class="btn primary">${icon('lock', 'sm')}Installa il driver</span></div>`);
 
@@ -230,7 +230,7 @@ screens['add-3-setup'] = () => flow(3, 'Muovi la leva in 3ª', `
       <div style="position:absolute;left:${(56 + 0.5 / 4 * 208 + 208 / 4 * 2 - 208 / 8) / 320 * 100}%;top:${(264 - 0.92 * 208) / 320 * 100}%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;border:2px dashed var(--accent);"></div></div>
     <div style="max-width:52ch">
       <div style="display:flex;gap:12px;align-items:center"><span class="chip"><span class="dot" style="color:var(--accent)"></span>In attesa del dispositivo</span><span class="small">Marcia 3 di 7</span></div>
-      <p class="ink2" style="margin:16px 0 28px">Porta la leva nella posizione evidenziata e tienila ferma: la riconosciamo da soli e passiamo alla successiva.</p>
+      <p class="ink2" style="margin:16px 0 28px">Portare la leva nella posizione evidenziata e tenerla ferma: la posizione è rilevata automaticamente e si passa alla successiva.</p>
       <table class="data"><tr><th>Posizione</th><th>Ingresso rilevato</th></tr>
         <tr><td>Marcia 1</td><td class="mono">byte 2 = 0x01</td></tr><tr><td>Marcia 2</td><td class="mono">byte 2 = 0x02</td></tr>
         <tr><td style="color:var(--ink3)">Marcia 3</td><td class="mono" style="color:var(--ink3)">in attesa</td></tr></table>
@@ -258,28 +258,28 @@ const sysRow = (ic, color, label, val, note = '') => `<div style="display:grid;g
 screens['first-1-welcome'] = () => firstRun(1, `
   <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:80px;align-items:center">
     <div><div style="display:flex;gap:14px;align-items:center">${MARK.replace('class="mark"', 'class="mark" style="width:44px;height:44px"')}</div>
-      <h1 class="title" style="font-size:40px;margin-top:28px">Configuriamo il tuo rig</h1>
-      <p class="ink2" style="font-size:18px;margin:16px 0 0;max-width:44ch">Collega volante, pedali e il resto: in pochi minuti li vedrai muoversi qui. Installiamo noi quello che serve.</p>
+      <h1 class="title" style="font-size:40px;margin-top:28px">Configurazione del rig</h1>
+      <p class="ink2" style="font-size:18px;margin:16px 0 0;max-width:44ch">Base, volante, pedali, cambio e freno a mano di qualsiasi marca. I driver necessari sono installati automaticamente e restano attivi a SimRig chiuso.</p>
       <div style="display:grid;gap:10px;margin-top:32px" class="small">
         <div style="display:flex;gap:8px;align-items:center">${icon('check', 'sm')}Funziona con qualsiasi marca, anche mischiate.</div>
         <div style="display:flex;gap:8px;align-items:center">${icon('check', 'sm')}Quando chiudi SimRig non resta niente in esecuzione.</div></div></div>
     <div><div class="label" style="margin-bottom:8px">Il tuo sistema</div>
       ${sysRow('check', 'ok', 'Ubuntu 26.04 LTS', 'ok')}${sysRow('check', 'ok', 'Kernel 7.0', 'ok')}
-      ${sysRow('info', 'ink2', 'Secure Boot attivo', 'nota', 'I driver vengono firmati. Al primo riavvio potrebbe servire una conferma, ti guidiamo noi.')}
+      ${sysRow('info', 'ink2', 'Secure Boot attivo', 'nota', 'I driver vengono firmati. Al primo riavvio può servire la conferma di una chiave, con istruzioni passo passo.')}
       ${sysRow('check', 'ok', 'Sessione Wayland', 'ok')}</div></div>`,
-  `<span class="small">Tema e lingua seguono il sistema: li cambi in Impostazioni.</span><div style="margin-left:auto"><span class="btn primary">Iniziamo</span></div>`);
+  `<span class="small">Tema e lingua seguono il sistema: li cambi in Impostazioni.</span><div style="margin-left:auto"><span class="btn primary">Avvia</span></div>`);
 
 screens['first-2-devices'] = () => firstRun(2, `
-  <div style="padding-top:8px"><h1 class="title">Abbiamo trovato 4 dispositivi</h1>
-    <p class="ink2" style="margin:10px 0 24px">Collegane altri quando vuoi: compaiono qui.</p>
+  <div style="padding-top:8px"><h1 class="title">4 dispositivi trovati</h1>
+    <p class="ink2" style="margin:10px 0 24px">I dispositivi collegati in seguito compaiono qui.</p>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0 56px">
       ${[['CSL DD', 'Fanatec · base', dev.base(78), '<span class="chip warn">' + icon('warn', 'sm') + 'Serve un driver</span>'],
          ['Formula V2.5', 'Fanatec · volante, montato sulla base', dev.wheel(66, 'formula', 0), '<span class="chip">Con la base</span>'],
          ['SR-P Lite', 'MOZA · pedaliera', dev.pedals(88, { clutch: 0, brake: 0, throttle: 0 }), '<span class="chip ok">' + icon('check', 'sm') + 'Pronta</span>'],
-         ['Unknown shifter', 'USB 1234:0001 · non riconosciuto', dev.shifter(60, 6, 'right_down', 'N'), '<span class="chip">Da configurare</span>']]
+         ['USB Game Controller', 'USB 1234:0001 · non riconosciuto', '', '<span class="chip">Da configurare</span>']]
         .map(([n, s, img, st]) => `<div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:14px 0;border-top:1px solid var(--line)">${thumb(img)}<div><div style="font-weight:500">${n}</div><div class="small">${s}</div></div>${st}</div>`).join('')}
     </div>
-    <div class="notice info" style="margin-top:28px;max-width:76ch">${icon('lock')}<span><strong>Una sola password per tutti i driver.</strong> Si installano nel sistema e funzionano anche con SimRig chiuso. Lo shifter lo configuriamo dopo, con una procedura guidata.</span></div></div>`,
+    <div class="notice info" style="margin-top:28px;max-width:76ch">${icon('lock')}<span><strong>Una sola password per tutti i driver.</strong> Si installano nel sistema e funzionano anche con SimRig chiuso. I dispositivi da configurare hanno poi una procedura guidata.</span></div></div>`,
   `<span class="btn quiet">Salta per ora</span><div style="margin-left:auto;display:grid;justify-items:end;gap:6px"><span class="btn primary">${icon('lock', 'sm')}Installa 1 driver</span></div>`);
 
 const toggle = (on) => `<span style="display:inline-block;width:40px;height:24px;border-radius:12px;background:${on ? 'var(--accent)' : 'var(--rule)'};position:relative;flex:none">
@@ -287,16 +287,16 @@ const toggle = (on) => `<span style="display:inline-block;width:40px;height:24px
 
 screens['first-3-rig'] = () => firstRun(3, `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:72px;padding-top:8px">
-    <div><h1 class="title">Il tuo rig</h1><p class="ink2" style="margin:10px 0 20px">Solo due domande, poi lo vedi muoversi.</p>
+    <div><h1 class="title">Composizione del rig</h1><p class="ink2" style="margin:10px 0 20px">Solo ciò che l'hardware non può rilevare.</p>
       <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:16px 0;border-top:1px solid var(--line)">
-        <div><div style="font-weight:500">Pedali collegati alla base</div><div class="small" style="margin-top:4px">La CSL DD ha un ingresso per i pedali. Usi una pedaliera separata (SR-P Lite), quindi lo nascondiamo.</div></div>${toggle(false)}</div>
+        <div><div style="font-weight:500">Pedali collegati alla base</div><div class="small" style="margin-top:4px">La CSL DD ha un ingresso per i pedali. Con una pedaliera separata (SR-P Lite) l'ingresso è escluso dal rig.</div></div>${toggle(false)}</div>
       <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:16px 0;border-top:1px solid var(--line)">
         <div><div style="font-weight:500">Frizione</div><div class="small" style="margin-top:4px">La SR-P Lite può avere 2 o 3 pedali.</div></div><span class="seg"><span>2 pedali</span><span class="on">3 pedali</span></span></div>
       <div class="label" style="margin:28px 0 12px">Anteprima dal vivo</div>
       <div class="card" style="display:flex;align-items:flex-end;justify-content:space-around;gap:16px;padding:20px">
         ${dev.base(110)}${dev.wheel(120, 'formula', 12)}${dev.pedals(210, { clutch: 0, brake: 0.4, throttle: 0 })}${dev.shifter(104, 6, 'right_down', 'N')}</div></div>
     <div><div class="label" style="margin:6px 0 12px">Da calibrare</div>
-      ${[['Pedaliera', 'Premi e rilascia ogni pedale quando richiesto.', 'Calibra', true], ['Unknown shifter', 'Scegli 6+R o 7+R e muovi la leva in ogni marcia.', 'Mappa le marce', false], ['Base', 'Centro e rotazione: va bene così per iniziare.', 'Fatto', false]]
+      ${[['Pedaliera', 'Premi e rilascia ogni pedale quando richiesto.', 'Calibra', true], ['USB Game Controller', 'Scegli il tipo (cambio, freno a mano, pedaliera) e muovi i comandi quando richiesto.', 'Configura', false], ['Base', 'Centro e rotazione: va bene così per iniziare.', 'Fatto', false]]
         .map(([n, s, b, primary]) => `<div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:16px 0;border-top:1px solid var(--line)"><div><div style="font-weight:500">${n}</div><div class="small" style="margin-top:4px">${s}</div></div>${b === 'Fatto' ? `<span class="chip ok">${icon('check', 'sm')}Fatto</span>` : `<span class="btn ${primary ? 'secondary' : 'secondary'} small">${b}</span>`}</div>`).join('')}</div></div>`,
   `<div style="margin-left:auto"><span class="btn primary">Vai al rig</span></div>`);
 
@@ -320,7 +320,7 @@ screens['style-guide'] = () => {
       ${sw('Gas', '--throttle', 'Dato, e successo')}${sw('Freno', '--brake', 'Dato, ed errore')}${sw('Frizione', '--clutch', 'Dato')}${sw('Avviso', '--warn', 'Sempre col triangolo')}</div>`)}
     ${section('Caratteri', `<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:48px;align-items:end">
       <div style="display:grid;gap:14px"><div class="title">Titolo · Barlow 600 28</div><div class="heading">Sezione · Barlow 600 20</div>
-        <div>Testo · Barlow 400 16. Collega il dispositivo: lo riconosciamo da soli.</div><div class="small">Piccolo · Barlow 400 14, aiuti e motivi</div><div class="label">Etichetta · 600 12 maiuscolo</div></div>
+        <div>Testo · Barlow 400 16. Dispositivo collegato: riconosciuto automaticamente.</div><div class="small">Piccolo · Barlow 400 14, aiuti e motivi</div><div class="label">Etichetta · 600 12 maiuscolo</div></div>
       <div style="display:flex;gap:40px;align-items:flex-end"><div><div class="label">Marcia</div>${value('3', '', 'value-xl')}</div><div><div class="label">Sterzo</div>${value('−38', '°')}</div><div><div class="label">Freno</div>${value('42', '%', 'value-m')}</div></div></div>
       <div class="small" style="margin-top:14px">Martian Mono solo per i valori dei dispositivi: cifre a larghezza fissa, non ballano mentre cambiano.</div>`)}
     ${section('Componenti', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px">

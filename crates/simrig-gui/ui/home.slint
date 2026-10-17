@@ -1,0 +1,471 @@
+// The home: the rig itself, drawn as it stands in the room, each device moving live.
+
+import { Theme, Icons } from "theme.slint";
+import { Rig, Api, PresetItem } from "api.slint";
+import { Device, LiveDevice, SteerTrack, PedalBar, Drawings } from "devices.slint";
+import { Button, ButtonKind, Chip, ChipTone, Card, Eyebrow, Heading, Small, LiveValue, Field, Hairline, Notice } from "widgets.slint";
+
+component CardHead inherits HorizontalLayout {
+    in property <Device> device;
+    spacing: 10px;
+    alignment: start;
+    Eyebrow {
+        text: device.kind-label.to-uppercase();
+    }
+    Text {
+        text: device.name;
+        font-family: Theme.sans;
+        font-size: 16px;
+        font-weight: 500;
+        color: Theme.ink;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+    Text {
+        text: device.brand;
+        font-family: Theme.sans;
+        font-size: 14px;
+        color: Theme.ink2;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+}
+
+component StateChip inherits Chip {
+    in property <Device> device;
+    text: device.state-text;
+    icon: device.state == "ready" ? Icons.check : device.state == "failed" ? Icons.error : Icons.warn;
+    tone: device.state == "ready" ? ChipTone.success : device.state == "failed" ? ChipTone.error : ChipTone.warning;
+}
+
+/// One device on the home: its drawing, one big live value and at most two small ones.
+component DeviceCard inherits Card {
+    in property <Device> device;
+    property <bool> down: device.state != "ready";
+    interactive: true;
+    label: device.kind-label + " " + device.name;
+    activated => { Api.open-component(device.address); }
+
+    VerticalLayout {
+        padding: 20px;
+        padding-top: 18px;
+        spacing: 8px;
+        HorizontalLayout {
+            CardHead { device: root.device; }
+            if root.down: StateChip { device: root.device; }
+        }
+
+        if root.device.kind == "wheel_base": VerticalLayout {
+            spacing: 12px;
+            LiveDevice {
+                device: root.device;
+                ghost: root.down;
+                vertical-stretch: 1;
+            }
+            HorizontalLayout {
+                spacing: 24px;
+                alignment: start;
+                if root.device.has-ffb: VerticalLayout {
+                    spacing: 4px;
+                    alignment: end;
+                    Eyebrow { text: @tr("STRENGTH"); }
+                    LiveValue { value: round(root.device.ffb); unit: "%"; size: "m"; }
+                }
+                if root.device.rotation > 0: VerticalLayout {
+                    spacing: 4px;
+                    alignment: end;
+                    Eyebrow { text: @tr("ROTATION"); }
+                    LiveValue { value: round(root.device.rotation); unit: "°"; size: "m"; }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if !root.down: VerticalLayout {
+                    alignment: end;
+                    StateChip { device: root.device; }
+                }
+            }
+        }
+
+        if root.device.kind == "steering_wheel": HorizontalLayout {
+            spacing: 8px;
+            LiveDevice {
+                device: root.device;
+                ghost: root.down;
+                horizontal-stretch: 1;
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 6px;
+                width: 168px;
+                Eyebrow { text: @tr("STEERING"); }
+                LiveValue {
+                    value: root.device.has-angle ? (root.device.angle < -0.5 ? "−" + round(-root.device.angle) : round(root.device.angle)) : "–";
+                    unit: "°";
+                }
+                SteerTrack {
+                    width: 150px;
+                    angle: root.device.angle;
+                    rotation: root.device.rotation;
+                }
+                if root.device.rotation > 0: Small {
+                    text: @tr("of {}° rotation", round(root.device.rotation));
+                }
+            }
+        }
+
+        if root.device.kind == "pedals": HorizontalLayout {
+            spacing: 24px;
+            LiveDevice {
+                device: root.device;
+                ghost: root.down;
+                horizontal-stretch: 1;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: center;
+                padding-right: 8px;
+                if root.device.has-clutch: PedalBar { name: @tr("CLUTCH"); value: root.device.clutch; color: Theme.clutch; }
+                if root.device.has-brake: PedalBar { name: @tr("BRAKE"); value: root.device.brake; color: Theme.brake; }
+                if root.device.has-throttle: PedalBar { name: @tr("THROTTLE"); value: root.device.throttle; color: Theme.throttle; }
+            }
+        }
+
+        if root.device.kind == "shifter": HorizontalLayout {
+            spacing: 8px;
+            LiveDevice {
+                device: root.device;
+                ghost: root.down;
+                horizontal-stretch: 1;
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 6px;
+                min-width: 110px;
+                Eyebrow { text: @tr("GEAR"); horizontal-alignment: right; }
+                LiveValue { value: root.device.gear; size: "xl"; align: right; }
+                Small { text: root.device.layout-text; horizontal-alignment: right; }
+            }
+        }
+
+        if root.device.kind == "handbrake": HorizontalLayout {
+            spacing: 12px;
+            LiveDevice {
+                device: root.device;
+                ghost: root.down;
+                horizontal-stretch: 1;
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 6px;
+                min-width: 110px;
+                Eyebrow { text: @tr("POSITION"); horizontal-alignment: right; }
+                LiveValue { value: round(clamp(root.device.pull, 0, 1) * 100); unit: "%"; align: right; }
+                Small { text: root.device.pull-text; horizontal-alignment: right; }
+            }
+        }
+    }
+}
+
+/// The preset picker: one click to switch preset, and saving the current settings as one.
+component PresetPicker {
+    callback open;
+    height: 36px;
+    min-width: l.min-width;
+    preferred-width: l.preferred-width;
+    forward-focus: fs;
+    accessible-role: AccessibleRole.combobox;
+    accessible-label: @tr("Preset");
+    accessible-value: Rig.preset;
+    accessible-action-default => { open(); }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" || e.text == Key.DownArrow {
+                root.open();
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 9px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    Rectangle {
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: Theme.rule;
+        background: ta.has-hover ? Theme.raised : Theme.bg;
+        l := HorizontalLayout {
+            padding-left: 14px;
+            padding-right: 12px;
+            spacing: 10px;
+            Eyebrow { text: @tr("PRESET"); font-size: 11px; }
+            Text {
+                text: Rig.preset != "" ? Rig.preset : @tr("None");
+                font-family: Theme.sans;
+                font-size: 16px;
+                font-weight: 600;
+                color: Rig.preset != "" ? Theme.ink : Theme.ink3;
+                vertical-alignment: center;
+            }
+            Image {
+                source: Icons.down;
+                colorize: Theme.ink;
+                width: 16px;
+                height: 16px;
+                y: (parent.height - 16px) / 2;
+            }
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            fs.focus();
+            root.open();
+        }
+    }
+}
+
+component PresetMenu inherits Rectangle {
+    callback close;
+    property <string> new-name;
+    width: 320px;
+    height: col.preferred-height;
+    border-radius: 10px;
+    background: Theme.surface;
+    border-width: Theme.dark ? 1px : 0px;
+    border-color: Theme.rule;
+    drop-shadow-blur: Theme.float-blur;
+    drop-shadow-offset-y: 12px;
+    drop-shadow-color: Theme.float-shadow;
+    // Clicks inside the menu stay in the menu.
+    TouchArea { }
+    col := VerticalLayout {
+        padding: 8px;
+        spacing: 2px;
+        if Rig.presets.length == 0: Small {
+            text: @tr("No presets yet. Save the current settings of the rig as the first one.");
+        }
+        for p in Rig.presets: Rectangle {
+            height: 40px;
+            border-radius: 6px;
+            background: pt.has-hover ? Theme.raised : transparent;
+            accessible-role: AccessibleRole.button;
+            accessible-label: p.name;
+            accessible-action-default => { Api.apply-preset(p.name); root.close(); }
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 8px;
+                spacing: 10px;
+                Text {
+                    text: p.name;
+                    font-family: Theme.sans;
+                    font-size: 16px;
+                    font-weight: p.current ? 600 : 400;
+                    color: Theme.ink;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                if p.current: Image {
+                    source: Icons.check;
+                    colorize: Theme.accent-ink;
+                    width: 18px;
+                    height: 18px;
+                    y: (parent.height - 18px) / 2;
+                }
+            }
+            pt := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    Api.apply-preset(p.name);
+                    root.close();
+                }
+            }
+        }
+        Rectangle { height: 6px; }
+        Hairline { }
+        Rectangle { height: 6px; }
+        Eyebrow { text: @tr("SAVE THE RIG AS A PRESET"); height: 24px; }
+        HorizontalLayout {
+            spacing: 8px;
+            name := Field {
+                placeholder: @tr("Name, e.g. GT3");
+                label: @tr("Preset name");
+                horizontal-stretch: 1;
+                accepted(t) => {
+                    if t != "" {
+                        Api.save-preset(t);
+                        root.close();
+                    }
+                }
+            }
+            Button {
+                text: @tr("Save");
+                enabled: name.text != "";
+                clicked => {
+                    Api.save-preset(name.text);
+                    root.close();
+                }
+            }
+        }
+    }
+}
+
+/// The rig header: "Rig", the preset picker and its state on the left, the overall state on
+/// the right.
+component RigHeader inherits HorizontalLayout {
+    callback open-presets;
+    spacing: 16px;
+    height: 36px;
+    Heading {
+        text: @tr("Rig");
+        vertical-alignment: center;
+    }
+    PresetPicker {
+        open => { root.open-presets(); }
+    }
+    if Rig.preset-note != "": Small {
+        text: Rig.preset-note;
+        vertical-alignment: center;
+        wrap: no-wrap;
+    }
+    Rectangle { horizontal-stretch: 1; }
+    VerticalLayout {
+        alignment: center;
+        Chip {
+            text: Rig.status-text;
+            icon: Rig.status-tone == "success" ? Icons.check : Rig.status-tone == "neutral" ? @image-url("") : Icons.warn;
+            tone: Rig.status-tone == "success" ? ChipTone.success : Rig.status-tone == "warning" ? ChipTone.warning : Rig.status-tone == "error" ? ChipTone.error : ChipTone.neutral;
+        }
+    }
+}
+
+component EmptyRig inherits HorizontalLayout {
+    spacing: 48px;
+    padding-left: 48px;
+    padding-right: 48px;
+    Rectangle {
+        horizontal-stretch: 1;
+        // The generic drawings, faded: what the rig will look like.
+        Rectangle {
+            opacity: 0.16;
+            Image { source: Drawings.wheel-round; x: parent.width * 0.06; y: parent.height * 0.18; width: parent.width * 0.32; height: self.width; }
+            Image { source: Drawings.shifter-plate; x: parent.width * 0.55; y: parent.height * 0.3; width: parent.width * 0.24; height: self.width; }
+            Image { source: Drawings.pedals-frame; x: parent.width * 0.02; y: parent.height * 0.6; width: parent.width * 0.42; height: self.width * 380 / 600; }
+            Image { source: Drawings.handbrake-body; x: parent.width * 0.58; y: parent.height * 0.62; width: parent.width * 0.18; height: self.width * 380 / 320; }
+            Image { source: Drawings.handbrake-lever; x: parent.width * 0.58; y: parent.height * 0.62; width: parent.width * 0.18; height: self.width * 380 / 320; }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 16px;
+        width: 440px;
+        Heading {
+            text: @tr("No devices connected");
+            font-size: 28px;
+        }
+        Text {
+            text: @tr("Plug in a wheel, pedals or another device: it shows up here by itself and moves when you use it.");
+            font-family: Theme.sans;
+            font-size: 16px;
+            color: Theme.ink2;
+            wrap: word-wrap;
+        }
+        HorizontalLayout {
+            spacing: 16px;
+            alignment: start;
+            padding-top: 12px;
+            Button {
+                kind: ButtonKind.primary;
+                icon: Icons.add-device;
+                text: @tr("Add a device");
+                clicked => { Api.start-add(); }
+            }
+        }
+        Rectangle {
+            border-radius: 10px;
+            background: Theme.raised;
+            height: n.preferred-height + 32px;
+            n := Notice {
+                x: 16px;
+                width: parent.width - 32px;
+                text: @tr("Set up a rig already? Its settings stay in the drivers even when the devices are unplugged.");
+            }
+        }
+    }
+}
+
+export component Home inherits Rectangle {
+    property <bool> presets-open: false;
+    background: Theme.bg;
+
+    VerticalLayout {
+        padding-left: 32px;
+        padding-right: 32px;
+        padding-top: 24px;
+        padding-bottom: 32px;
+        spacing: 24px;
+
+        header := RigHeader {
+            open-presets => { root.presets-open = !root.presets-open; }
+        }
+
+        if Rig.device-count == 0 && !Rig.starting: EmptyRig {
+            vertical-stretch: 1;
+        }
+
+        if Rig.device-count == 0 && Rig.starting: Rectangle {
+            vertical-stretch: 1;
+            Small {
+                text: @tr("Searching for devices…");
+                horizontal-alignment: center;
+            }
+        }
+
+        if Rig.device-count > 0: HorizontalLayout {
+            spacing: 24px;
+            vertical-stretch: 1;
+            if Rig.top.length > 0 || Rig.bottom.length > 0: VerticalLayout {
+                spacing: 24px;
+                horizontal-stretch: 2.2;
+                if Rig.top.length > 0: HorizontalLayout {
+                    spacing: 24px;
+                    vertical-stretch: 1;
+                    for d in Rig.top: DeviceCard {
+                        device: d;
+                        horizontal-stretch: d.kind == "steering_wheel" ? 1.45 : 1;
+                    }
+                }
+                if Rig.bottom.length > 0: HorizontalLayout {
+                    spacing: 24px;
+                    vertical-stretch: 0.92;
+                    for d in Rig.bottom: DeviceCard {
+                        device: d;
+                    }
+                }
+            }
+            if Rig.side.length > 0: VerticalLayout {
+                spacing: 24px;
+                horizontal-stretch: 1;
+                for d in Rig.side: DeviceCard {
+                    device: d;
+                    vertical-stretch: 1;
+                }
+            }
+        }
+    }
+
+    if root.presets-open: TouchArea {
+        clicked => { root.presets-open = false; }
+    }
+    if root.presets-open: PresetMenu {
+        x: 32px + 64px;
+        y: 24px + 44px;
+        close => { root.presets-open = false; }
+    }
+}

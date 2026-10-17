@@ -179,6 +179,7 @@ pub struct DeviceSetup {
     stage: SetupStage,
     kind: String,
     gears: i64,
+    pedals: i64,
     detected: Vec<(String, String)>,
     since: Instant,
 }
@@ -191,19 +192,39 @@ impl DeviceSetup {
             stage: SetupStage::Kind,
             kind: "shifter".into(),
             gears: 6,
+            pedals: 3,
             detected: Vec::new(),
             since: Instant::now(),
         }
     }
 
+    /// What the user moves, one after the other, so the device's inputs can be detected.
     fn positions(&self) -> Vec<String> {
-        if self.kind == "shifter" {
-            (1..=self.gears)
+        match self.kind.as_str() {
+            "shifter" => (1..=self.gears)
                 .map(|g| format!("Gear {g}"))
                 .chain(["Reverse".to_string()])
-                .collect()
-        } else {
-            vec!["Pulled".into(), "Released".into()]
+                .collect(),
+            "sequential" => vec!["Shift up".into(), "Shift down".into()],
+            "pedals" => Setup::pedal_roles(self.pedals)
+                .into_iter()
+                .map(|r| {
+                    let name = r.key();
+                    let mut chars = name.chars();
+                    let first = chars.next().map(|c| c.to_ascii_uppercase()).unwrap_or(' ');
+                    format!("{first}{}", chars.as_str())
+                })
+                .collect(),
+            _ => vec!["Pulled".into(), "Released".into()],
+        }
+    }
+
+    fn setup(&self) -> Setup {
+        match self.kind.as_str() {
+            "shifter" => Setup::Shifter { gears: self.gears },
+            "sequential" => Setup::SequentialShifter,
+            "pedals" => Setup::Pedals { count: self.pedals },
+            _ => Setup::Handbrake,
         }
     }
 
@@ -225,27 +246,41 @@ impl DeviceSetup {
                         "Device type",
                         ParamType::Choice {
                             options: vec![
-                                ChoiceOption::new("shifter", "Shifter (H-pattern)"),
+                                ChoiceOption::new("shifter", "H-pattern shifter"),
+                                ChoiceOption::new("sequential", "Sequential shifter"),
                                 ChoiceOption::new("handbrake", "Handbrake"),
+                                ChoiceOption::new("pedals", "Pedals"),
                             ],
                         },
                         Value::Choice(self.kind.clone()),
                     ))
                     .element(Element::field(
                         "gears",
-                        "Forward gears (shifters only)",
+                        "Forward gears (H-pattern)",
                         ParamType::Int {
                             min: 4,
                             max: 8,
                             step: 1,
                         },
                         Value::Int(self.gears),
+                    ))
+                    .element(Element::field(
+                        "pedals",
+                        "Pedals (pedal sets)",
+                        ParamType::Int {
+                            min: 1,
+                            max: 3,
+                            step: 1,
+                        },
+                        Value::Int(self.pedals),
                     )),
             ),
             SetupStage::Detect(i) => {
                 let positions = self.positions();
                 let title = match (self.kind.as_str(), positions[i].as_str()) {
                     ("shifter", p) => format!("Move the lever to {}", p.to_lowercase()),
+                    ("sequential", p) => format!("{p} once"),
+                    ("pedals", p) => format!("Press the {} all the way", p.to_lowercase()),
                     (_, "Pulled") => "Pull the handbrake fully".into(),
                     _ => "Release the handbrake".into(),
                 };
@@ -314,17 +349,14 @@ impl Procedure for DeviceSetup {
                     .unwrap_or("shifter")
                     .into();
                 self.gears = values.get("gears").and_then(Value::as_f64).unwrap_or(6.0) as i64;
+                self.pedals = values.get("pedals").and_then(Value::as_f64).unwrap_or(3.0) as i64;
                 self.detected.clear();
                 self.stage = SetupStage::Detect(0);
                 self.since = Instant::now();
             }
             (SetupStage::Summary, "restart") => self.stage = SetupStage::Kind,
             (SetupStage::Summary, "finish") => {
-                let setup = if self.kind == "shifter" {
-                    Setup::Shifter { gears: self.gears }
-                } else {
-                    Setup::Handbrake
-                };
+                let setup = self.setup();
                 let saved = self.driver_installed();
                 if saved {
                     let key = format!("{}.setup", self.device);
@@ -333,17 +365,19 @@ impl Procedure for DeviceSetup {
                         &[("key", &key), ("value", &setup.to_text())],
                     )?;
                 }
-                self.shared.get().setups.insert(self.device.clone(), setup);
-                let what = if self.kind == "shifter" {
-                    format!("a shifter with {} gears", self.gears)
-                } else {
-                    "a handbrake".into()
+                let what = match &setup {
+                    Setup::Shifter { gears } => format!("an H-pattern shifter with {gears} gears"),
+                    Setup::SequentialShifter => "a sequential shifter".into(),
+                    Setup::Handbrake => "a handbrake".into(),
+                    Setup::Pedals { count: 1 } => "a single pedal".into(),
+                    Setup::Pedals { count } => format!("a set of {count} pedals"),
                 };
                 let note = if saved {
                     ""
                 } else {
                     " (not saved: install the driver to keep it)"
                 };
+                self.shared.get().setups.insert(self.device.clone(), setup);
                 return Ok(Outcome::finished(format!("Set up as {what}{note}.")));
             }
             (_, other) => return Err(Error::InvalidValue(format!("unexpected action '{other}'"))),

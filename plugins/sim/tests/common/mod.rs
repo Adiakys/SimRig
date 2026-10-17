@@ -85,7 +85,7 @@ impl Env {
         fs::create_dir_all(&dev).unwrap();
         fs::write(dev.join("idVendor"), "1234\n").unwrap();
         fs::write(dev.join("idProduct"), "0001\n").unwrap();
-        fs::write(dev.join("product"), "Unknown shifter\n").unwrap();
+        fs::write(dev.join("product"), "USB Game Controller\n").unwrap();
     }
 
     pub fn plug_usb(&self, port: &str) {

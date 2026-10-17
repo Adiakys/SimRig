@@ -33,15 +33,24 @@ impl Identity {
 /// How a generic (unconfigured) device was set up by its setup procedure.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Setup {
-    Shifter { gears: i64 },
+    Shifter {
+        gears: i64,
+    },
+    SequentialShifter,
     Handbrake,
+    /// 1: throttle; 2: throttle and brake; 3: with a clutch.
+    Pedals {
+        count: i64,
+    },
 }
 
 impl Setup {
     pub fn to_text(&self) -> String {
         match self {
             Setup::Shifter { gears } => format!("shifter:{gears}"),
+            Setup::SequentialShifter => "sequential".into(),
             Setup::Handbrake => "handbrake".into(),
+            Setup::Pedals { count } => format!("pedals:{count}"),
         }
     }
 
@@ -50,8 +59,21 @@ impl Setup {
             Some(("shifter", gears)) => Some(Setup::Shifter {
                 gears: gears.parse().ok()?,
             }),
+            Some(("pedals", count)) => Some(Setup::Pedals {
+                count: count.parse::<i64>().ok()?.clamp(1, 3),
+            }),
             None if text == "handbrake" => Some(Setup::Handbrake),
+            None if text == "sequential" => Some(Setup::SequentialShifter),
             _ => None,
+        }
+    }
+
+    /// The pedals of a pedal set of `count` pedals, as they are found on real sets.
+    pub fn pedal_roles(count: i64) -> Vec<PedalRole> {
+        match count {
+            1 => vec![PedalRole::Throttle],
+            2 => vec![PedalRole::Throttle, PedalRole::Brake],
+            _ => PedalRole::ALL.to_vec(),
         }
     }
 }

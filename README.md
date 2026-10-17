@@ -5,8 +5,9 @@ handbrake — whatever the brand, from one polished app.
 
 > **Status: early development.** The core (M0) is done and tested on a simulated rig: plugins,
 > hotplug, drivers with a privileged helper, saved settings, rig composition, presets, catalog,
-> guided procedures defined by plugins, generic plugins for unbranded devices.
-> The GUI comes next, then the first real hardware (Fanatec).
+> guided procedures defined by plugins, generic plugins for unbranded devices. The desktop app
+> (M1, Slint) runs on it: live rig, settings, guided procedures, adding a device, plugins and
+> drivers, presets, first run. Next: the generic USB plugin, then the first real hardware.
 
 ## How it works
 
@@ -28,7 +29,30 @@ Read more in [docs/requirements.md](docs/requirements.md) and
 
 ## Try it
 
-Requires a recent stable Rust toolchain (1.86+).
+Requires a recent stable Rust toolchain (1.92+ for the app, 1.86+ for the rest) and, to build
+the app, the fontconfig and xkbcommon development files (`libfontconfig1-dev libxkbcommon-dev`
+on Debian and Ubuntu, `fontconfig-devel libxkbcommon-devel` on Fedora).
+
+### The app
+
+```sh
+scripts/dev-gui.sh              # the app on the simulated rig, in throwaway directories
+scripts/dev-gui.sh plug         # while it runs: plug a fake USB device, then "Add device"
+scripts/dev-gui.sh reset        # forget the rig, the presets and the first run
+```
+
+Everything lives under `target/dev`: your real configuration is not touched. Without a display
+(or to check a screen), the app can draw itself into a PNG:
+
+```sh
+./target/debug/simrig --plugin-dir plugins/sim --no-default-dirs --config-dir target/shots/cfg \
+    --screenshot target/shots/home.png --theme dark --screen component:pedals
+```
+
+`--screen` takes `home`, `component:<component>`, `procedure:<component>/<id>`, `plugins`,
+`settings`, `add`, `first:<step>`, and can chain actions with `;` (see `src/main.rs`).
+
+### The command line
 
 ```sh
 cargo build --workspace
@@ -72,7 +96,11 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `crates/simrig-helper` | Privileged helper, run through `pkexec` only for driver operations |
 | `crates/simrig-host` | The app core: plugins, rig, events, drivers, presets, catalog, system check |
 | `crates/simrig-cli` | Command-line interface |
+| `crates/simrig-gui` | The desktop app (`simrig`, Slint) |
 | `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
+| `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
+| `docs/design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
+| `scripts` | Development helpers |
 | `packaging/polkit` | polkit action of the helper |
 
 ## Development

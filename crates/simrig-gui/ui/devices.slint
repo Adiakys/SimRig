@@ -1,0 +1,335 @@
+// The Live Device: the core's generic drawings (assets/devices), animated from live inputs
+// following assets/devices/devices.toml. Live animation follows the hardware with no easing of
+// its own: it is data.
+
+import { Theme } from "theme.slint";
+
+export struct GateLabel {
+    text: string,
+    x: float,
+    y: float,
+}
+
+/// Everything the home and the settings screens show about a component.
+export struct Device {
+    address: string,
+    /// wheel_base, steering_wheel, pedals, shifter, handbrake
+    kind: string,
+    kind-label: string,
+    name: string,
+    /// Display name of the plugin.
+    brand: string,
+    /// ready, disconnected, failed
+    state: string,
+    state-text: string,
+    /// A picture shipped by the plugin or chosen by the user, drawn instead of the core's.
+    picture: image,
+    /// round, gt, formula
+    rim: string,
+
+    // Wheel base and steering wheel
+    has-angle: bool,
+    angle: float,
+    rotation: float,
+    ffb: float,
+    has-ffb: bool,
+
+    // Pedals: declared pedals, position 0..1 and hinge point in view-box units
+    has-clutch: bool,
+    clutch: float,
+    clutch-x: float,
+    clutch-y: float,
+    has-brake: bool,
+    brake: float,
+    brake-x: float,
+    brake-y: float,
+    has-throttle: bool,
+    throttle: float,
+    throttle-x: float,
+    throttle-y: float,
+
+    // Shifter
+    gear: string,
+    layout-text: string,
+    /// Gate and gear labels drawn for the current configuration.
+    gate: image,
+    gate-labels: [GateLabel],
+    /// The rotated layer (wheel or lever) drawn on the CPU, when the renderer cannot rotate.
+    frame: image,
+    knob-x: float,
+    knob-y: float,
+
+    // Handbrake
+    has-pull: bool,
+    pull: float,
+    pull-text: string,
+}
+
+/// Geometry of the drawings, read from devices.toml at startup.
+export global Geometry {
+    /// The renderer cannot rotate images: rotated layers come drawn in `Device.frame`.
+    in property <bool> raster: false;
+    in property <float> base-w: 380;
+    in property <float> base-h: 360;
+    in property <float> wheel-w: 400;
+    in property <float> wheel-h: 400;
+    in property <float> wheel-pivot-x: 200;
+    in property <float> wheel-pivot-y: 200;
+    in property <float> pedals-w: 600;
+    in property <float> pedals-h: 380;
+    in property <float> pedal-w: 120;
+    in property <float> pedal-h: 300;
+    in property <float> pedal-hinge-x: 60;
+    in property <float> pedal-hinge-y: 290;
+    in property <float> shifter-w: 320;
+    in property <float> shifter-h: 320;
+    in property <float> knob-size: 100;
+    in property <float> handbrake-w: 320;
+    in property <float> handbrake-h: 380;
+    in property <float> lever-pivot-x: 170;
+    in property <float> lever-pivot-y: 236;
+    in property <float> lever-angle: 34;
+}
+
+export global Drawings {
+    out property <image> base: @image-url("../../../assets/devices/base.svg");
+    out property <image> wheel-round: @image-url("../../../assets/devices/wheel-round.svg");
+    out property <image> wheel-gt: @image-url("../../../assets/devices/wheel-gt.svg");
+    out property <image> wheel-formula: @image-url("../../../assets/devices/wheel-formula.svg");
+    out property <image> pedals-frame: @image-url("../../../assets/devices/pedals-frame.svg");
+    out property <image> pedal: @image-url("../../../assets/devices/pedal.svg");
+    out property <image> shifter-plate: @image-url("../../../assets/devices/shifter-plate.svg");
+    out property <image> shifter-knob: @image-url("../../../assets/devices/shifter-knob.svg");
+    out property <image> handbrake-body: @image-url("../../../assets/devices/handbrake-body.svg");
+    out property <image> handbrake-lever: @image-url("../../../assets/devices/handbrake-lever.svg");
+}
+
+/// One pedal, on its hinge point. Pedals do not move: the travel is in the bars next to them.
+component Pedal inherits Image {
+    in property <float> scale;
+    in property <float> hinge-x;
+    in property <float> hinge-y;
+    source: Drawings.pedal;
+    image-fit: fill;
+    width: Geometry.pedal-w * scale * 1px;
+    height: Geometry.pedal-h * scale * 1px;
+    x: (hinge-x - Geometry.pedal-hinge-x) * scale * 1px;
+    y: (hinge-y - Geometry.pedal-hinge-y) * scale * 1px;
+}
+
+/// The drawing of a device, live. `ghost` fades it to say "disconnected".
+export component LiveDevice {
+    in property <Device> device;
+    in property <bool> ghost: false;
+
+    property <bool> custom: device.picture.width > 0;
+    property <float> vw: custom ? device.picture.width : device.kind == "wheel_base" ? Geometry.base-w
+        : device.kind == "steering_wheel" ? Geometry.wheel-w
+        : device.kind == "pedals" ? Geometry.pedals-w
+        : device.kind == "shifter" ? Geometry.shifter-w : Geometry.handbrake-w;
+    property <float> vh: custom ? device.picture.height : device.kind == "wheel_base" ? Geometry.base-h
+        : device.kind == "steering_wheel" ? Geometry.wheel-h
+        : device.kind == "pedals" ? Geometry.pedals-h
+        : device.kind == "shifter" ? Geometry.shifter-h : Geometry.handbrake-h;
+    property <float> s: min(root.width / 1px / vw, root.height / 1px / vh);
+
+    preferred-width: vw * 1px;
+    preferred-height: vh * 1px;
+    accessible-role: AccessibleRole.image;
+    accessible-label: device.kind-label;
+
+    stage := Rectangle {
+        width: root.vw * root.s * 1px;
+        height: root.vh * root.s * 1px;
+        opacity: root.ghost ? 0.18 : 1;
+
+        if root.custom: Image {
+            source: root.device.picture;
+            width: 100%;
+            height: 100%;
+        }
+
+        if !root.custom && root.device.kind == "wheel_base": Image {
+            source: Drawings.base;
+            width: 100%;
+            height: 100%;
+        }
+
+        if !root.custom && root.device.kind == "steering_wheel" && Geometry.raster: Image {
+            source: root.device.frame;
+            width: 100%;
+            height: 100%;
+        }
+
+        if !root.custom && root.device.kind == "steering_wheel" && !Geometry.raster: Image {
+            source: root.device.rim == "gt" ? Drawings.wheel-gt
+                : root.device.rim == "formula" ? Drawings.wheel-formula : Drawings.wheel-round;
+            width: 100%;
+            height: 100%;
+            transform-origin: {
+                x: Geometry.wheel-pivot-x * root.s * 1px,
+                y: Geometry.wheel-pivot-y * root.s * 1px,
+            };
+            transform-rotation: root.device.angle * 1deg;
+        }
+
+        if !root.custom && root.device.kind == "pedals": Rectangle {
+            Image {
+                source: Drawings.pedals-frame;
+                width: 100%;
+                height: 100%;
+            }
+            if root.device.has-clutch: Pedal {
+                scale: root.s;
+                hinge-x: root.device.clutch-x;
+                hinge-y: root.device.clutch-y;
+            }
+            if root.device.has-brake: Pedal {
+                scale: root.s;
+                hinge-x: root.device.brake-x;
+                hinge-y: root.device.brake-y;
+            }
+            if root.device.has-throttle: Pedal {
+                scale: root.s;
+                hinge-x: root.device.throttle-x;
+                hinge-y: root.device.throttle-y;
+            }
+        }
+
+        if !root.custom && root.device.kind == "shifter": Rectangle {
+            Image {
+                source: Drawings.shifter-plate;
+                width: 100%;
+                height: 100%;
+            }
+            Image {
+                source: root.device.gate;
+                width: 100%;
+                height: 100%;
+            }
+            for l in root.device.gate-labels: Text {
+                property <bool> on: l.text == root.device.gear;
+                x: l.x * root.s * 1px - self.width / 2;
+                y: l.y * root.s * 1px - self.height / 2;
+                text: l.text;
+                font-family: Theme.mono;
+                font-size: 19px * root.s;
+                font-weight: self.on ? 700 : 500;
+                color: self.on ? Theme.accent : #9aa0a6;
+            }
+            Image {
+                source: Drawings.shifter-knob;
+                width: Geometry.knob-size * root.s * 1px;
+                height: self.width;
+                x: (root.device.knob-x - Geometry.knob-size / 2) * root.s * 1px;
+                y: (root.device.knob-y - Geometry.knob-size / 2) * root.s * 1px;
+            }
+        }
+
+        if !root.custom && root.device.kind == "handbrake": Rectangle {
+            Image {
+                source: Drawings.handbrake-body;
+                width: 100%;
+                height: 100%;
+            }
+            if Geometry.raster: Image {
+                source: root.device.frame;
+                width: 100%;
+                height: 100%;
+            }
+            if !Geometry.raster: Image {
+                source: Drawings.handbrake-lever;
+                width: 100%;
+                height: 100%;
+                transform-origin: {
+                    x: Geometry.lever-pivot-x * root.s * 1px,
+                    y: Geometry.lever-pivot-y * root.s * 1px,
+                };
+                transform-rotation: clamp(root.device.pull, 0, 1) * Geometry.lever-angle * 1deg;
+            }
+        }
+    }
+}
+
+/// Steering position within the rotation: a track with a centre tick and a marker.
+export component SteerTrack {
+    in property <float> angle;
+    in property <float> rotation;
+    property <float> pos: rotation > 0 ? clamp(0.5 + angle / rotation, 0, 1) : 0.5;
+    height: 14px;
+    Rectangle {
+        y: 6px;
+        height: 2px;
+        border-radius: 1px;
+        background: Theme.track;
+    }
+    Rectangle {
+        x: (parent.width - 2px) / 2;
+        y: 1px;
+        width: 2px;
+        height: 12px;
+        background: Theme.rule;
+    }
+    Rectangle {
+        x: root.pos * parent.width - 2px;
+        width: 4px;
+        border-radius: 2px;
+        background: Theme.ink;
+    }
+}
+
+/// Vertical pedal bar: percentage, fill in the pedal's data colour, name. Never colour alone.
+export component PedalBar inherits VerticalLayout {
+    in property <string> name;
+    in property <float> value;
+    in property <color> color;
+    in property <length> bar-height: 118px;
+    width: 64px;
+    spacing: 8px;
+    alignment: center;
+    HorizontalLayout {
+        alignment: center;
+        spacing: 0px;
+        Text {
+            text: round(clamp(root.value, 0, 1) * 100);
+            font-family: Theme.mono;
+            font-size: 20px;
+            font-weight: 500;
+            color: Theme.ink;
+            vertical-alignment: bottom;
+        }
+        Text {
+            text: "%";
+            font-family: Theme.mono;
+            font-size: 10px;
+            font-weight: 500;
+            color: Theme.ink2;
+            vertical-alignment: bottom;
+        }
+    }
+    HorizontalLayout {
+        alignment: center;
+        Rectangle {
+            width: 12px;
+            height: root.bar-height;
+            border-radius: 6px;
+            background: Theme.track;
+            clip: true;
+            Rectangle {
+                y: parent.height - self.height;
+                height: clamp(root.value, 0, 1) * parent.height;
+                border-radius: 6px;
+                background: root.color;
+            }
+        }
+    }
+    Text {
+        text: root.name;
+        font-family: Theme.sans;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 1.08px;
+        color: Theme.ink2;
+        horizontal-alignment: center;
+    }
+}

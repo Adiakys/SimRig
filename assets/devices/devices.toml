@@ -21,9 +21,9 @@ shapes = { round = "wheel-round.svg", gt = "wheel-gt.svg", formula = "wheel-form
 view_box = [600, 380]
 layers = ["pedals-frame.svg"]       # seen from the driver's seat
 # Only the pedals the component declares are drawn (e.g. no clutch on a two-pedal set), on the
-# hinge points for that count, left to right. Each pedal.svg is placed with its hinge on the
-# point; pressing scales it vertically towards the hinge (1 = released, pressed_scale_y = fully pressed).
-pedal = { file = "pedal.svg", size = [120, 300], hinge = [60, 290], pressed_scale_y = 0.62 }
+# hinge points for that count, left to right, with pedal.svg's hinge on the point. The pedals do
+# not move: their travel is shown by the live values next to the drawing.
+pedal = { file = "pedal.svg", size = [120, 300], hinge = [60, 290] }
 hinges.3 = { clutch = [175, 290], brake = [300, 290], throttle = [425, 290] }
 hinges.2 = { brake = [238, 290], throttle = [362, 290] }
 hinges.1 = { throttle = [300, 290] }

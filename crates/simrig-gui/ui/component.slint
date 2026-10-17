@@ -1,0 +1,540 @@
+// Settings of one component: the live device on the left, the settings on the right.
+
+import { ScrollView } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+import { Rig, Api, SettingRow, RowKind } from "api.slint";
+import { Device, LiveDevice, SteerTrack, PedalBar } from "devices.slint";
+import { Button, ButtonKind, Chip, ChipTone, QuickChip, Slider, Segmented, Toggle, Field, Eyebrow, Title, Heading, Body, Small, LiveValue, Hairline, BackRow, Notice } from "widgets.slint";
+
+/// The response curve of a pedal or handbrake: drag a point up or down.
+component CurveEditor {
+    in property <SettingRow> setting;
+    in property <bool> enabled: setting.enabled;
+    width: 168px;
+    height: 128px;
+    accessible-role: AccessibleRole.groupbox;
+    accessible-label: setting.label;
+    Rectangle {
+        border-radius: 6px;
+        background: Theme.dark ? Theme.raised : Theme.surface;
+        border-width: 1px;
+        border-color: Theme.line;
+    }
+    plot := Rectangle {
+        x: 12px;
+        y: 12px;
+        width: parent.width - 24px;
+        height: parent.height - 24px;
+        // Linear reference
+        Path {
+            viewbox-width: 100;
+            viewbox-height: 100;
+            commands: "M0 100 L100 0";
+            stroke: Theme.line;
+            stroke-width: 1px;
+        }
+        Path {
+            viewbox-width: 100;
+            viewbox-height: 100;
+            commands: root.setting.curve-path;
+            stroke: root.enabled ? Theme.ink : Theme.ink3;
+            stroke-width: 2px;
+        }
+        for x[i] in root.setting.curve-x: Rectangle {
+            property <float> py: root.setting.curve-y[i];
+            property <bool> movable: root.enabled && i > 0 && i < root.setting.curve-x.length - 1;
+            x: x * parent.width - 7px;
+            y: (1 - (ta.pressed ? ta.drag : py)) * parent.height - 7px;
+            width: 14px;
+            height: 14px;
+            border-radius: 7px;
+            background: self.movable ? Theme.surface : Theme.ink;
+            border-width: 2px;
+            border-color: root.enabled ? Theme.ink : Theme.ink3;
+            accessible-role: AccessibleRole.slider;
+            accessible-label: root.setting.label + " " + (i + 1);
+            accessible-value: round(py * 100) + "%";
+            ta := TouchArea {
+                property <float> drag;
+                enabled: parent.movable;
+                mouse-cursor: parent.movable ? MouseCursor.ns-resize : MouseCursor.default;
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        self.drag = parent.py;
+                    }
+                    if e.kind == PointerEventKind.up {
+                        Api.set-curve-point(root.setting.item, i, self.drag);
+                    }
+                }
+                moved => {
+                    if self.pressed {
+                        self.drag = clamp(1 - (parent.y + self.mouse-y) / plot.height, 0, 1);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One setting: label, help and reason on the left; the control on the right.
+component SettingLine {
+    in property <SettingRow> setting;
+    property <bool> confirming: false;
+    min-height: l.min-height;
+    preferred-height: l.preferred-height;
+
+    l := VerticalLayout {
+        spacing: 0px;
+        if root.setting.kind == RowKind.heading && root.setting.count == 0: VerticalLayout {
+            padding-top: 28px;
+            padding-bottom: 8px;
+            spacing: 8px;
+            Heading { text: root.setting.label; }
+            Hairline { }
+        }
+        if root.setting.kind == RowKind.heading && root.setting.count > 0: VerticalLayout {
+            padding-top: 18px;
+            padding-bottom: 2px;
+            Eyebrow { text: root.setting.label.to-uppercase(); }
+        }
+
+        if root.setting.kind == RowKind.disclosure: VerticalLayout {
+            padding-top: 10px;
+            padding-bottom: 10px;
+            Rectangle {
+                height: 36px;
+                border-radius: 6px;
+                background: dt.has-hover ? Theme.raised : transparent;
+                accessible-role: AccessibleRole.button;
+                accessible-label: root.setting.label;
+                accessible-expanded: root.setting.expanded;
+                accessible-action-default => { Api.toggle-advanced(root.setting.item); }
+                HorizontalLayout {
+                    padding-left: 4px;
+                    spacing: 10px;
+                    alignment: start;
+                    Image {
+                        source: root.setting.expanded ? Icons.down : Icons.right;
+                        colorize: Theme.ink;
+                        width: 18px;
+                        height: 18px;
+                        y: (parent.height - 18px) / 2;
+                    }
+                    Text {
+                        text: root.setting.label;
+                        font-family: Theme.sans;
+                        font-size: 16px;
+                        font-weight: 500;
+                        color: Theme.ink;
+                        vertical-alignment: center;
+                    }
+                    Small {
+                        text: root.setting.count == 1 ? @tr("1 setting") : @tr("{} settings", root.setting.count);
+                        vertical-alignment: center;
+                    }
+                }
+                dt := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { Api.toggle-advanced(root.setting.item); }
+                }
+            }
+            Hairline { }
+        }
+
+        if root.setting.kind != RowKind.heading && root.setting.kind != RowKind.disclosure && root.setting.kind != RowKind.action: VerticalLayout {
+            HorizontalLayout {
+                padding-top: 14px;
+                padding-bottom: 14px;
+                spacing: 24px;
+                // Label column: the reason of an unsupported item sits right under it.
+                VerticalLayout {
+                    width: 236px;
+                    spacing: 4px;
+                    alignment: start;
+                    Text {
+                        text: root.setting.label;
+                        font-family: Theme.sans;
+                        font-size: 16px;
+                        color: root.setting.enabled ? Theme.ink : Theme.ink3;
+                        wrap: word-wrap;
+                    }
+                    if root.setting.reason != "": Small {
+                        text: root.setting.reason;
+                        color: Theme.ink2;
+                    }
+                    if root.setting.reason == "" && root.setting.help != "": Small {
+                        text: root.setting.help;
+                        color: Theme.ink3;
+                        font-size: 13px;
+                    }
+                }
+                // Control column
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 10px;
+                    alignment: start;
+
+                    if root.setting.kind == RowKind.slider: HorizontalLayout {
+                        spacing: 20px;
+                        s := Slider {
+                            horizontal-stretch: 1;
+                            y: 2px;
+                            value: root.setting.value;
+                            minimum: root.setting.minimum;
+                            maximum: root.setting.maximum;
+                            step: root.setting.step;
+                            enabled: root.setting.enabled;
+                            label: root.setting.label;
+                            moved(v) => { Api.set-number(root.setting.item, v); }
+                            released(v) => { Api.set-number(root.setting.item, v); }
+                        }
+                        LiveValue {
+                            width: 112px;
+                            align: right;
+                            size: "m";
+                            value: !root.setting.enabled ? "–" : root.setting.decimals == 0 ? round(s.shown) : s.shown.to-fixed(root.setting.decimals);
+                            unit: root.setting.enabled ? root.setting.unit : "";
+                            color: root.setting.enabled ? Theme.ink : Theme.ink3;
+                        }
+                    }
+                    if root.setting.kind == RowKind.slider && root.setting.quick.length > 0: HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        for q in root.setting.quick: QuickChip {
+                            text: round(q);
+                            selected: abs(q - root.setting.value) < 0.5;
+                            enabled: root.setting.enabled;
+                            clicked => { Api.set-number(root.setting.item, q); }
+                        }
+                    }
+
+                    if root.setting.kind == RowKind.toggle: HorizontalLayout {
+                        alignment: start;
+                        spacing: 12px;
+                        Toggle {
+                            checked: root.setting.checked;
+                            enabled: root.setting.enabled;
+                            label: root.setting.label;
+                            toggled(on) => { Api.set-bool(root.setting.item, on); }
+                        }
+                        Small {
+                            text: !root.setting.enabled ? "" : root.setting.checked ? @tr("On") : @tr("Off");
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    if root.setting.kind == RowKind.segmented || root.setting.kind == RowKind.choice: HorizontalLayout {
+                        alignment: start;
+                        Segmented {
+                            options: root.setting.options;
+                            selected: root.setting.selected;
+                            enabled: root.setting.enabled;
+                            label: root.setting.label;
+                            picked(i) => { Api.set-choice(root.setting.item, i); }
+                        }
+                    }
+
+                    if root.setting.kind == RowKind.curve: HorizontalLayout {
+                        alignment: start;
+                        spacing: 16px;
+                        CurveEditor { setting: root.setting; }
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: root.setting.enabled ? root.setting.value-text : "–";
+                                font-family: Theme.sans;
+                                font-size: 15px;
+                                font-weight: 500;
+                                color: root.setting.enabled ? Theme.ink : Theme.ink3;
+                            }
+                            Small {
+                                text: root.setting.enabled ? @tr("Drag a point up or down") : "";
+                                font-size: 13px;
+                                color: Theme.ink3;
+                            }
+                        }
+                    }
+
+                    if root.setting.kind == RowKind.text: HorizontalLayout {
+                        alignment: start;
+                        f := Field {
+                            width: 280px;
+                            text: root.setting.text;
+                            enabled: root.setting.enabled;
+                            label: root.setting.label;
+                            accepted(t) => { Api.set-text(root.setting.item, t); }
+                        }
+                    }
+
+                    if root.setting.kind == RowKind.info: HorizontalLayout {
+                        alignment: end;
+                        Text {
+                            text: root.setting.value-text;
+                            font-family: root.setting.value-text == "Used by games" ? Theme.sans : Theme.mono;
+                            font-size: 15px;
+                            color: root.setting.enabled ? Theme.ink2 : Theme.ink3;
+                        }
+                    }
+
+                    if root.setting.persistence != "" && root.setting.enabled: HorizontalLayout {
+                        alignment: start;
+                        Chip {
+                            text: root.setting.persistence;
+                            tone: root.setting.unsaved ? ChipTone.warning : ChipTone.neutral;
+                            dot: root.setting.unsaved;
+                        }
+                    }
+                }
+            }
+            Hairline { }
+        }
+
+        if root.setting.kind == RowKind.action: VerticalLayout {
+            padding-top: 10px;
+            padding-bottom: 10px;
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+                Button {
+                    text: root.setting.label;
+                    enabled: root.setting.enabled && !root.confirming;
+                    clicked => {
+                        if root.setting.confirm != "" {
+                            root.confirming = true;
+                        } else {
+                            Api.run-action(root.setting.item);
+                        }
+                    }
+                }
+                if root.setting.reason != "": Small {
+                    text: root.setting.reason;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                if root.setting.reason == "" && root.setting.help != "": Small {
+                    text: root.setting.help;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+            // Effects that move the wheel ask first, inline.
+            if root.confirming: Rectangle {
+                border-radius: 10px;
+                background: Theme.raised;
+                height: cl.preferred-height;
+                cl := HorizontalLayout {
+                    padding: 14px;
+                    spacing: 12px;
+                    Notice {
+                        text: root.setting.confirm;
+                        level: "warning";
+                        horizontal-stretch: 1;
+                    }
+                    Button {
+                        kind: ButtonKind.quiet;
+                        text: @tr("Cancel");
+                        clicked => { root.confirming = false; }
+                    }
+                    Button {
+                        kind: ButtonKind.primary;
+                        text: root.setting.label;
+                        clicked => {
+                            root.confirming = false;
+                            Api.run-action(root.setting.item);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The main live values next to the drawing: one big, at most two small.
+component LiveSummary inherits VerticalLayout {
+    in property <Device> device;
+    spacing: 8px;
+    alignment: end;
+    if device.kind == "wheel_base" || device.kind == "steering_wheel": HorizontalLayout {
+        spacing: 40px;
+        alignment: start;
+        VerticalLayout {
+            spacing: 4px;
+            Eyebrow { text: @tr("STEERING"); }
+            LiveValue {
+                value: root.device.has-angle ? (root.device.angle < -0.5 ? "−" + round(-root.device.angle) : round(root.device.angle)) : "–";
+                unit: "°";
+            }
+            SteerTrack {
+                width: 150px;
+                angle: root.device.angle;
+                rotation: root.device.rotation;
+            }
+        }
+        if root.device.has-ffb: VerticalLayout {
+            spacing: 4px;
+            alignment: end;
+            Eyebrow { text: @tr("FORCE"); }
+            LiveValue { value: round(root.device.ffb); unit: "%"; size: "m"; }
+        }
+    }
+    if device.kind == "pedals": HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        if root.device.has-clutch: PedalBar { name: @tr("CLUTCH"); value: root.device.clutch; color: Theme.clutch; bar-height: 90px; }
+        if root.device.has-brake: PedalBar { name: @tr("BRAKE"); value: root.device.brake; color: Theme.brake; bar-height: 90px; }
+        if root.device.has-throttle: PedalBar { name: @tr("THROTTLE"); value: root.device.throttle; color: Theme.throttle; bar-height: 90px; }
+    }
+    if device.kind == "shifter": VerticalLayout {
+        spacing: 4px;
+        Eyebrow { text: @tr("GEAR"); }
+        LiveValue { value: root.device.gear; size: "xl"; }
+        Small { text: root.device.layout-text; }
+    }
+    if device.kind == "handbrake": VerticalLayout {
+        spacing: 4px;
+        Eyebrow { text: @tr("POSITION"); }
+        LiveValue { value: round(clamp(root.device.pull, 0, 1) * 100); unit: "%"; }
+        Small { text: root.device.pull-text; }
+    }
+}
+
+export component ComponentScreen inherits Rectangle {
+    background: Theme.bg;
+    VerticalLayout {
+        BackRow {
+            label: @tr("Rig");
+            back => { Api.go-home(); }
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            // Left: the device, live
+            VerticalLayout {
+                width: 40%;
+                padding-left: 28px;
+                padding-right: 28px;
+                padding-bottom: 24px;
+                spacing: 6px;
+                Title { text: Rig.current-title; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: start;
+                    height: 24px;
+                    Body { text: Rig.current.name; wrap: no-wrap; overflow: elide; vertical-alignment: center; }
+                    Small { text: Rig.current.brand; wrap: no-wrap; vertical-alignment: center; }
+                }
+                if Rig.current-gone: Notice {
+                    text: @tr("Disconnected. It comes back by itself when plugged in.");
+                    level: "warning";
+                }
+                LiveDevice {
+                    vertical-stretch: 1;
+                    max-height: 400px;
+                    device: Rig.current;
+                    ghost: Rig.current-gone;
+                }
+                // Space left over goes here, not between the title lines.
+                Rectangle { vertical-stretch: 1; }
+                LiveSummary { device: Rig.current; }
+                Rectangle { height: 16px; }
+                // Every input, unsupported ones with their reason.
+                VerticalLayout {
+                    spacing: 2px;
+                    for input in Rig.live-values: HorizontalLayout {
+                        spacing: 12px;
+                        Text {
+                            text: input.label;
+                            font-family: Theme.sans;
+                            font-size: 13px;
+                            color: input.enabled ? Theme.ink2 : Theme.ink3;
+                            width: 40%;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: input.enabled ? input.value-text + (input.unit == "" || input.unit == "°" ? input.unit : " " + input.unit) : input.reason;
+                            font-family: input.enabled ? Theme.mono : Theme.sans;
+                            font-size: 13px;
+                            color: input.enabled ? Theme.ink : Theme.ink3;
+                            horizontal-alignment: right;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                width: 1px;
+                background: Theme.line;
+            }
+            // Right: the settings
+            VerticalLayout {
+                horizontal-stretch: 1;
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        padding-left: 40px;
+                        padding-right: 40px;
+                        padding-bottom: 24px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            padding-top: 4px;
+                            for c in Rig.current-chips: Chip {
+                                text: c.text;
+                                tone: c.tone == "success" ? ChipTone.success : c.tone == "warning" ? ChipTone.warning : ChipTone.neutral;
+                                icon: c.tone == "success" ? Icons.check : c.tone == "warning" ? Icons.warn : @image-url("");
+                            }
+                        }
+                        for row in Rig.rows: SettingLine { setting: row; }
+                    }
+                }
+                // Footer: reset on the left, save on the right with why it may ask.
+                Rectangle {
+                    height: 1px;
+                    vertical-stretch: 0;
+                    background: Theme.line;
+                }
+                HorizontalLayout {
+                    vertical-stretch: 0;
+                    padding-left: 40px;
+                    padding-right: 40px;
+                    padding-top: 14px;
+                    padding-bottom: 14px;
+                    spacing: 16px;
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 0;
+                        Button {
+                            kind: ButtonKind.quiet;
+                            icon: Icons.restart;
+                            text: @tr("Undo changes");
+                            enabled: Rig.unsaved;
+                            clicked => { Api.reset-values(); }
+                        }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 0;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            alignment: end;
+                            Button {
+                                kind: ButtonKind.primary;
+                                text: @tr("Save as default");
+                                privileged: Rig.save-privileged;
+                                enabled: Rig.unsaved;
+                                clicked => { Api.save-all(); }
+                            }
+                        }
+                        Small {
+                            text: Rig.unsaved ? Rig.save-note : @tr("Every change is kept: nothing to save.");
+                            font-size: 13px;
+                            horizontal-alignment: right;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

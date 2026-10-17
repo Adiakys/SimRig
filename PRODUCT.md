@@ -23,6 +23,8 @@ Success: a beginner plugs in a new device, opens the app, and within a couple of
 
 **Sporty, technical, essential.** The language of motorsport instrumentation and telemetry, made clean: values that read at a glance from the seat, precise numbers, nothing decorative. Confident and calm rather than loud. It speaks plainly to the beginner and never talks down to the expert.
 
+The voice is **impersonal and technical**, like instrumentation: "4 devices found", "The password is asked once", never "we found" or "we ask you". No first person, no chatter.
+
 What to keep from manufacturers' apps: **big, readable live values** (angle, pedal pressure, gear) and **presets one click away** from the home.
 
 ## Anti-references

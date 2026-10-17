@@ -121,6 +121,18 @@ impl SimAdapter {
                 ),
                 *gears,
             ))),
+            Setup::SequentialShifter => AnyComponent::Shifter(Box::new(
+                shifter::SimShifter::new(
+                    s,
+                    Identity::new(
+                        format!("{device}/shifter"),
+                        "Generic sequential shifter",
+                        "sim/generic-shifter",
+                    ),
+                    6,
+                )
+                .sequential(),
+            )),
             Setup::Handbrake => AnyComponent::Handbrake(Box::new(handbrake::SimHandbrake::new(
                 s,
                 Identity::new(
@@ -129,6 +141,15 @@ impl SimAdapter {
                     "sim/generic-handbrake",
                 ),
             ))),
+            Setup::Pedals { count } => AnyComponent::Pedals(Box::new(
+                pedals::SimPedals::new(
+                    s,
+                    &format!("{device}/pedals"),
+                    "Generic pedals",
+                    "sim/generic-pedals",
+                )
+                .with_roles(Setup::pedal_roles(*count)),
+            )),
         };
         self.restore(component)
     }

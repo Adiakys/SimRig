@@ -28,6 +28,12 @@ impl SimShifter {
         }
     }
 
+    /// Starts in sequential mode.
+    pub fn sequential(mut self) -> Self {
+        self.mode = SEQUENTIAL.into();
+        self
+    }
+
     fn is_h(&self) -> bool {
         self.mode == H_PATTERN
     }

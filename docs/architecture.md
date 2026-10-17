@@ -308,7 +308,7 @@ live inputs, also in Slint, which cannot animate inside a single SVG:
 |---|---|---|
 | Wheel base | three-quarter view, static | marker on the hub ellipse (when no rim is mounted) |
 | Steering wheel | front view, drawn on its own; **round, GT (GT3-style, cut top and bottom) or formula** | turns around its centre with the steering angle |
-| Pedals | frame + one pedal drawing per pedal, from the driver's seat | each pedal shortens towards its hinge as it is pressed; only the pedals the component declares are drawn (2-pedal sets have no clutch) |
+| Pedals | frame + one pedal drawing per pedal, from the driver's seat | the pedals stay still: their travel is shown by the live bars next to the drawing; only the pedals the component declares are drawn (2-pedal sets have no clutch) |
 | Shifter | top view of the plate + knob | the app draws the gate of the current configuration (6+R, 7+R, reverse position, sequential) and puts the knob on the engaged slot |
 | Handbrake | side view, body + lever | the lever turns on its pivot |
 

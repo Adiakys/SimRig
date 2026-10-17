@@ -4,10 +4,12 @@ use crate::sim::{AxisShape, RAW_MAX, Shared, as_f64, raw_from_unit};
 
 const ONLY_BRAKE: &str = "Only the brake pedal has a load cell.";
 
-/// Simulated 3-pedal set. The brake has a load cell; vibration is not implemented.
+/// Simulated pedal set (three pedals unless told otherwise). The brake has a load cell;
+/// vibration is not implemented.
 pub struct SimPedals {
     shared: Shared,
     id: String,
+    roles: Vec<PedalRole>,
     name: String,
     model: String,
     shapes: [AxisShape; 3],
@@ -37,11 +39,18 @@ impl SimPedals {
         Self {
             shared,
             id: id.into(),
+            roles: PedalRole::ALL.to_vec(),
             name: name.into(),
             model: model.into(),
             shapes: Default::default(),
             brake_max_force: 80.0,
         }
+    }
+
+    /// A set with only these pedals (e.g. no clutch).
+    pub fn with_roles(mut self, roles: Vec<PedalRole>) -> Self {
+        self.roles = roles;
+        self
     }
 
     fn raw(&self, pedal: PedalRole) -> i64 {
@@ -63,7 +72,7 @@ impl Component for SimPedals {
     }
 
     fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
-        PedalRole::ALL
+        self.roles
             .iter()
             .map(|p| {
                 ProcedureDescriptor::new(&format!("calibrate-{}", p.key()), &format!("Calibrate the {} (guided)", p.key()))
@@ -90,7 +99,7 @@ impl Component for SimPedals {
 
 impl Pedals for SimPedals {
     fn pedals(&self) -> Vec<PedalRole> {
-        PedalRole::ALL.to_vec()
+        self.roles.clone()
     }
 
     fn position(&mut self, pedal: PedalRole) -> Support<Axis> {

@@ -1,0 +1,78 @@
+// Design tokens from DESIGN.md ("The Timing Board"), for both themes.
+
+import { Palette } from "std-widgets.slint";
+import "../../../assets/fonts/Barlow-Regular.ttf";
+import "../../../assets/fonts/Barlow-Medium.ttf";
+import "../../../assets/fonts/Barlow-SemiBold.ttf";
+import "../../../assets/fonts/Barlow-Bold.ttf";
+import "../../../assets/fonts/MartianMono-Variable.ttf";
+
+export global Theme {
+    /// 0 follows the system, 1 light, 2 dark.
+    in-out property <int> mode: 0;
+    out property <bool> dark: mode == 2 || (mode == 0 && Palette.color-scheme == ColorScheme.dark);
+    /// Interface transitions become instant (live devices keep moving).
+    in-out property <bool> reduced-motion: false;
+
+    // Neutrals
+    out property <brush> bg: dark ? #151411 : #f7f6f3;
+    out property <brush> surface: dark ? #1d1c18 : #fcfcf9;
+    out property <brush> raised: dark ? #272521 : #efeee9;
+    out property <brush> line: dark ? #34332e : #dbd9d4;
+    out property <brush> rule: dark ? #4f4d46 : #b9b7b1;
+    out property <brush> track: dark ? #34332e : #dbd9d4;
+    out property <color> ink: dark ? #eeede8 : #201e18;
+    out property <color> ink2: dark ? #b0aea7 : #5a5851;
+    out property <color> ink3: dark ? #88867f : #73716b;
+
+    // The one accent
+    out property <color> accent: dark ? #efc63a : #f3c726;
+    out property <color> accent-hover: dark ? #e2b92c : #e6ba18;
+    out property <color> accent-edge: dark ? #efc63a : #c7a01e;
+    out property <color> accent-ink: dark ? #f4cd4b : #8a6500;
+    out property <color> quiet-outline: dark ? #6b5a1c : #c7a01e;
+    out property <color> on-accent: #231e0d;
+    out property <color> focus: dark ? #efc63a : #8a6500;
+
+    // Data and states (never alone: always with a label or an icon)
+    out property <color> throttle: dark ? #55c975 : #1b9247;
+    out property <color> brake: dark ? #f66d62 : #cc3430;
+    out property <color> clutch: dark ? #67aaed : #1f74bf;
+    out property <color> warning: dark ? #fc9e47 : #cc6600;
+    out property <color> error: dark ? #f66d62 : #c9302d;
+    out property <color> success: dark ? #62c37a : #2d8949;
+
+    // Floating layers: a soft shadow in the light theme, a Rule border in the dark one.
+    out property <length> float-blur: dark ? 0px : 32px;
+    out property <color> float-shadow: dark ? transparent : #201e1838;
+
+    // Type
+    out property <string> sans: "Barlow";
+    out property <string> mono: "Martian Mono";
+
+    // Motion: ease-out-quart
+    out property <duration> fast: reduced-motion ? 0ms : 120ms;
+    out property <duration> normal: reduced-motion ? 0ms : 200ms;
+    out property <duration> slow: reduced-motion ? 0ms : 320ms;
+}
+
+export global Icons {
+    out property <image> gear: @image-url("icons/gear.svg");
+    out property <image> plug: @image-url("icons/plug.svg");
+    // No bare "+": every add action names what it adds, with a small plus on the icon.
+    out property <image> add-device: @image-url("icons/add-device.svg");
+    out property <image> add-preset: @image-url("icons/add-preset.svg");
+    out property <image> back: @image-url("icons/back.svg");
+    out property <image> down: @image-url("icons/down.svg");
+    out property <image> right: @image-url("icons/right.svg");
+    out property <image> check: @image-url("icons/check.svg");
+    out property <image> warn: @image-url("icons/warn.svg");
+    out property <image> info: @image-url("icons/info.svg");
+    out property <image> lock: @image-url("icons/lock.svg");
+    out property <image> x: @image-url("icons/x.svg");
+    out property <image> usb: @image-url("icons/usb.svg");
+    out property <image> sliders: @image-url("icons/sliders.svg");
+    out property <image> restart: @image-url("icons/restart.svg");
+    out property <image> error: @image-url("icons/error.svg");
+    out property <image> mark: @image-url("icons/mark.svg");
+}

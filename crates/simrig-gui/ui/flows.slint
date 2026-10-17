@@ -1,0 +1,821 @@
+// Add a device, plugins and drivers, general settings and the first run. Flows are full
+// screens, never modals: a step header, one primary action at the bottom right.
+
+import { ScrollView } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+import { Rig, Api, FoundDevice, PluginRow, SystemCheck, ExcludedRow, PresetItem } from "api.slint";
+import { Device, LiveDevice } from "devices.slint";
+import { Button, ButtonKind, Chip, ChipTone, Segmented, Toggle, Eyebrow, Title, Heading, Body, Small, Hairline, BackRow, Notice, Steps } from "widgets.slint";
+
+/// A small picture of a device: drawn live when it has components, else the USB mark.
+component Thumb inherits Rectangle {
+    in property <Device> preview;
+    width: 96px;
+    height: 72px;
+    border-radius: 10px;
+    background: Theme.raised;
+    if root.preview.kind == "": Image {
+        source: Icons.usb;
+        colorize: Theme.ink2;
+        width: 28px;
+        height: 28px;
+    }
+    if root.preview.kind != "": LiveDevice {
+        width: parent.width - 12px;
+        height: parent.height - 8px;
+        device: root.preview;
+    }
+}
+
+component FoundLine inherits VerticalLayout {
+    in property <FoundDevice> found;
+    /// Offer the actions of the add flow (set up, generic).
+    in property <bool> actions: true;
+    HorizontalLayout {
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 20px;
+        Thumb { preview: root.found.preview; }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: start;
+                Body { text: root.found.name; wrap: no-wrap; overflow: elide; }
+                if root.found.is-new: Chip { text: @tr("New"); tone: ChipTone.warning; }
+            }
+            Small { text: root.found.detail; }
+        }
+        VerticalLayout {
+            alignment: center;
+            if root.found.state == "ready": Chip {
+                text: @tr("Ready");
+                icon: Icons.check;
+                tone: ChipTone.success;
+            }
+            if root.found.state == "driver" && !root.actions: Chip {
+                text: @tr("Needs a driver");
+                icon: Icons.warn;
+                tone: ChipTone.warning;
+            }
+            if root.found.state == "setup" && !root.actions: Chip { text: @tr("To set up"); }
+            if root.found.state == "unsupported": Chip { text: @tr("Not supported"); }
+            // Only a device just plugged in gets the accent: one signal per screen.
+            if root.actions && (root.found.state == "driver" || root.found.state == "setup"): Button {
+                kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
+                text: root.found.state == "driver" ? @tr("Install the driver") : @tr("Set up");
+                enabled: !Rig.add-busy;
+                clicked => { Api.add-choose(root.found.key); }
+            }
+            if root.actions && root.found.state == "unknown": Button {
+                kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
+                text: @tr("Set up as generic");
+                enabled: !Rig.add-busy;
+                clicked => { Api.add-generic(root.found.key); }
+            }
+        }
+    }
+    Hairline { }
+}
+
+/// The bottom bar of flows: secondary at the left, the primary action at the right.
+component FlowFooter inherits VerticalLayout {
+    vertical-stretch: 0;
+    Hairline { }
+    HorizontalLayout {
+        padding-left: 28px;
+        padding-right: 28px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 12px;
+        min-height: 68px;
+        @children
+    }
+}
+
+/// A short list of promises with check marks.
+component Promise inherits HorizontalLayout {
+    in property <string> text;
+    spacing: 12px;
+    Image {
+        source: Icons.check;
+        colorize: Theme.ink;
+        width: 18px;
+        height: 18px;
+        y: 2px;
+    }
+    Body { text: root.text; horizontal-stretch: 1; }
+}
+
+/// "Say before asking": one line why the password is needed, with the lock.
+component PasswordNote inherits Rectangle {
+    in property <string> text;
+    border-radius: 10px;
+    background: Theme.raised;
+    height: l.preferred-height;
+    l := HorizontalLayout {
+        padding: 16px;
+        spacing: 12px;
+        Image {
+            source: Icons.lock;
+            colorize: Theme.ink2;
+            width: 18px;
+            height: 18px;
+        }
+        Small { text: root.text; horizontal-stretch: 1; }
+    }
+}
+
+export component AddScreen inherits Rectangle {
+    background: Theme.bg;
+    VerticalLayout {
+        BackRow {
+            label: @tr("Rig");
+            back => { Api.go-home(); }
+            Steps {
+                y: 16px;
+                steps: [@tr("Connect"), @tr("Driver"), @tr("Set up"), @tr("Done")];
+                current: Rig.add-step;
+            }
+        }
+
+        // 1. Connect: devices appear as they are plugged in.
+        if Rig.add-step == 0: VerticalLayout {
+            vertical-stretch: 1;
+            HorizontalLayout {
+                padding-left: 28px;
+                Title { text: @tr("Add a device"); }
+            }
+            HorizontalLayout {
+                vertical-stretch: 1;
+                padding: 28px;
+                padding-top: 40px;
+                spacing: 96px;
+                VerticalLayout {
+                    width: 360px;
+                    spacing: 28px;
+                    alignment: start;
+                    Rectangle {
+                        width: 200px;
+                        height: 200px;
+                        border-radius: 100px;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        Rectangle {
+                            width: 140px;
+                            height: 140px;
+                            border-radius: 70px;
+                            border-width: 1px;
+                            border-color: Theme.rule;
+                        }
+                        Rectangle {
+                            width: 76px;
+                            height: 76px;
+                            border-radius: 38px;
+                            background: Theme.raised;
+                            Image {
+                                source: Icons.usb;
+                                colorize: Theme.ink;
+                                width: 32px;
+                                height: 32px;
+                            }
+                        }
+                    }
+                    Text {
+                        text: @tr("Connect the device to a USB port. Known devices are recognized automatically; a device no plugin knows can be set up as a generic device.");
+                        font-family: Theme.sans;
+                        font-size: 16px;
+                        color: Theme.ink2;
+                        wrap: word-wrap;
+                    }
+                    if Rig.add-error != "": Notice { text: Rig.add-error; level: "error"; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 0px;
+                    Eyebrow { text: @tr("DEVICES"); height: 28px; }
+                    Hairline { }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            alignment: start;
+                            padding-right: 16px;
+                            for f in Rig.found: FoundLine { found: f; }
+                            HorizontalLayout {
+                                padding-top: 16px;
+                                spacing: 12px;
+                                Small {
+                                    text: Rig.add-busy ? @tr("Starting the plugin…") : @tr("Devices plugged in now are added to this list.");
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                }
+                                Toggle {
+                                    checked: Rig.show-all;
+                                    label: @tr("Show every USB device");
+                                    toggled(on) => { Api.add-show-all(on); }
+                                }
+                                Small {
+                                    text: @tr("Show every USB device");
+                                    vertical-alignment: center;
+                                    wrap: no-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            FlowFooter {
+                Small {
+                    text: @tr("Not listed? Check the cable and try another port, not a hub.");
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 2. Driver: what is installed, the three promises, the password line above the button.
+        if Rig.add-step == 1: VerticalLayout {
+            vertical-stretch: 1;
+            HorizontalLayout {
+                padding-left: 28px;
+                Title { text: @tr("A driver is needed"); }
+            }
+            HorizontalLayout {
+                padding: 28px;
+                padding-top: 40px;
+                spacing: 56px;
+                alignment: start;
+                VerticalLayout {
+                    alignment: start;
+                    Thumb {
+                        preview: Rig.adding.preview;
+                        width: 200px;
+                        height: 160px;
+                    }
+                }
+                VerticalLayout {
+                    width: 560px;
+                    spacing: 16px;
+                    alignment: start;
+                    Body {
+                        text: @tr("The {} plugin installs the driver of {}.", Rig.add-driver-name, Rig.adding.name);
+                    }
+                    Promise { text: @tr("Works with SimRig closed."); }
+                    Promise { text: @tr("Starts only when the device is connected."); }
+                    Promise { text: @tr("Included in the app: nothing is downloaded. Removable at any time."); }
+                    if Rig.add-privileged: PasswordNote {
+                        text: @tr("The password is asked once, because the driver is installed in the system. SimRig itself never needs privileges.");
+                    }
+                    if Rig.add-error != "": Notice { text: Rig.add-error; level: "error"; }
+                }
+            }
+            Rectangle { vertical-stretch: 1; }
+            FlowFooter {
+                Button {
+                    kind: ButtonKind.quiet;
+                    text: @tr("Not now");
+                    clicked => { Api.go-home(); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if Rig.add-busy: Small { text: @tr("Installing…"); vertical-alignment: center; }
+                Button {
+                    kind: ButtonKind.primary;
+                    privileged: Rig.add-privileged;
+                    text: Rig.add-error != "" ? @tr("Try again") : @tr("Install the driver");
+                    enabled: !Rig.add-busy;
+                    clicked => { Api.add-install-driver(); }
+                }
+            }
+        }
+
+        // 3. Set up: waiting for the plugin's procedure (it opens by itself).
+        if Rig.add-step == 2: VerticalLayout {
+            vertical-stretch: 1;
+            HorizontalLayout {
+                padding-left: 28px;
+                Title { text: @tr("Preparing the setup"); }
+            }
+            HorizontalLayout {
+                padding: 28px;
+                Small { text: @tr("Asking the plugin how to set up the device…"); }
+            }
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        // 4. Done: the device moving live.
+        if Rig.add-step == 3: VerticalLayout {
+            vertical-stretch: 1;
+            HorizontalLayout {
+                padding-left: 28px;
+                Title { text: @tr("{} is ready", Rig.adding.name); }
+            }
+            HorizontalLayout {
+                padding-left: 28px;
+                padding-top: 8px;
+                Small {
+                    text: Rig.add-done-message != "" ? Rig.add-done-message : @tr("Move it to check that it responds.");
+                }
+            }
+            HorizontalLayout {
+                vertical-stretch: 1;
+                padding: 28px;
+                spacing: 24px;
+                for d in Rig.add-done: LiveDevice {
+                    device: d;
+                    max-width: 420px;
+                }
+                if Rig.add-done.length == 0: Notice {
+                    text: @tr("The device has no settings to show yet: it may need a restart of the computer.");
+                }
+            }
+            FlowFooter {
+                Button {
+                    kind: ButtonKind.quiet;
+                    text: @tr("Open settings");
+                    enabled: Rig.add-done.length > 0;
+                    clicked => { Api.add-open-settings(); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Button {
+                    kind: ButtonKind.primary;
+                    text: @tr("Back to the rig");
+                    clicked => { Api.add-finish(); }
+                }
+            }
+        }
+    }
+}
+
+component PluginLine inherits VerticalLayout {
+    in property <PluginRow> plugin;
+    property <bool> confirm-remove: false;
+    HorizontalLayout {
+        padding-top: 18px;
+        padding-bottom: 18px;
+        spacing: 24px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 4px;
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: start;
+                Text {
+                    text: root.plugin.name;
+                    font-family: Theme.sans;
+                    font-size: 17px;
+                    font-weight: 600;
+                    color: Theme.ink;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.plugin.version;
+                    font-family: Theme.mono;
+                    font-size: 12px;
+                    color: Theme.ink3;
+                    vertical-alignment: center;
+                }
+                Chip { text: root.plugin.origin; }
+            }
+            if root.plugin.description != "": Small { text: root.plugin.description; }
+            Small { text: root.plugin.devices; color: Theme.ink; }
+            if root.plugin.error != "": Notice { text: root.plugin.error; level: "error"; }
+        }
+        VerticalLayout {
+            alignment: start;
+            spacing: 10px;
+            width: 300px;
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                Chip {
+                    text: root.plugin.state;
+                    dot: true;
+                    tone: root.plugin.tone == "success" ? ChipTone.success : root.plugin.tone == "error" ? ChipTone.error : ChipTone.neutral;
+                }
+            }
+            HorizontalLayout {
+                alignment: end;
+                Chip {
+                    text: root.plugin.driver-text;
+                    icon: root.plugin.driver-tone == "success" ? Icons.check : root.plugin.driver-tone == "warning" ? Icons.warn : @image-url("");
+                    tone: root.plugin.driver-tone == "success" ? ChipTone.success : root.plugin.driver-tone == "warning" ? ChipTone.warning : ChipTone.neutral;
+                }
+            }
+            HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+                if root.plugin.tone == "error": Button {
+                    small: true;
+                    icon: Icons.restart;
+                    text: @tr("Restart");
+                    clicked => { Api.restart-plugin(root.plugin.id); }
+                }
+                if root.plugin.driver-state == "missing": Button {
+                    small: true;
+                    privileged: root.plugin.privileged;
+                    text: @tr("Install");
+                    enabled: !root.plugin.busy;
+                    clicked => { Api.install-driver(root.plugin.id); }
+                }
+                if (root.plugin.driver-state == "installed" || root.plugin.driver-state == "reboot") && !root.confirm-remove: Button {
+                    small: true;
+                    kind: ButtonKind.quiet;
+                    text: @tr("Remove the driver");
+                    enabled: !root.plugin.busy;
+                    clicked => { root.confirm-remove = true; }
+                }
+            }
+        }
+    }
+    // Removing a driver says what stops working, then asks.
+    if root.confirm-remove: Rectangle {
+        border-radius: 10px;
+        background: Theme.raised;
+        height: cl.preferred-height;
+        cl := HorizontalLayout {
+            padding: 14px;
+            spacing: 12px;
+            Notice {
+                text: @tr("Its devices stop working, in games too, until the driver is installed again.");
+                level: "warning";
+                horizontal-stretch: 1;
+            }
+            Button {
+                kind: ButtonKind.quiet;
+                text: @tr("Keep it");
+                clicked => { root.confirm-remove = false; }
+            }
+            Button {
+                privileged: root.plugin.privileged;
+                text: @tr("Remove");
+                clicked => {
+                    root.confirm-remove = false;
+                    Api.remove-driver(root.plugin.id);
+                }
+            }
+        }
+    }
+    Hairline { }
+}
+
+export component PluginsScreen inherits Rectangle {
+    background: Theme.bg;
+    VerticalLayout {
+        BackRow {
+            label: @tr("Rig");
+            back => { Api.go-home(); }
+        }
+        HorizontalLayout {
+            padding-left: 28px;
+            Title { text: @tr("Plugins and drivers"); }
+        }
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: 28px;
+                padding-top: 16px;
+                alignment: start;
+                Small {
+                    text: @tr("Each brand is supported by a plugin. A plugin may ship a driver: it works with SimRig closed and starts only with its devices.");
+                }
+                Rectangle { height: 12px; }
+                Hairline { }
+                for p in Rig.plugins: PluginLine { plugin: p; }
+                if Rig.problems.length > 0: VerticalLayout {
+                    padding-top: 28px;
+                    spacing: 8px;
+                    Heading { text: @tr("Problems"); }
+                    for problem in Rig.problems: Notice { text: problem; level: "warning"; }
+                }
+            }
+        }
+    }
+}
+
+component SettingsSection inherits VerticalLayout {
+    in property <string> title;
+    in property <string> note;
+    padding-top: 28px;
+    spacing: 8px;
+    Heading { text: root.title; }
+    if root.note != "": Small { text: root.note; }
+    Hairline { }
+    @children
+}
+
+component SettingsLine inherits VerticalLayout {
+    in property <string> label;
+    in property <string> help;
+    HorizontalLayout {
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 24px;
+        VerticalLayout {
+            width: 300px;
+            spacing: 4px;
+            Body { text: root.label; }
+            if root.help != "": Small { text: root.help; }
+        }
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            alignment: start;
+            spacing: 12px;
+            @children
+        }
+    }
+    Hairline { }
+}
+
+export component SettingsScreen inherits Rectangle {
+    background: Theme.bg;
+    VerticalLayout {
+        BackRow {
+            label: @tr("Rig");
+            back => { Api.go-home(); }
+        }
+        HorizontalLayout {
+            padding-left: 28px;
+            Title { text: @tr("Settings"); }
+        }
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: 28px;
+                padding-top: 0px;
+                max-width: 900px;
+                alignment: start;
+
+                SettingsSection {
+                    title: @tr("Appearance");
+                    SettingsLine {
+                        label: @tr("Theme");
+                        Segmented {
+                            options: [@tr("System"), @tr("Light"), @tr("Dark")];
+                            selected: Rig.theme-index;
+                            label: @tr("Theme");
+                            picked(i) => { Api.set-theme(i); }
+                        }
+                    }
+                    SettingsLine {
+                        label: @tr("Reduce motion");
+                        help: @tr("Screens change without animations. Devices keep moving: that is information.");
+                        Toggle {
+                            checked: Rig.reduced-motion;
+                            label: @tr("Reduce motion");
+                            toggled(on) => { Api.set-reduced-motion(on); }
+                        }
+                    }
+                    SettingsLine {
+                        label: @tr("Language");
+                        help: @tr("Only English for now: more languages come with the translations.");
+                        Segmented {
+                            options: ["English"];
+                            selected: 0;
+                            enabled: false;
+                            label: @tr("Language");
+                        }
+                    }
+                }
+
+                SettingsSection {
+                    title: @tr("Rig composition");
+                    note: @tr("An excluded component stays connected but leaves the home and the presets, e.g. the pedal inputs of a base when separate pedals are used.");
+                    for c in Rig.composition: SettingsLine {
+                        label: c.label;
+                        help: c.detail;
+                        Toggle {
+                            checked: !c.excluded;
+                            label: c.label;
+                            toggled(on) => { Api.set-excluded(c.address, !on); }
+                        }
+                        Small {
+                            text: c.excluded ? @tr("Excluded") : @tr("In the rig");
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                SettingsSection {
+                    title: @tr("Presets");
+                    note: @tr("Applying a preset saves its values in the drivers. New presets are saved from the picker on the home.");
+                    if Rig.presets.length == 0: Small { text: @tr("No presets yet."); }
+                    for p in Rig.presets: SettingsLine {
+                        label: p.name;
+                        help: p.current ? @tr("Applied last") : "";
+                        Button {
+                            small: true;
+                            text: @tr("Apply");
+                            clicked => { Api.apply-preset(p.name); }
+                        }
+                        Button {
+                            small: true;
+                            kind: ButtonKind.quiet;
+                            text: @tr("Delete");
+                            clicked => { Api.delete-preset(p.name); }
+                        }
+                    }
+                }
+
+                SettingsSection {
+                    title: @tr("Uninstall");
+                    Small {
+                        text: @tr("SimRig is removed with the system's software tool. Its drivers can be removed with it, or kept so the devices keep working; drivers can also be removed one by one from Plugins.");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The first run: system check, devices, the rig.
+export component FirstRunScreen inherits Rectangle {
+    background: Theme.bg;
+    VerticalLayout {
+        BackRow {
+            label: Rig.first-step > 0 ? @tr("Back") : "";
+            back => { Api.first-back(); }
+            Small {
+                y: 22px;
+                text: @tr("First setup · {} of 3", Rig.first-step + 1);
+            }
+        }
+
+        if Rig.first-step == 0: VerticalLayout {
+            vertical-stretch: 1;
+            HorizontalLayout {
+                padding: 28px;
+                padding-top: 24px;
+                spacing: 96px;
+                VerticalLayout {
+                    width: 480px;
+                    spacing: 20px;
+                    alignment: start;
+                    Image {
+                        source: Icons.mark;
+                        width: 44px;
+                        height: 44px;
+                    }
+                    Title { text: @tr("Every device of the rig, in one place"); font-size: 34px; }
+                    Text {
+                        text: @tr("SimRig sets up wheel bases, wheels, pedals, shifters and handbrakes of any brand, installs the drivers they need and then steps aside: the drivers keep working with SimRig closed.");
+                        font-family: Theme.sans;
+                        font-size: 17px;
+                        color: Theme.ink2;
+                        wrap: word-wrap;
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: start;
+                    Eyebrow { text: @tr("SYSTEM CHECK"); height: 28px; }
+                    Hairline { }
+                    for c in Rig.system: VerticalLayout {
+                        HorizontalLayout {
+                            padding-top: 12px;
+                            padding-bottom: 12px;
+                            spacing: 16px;
+                            Image {
+                                source: c.tone == "success" ? Icons.check : c.tone == "error" ? Icons.error : Icons.warn;
+                                colorize: c.tone == "success" ? Theme.success : c.tone == "error" ? Theme.error : Theme.warning;
+                                width: 18px;
+                                height: 18px;
+                                y: 2px;
+                            }
+                            VerticalLayout {
+                                width: 200px;
+                                Body { text: c.label; }
+                            }
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                spacing: 2px;
+                                Text {
+                                    text: c.value;
+                                    font-family: Theme.mono;
+                                    font-size: 14px;
+                                    color: Theme.ink;
+                                    wrap: word-wrap;
+                                }
+                                if c.note != "": Small { text: c.note; }
+                            }
+                        }
+                        Hairline { }
+                    }
+                }
+            }
+            Rectangle { vertical-stretch: 1; }
+            FlowFooter {
+                Button {
+                    kind: ButtonKind.quiet;
+                    text: @tr("Skip the setup");
+                    clicked => { Api.first-run-done(); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Button {
+                    kind: ButtonKind.primary;
+                    text: @tr("Start");
+                    clicked => { Api.first-next(); }
+                }
+            }
+        }
+
+        if Rig.first-step == 1: VerticalLayout {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding-left: 28px;
+                spacing: 6px;
+                Title {
+                    text: Rig.first-found.length == 1 ? @tr("1 device found") : @tr("{} devices found", Rig.first-found.length);
+                }
+                Small { text: @tr("Devices connected later appear here as well."); }
+            }
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding: 28px;
+                    alignment: start;
+                    Hairline { }
+                    for f in Rig.first-found: FoundLine {
+                        found: f;
+                        actions: false;
+                    }
+                    if Rig.drivers-missing > 0: VerticalLayout {
+                        padding-top: 24px;
+                        PasswordNote {
+                            text: @tr("One password for every driver. Drivers are installed in the system and keep working with SimRig closed. Devices to set up get a guided procedure later.");
+                        }
+                    }
+                }
+            }
+            FlowFooter {
+                Button {
+                    kind: ButtonKind.quiet;
+                    text: Rig.drivers-missing > 0 ? @tr("Skip for now") : "";
+                    visible: Rig.drivers-missing > 0;
+                    clicked => { Api.first-next(); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if Rig.first-busy: Small { text: @tr("Installing…"); vertical-alignment: center; }
+                if Rig.drivers-missing > 0: Button {
+                    kind: ButtonKind.primary;
+                    privileged: true;
+                    enabled: !Rig.first-busy;
+                    text: Rig.drivers-missing == 1 ? @tr("Install 1 driver") : @tr("Install {} drivers", Rig.drivers-missing);
+                    clicked => { Api.first-install-drivers(); }
+                }
+                if Rig.drivers-missing == 0: Button {
+                    kind: ButtonKind.primary;
+                    text: @tr("Continue");
+                    clicked => { Api.first-next(); }
+                }
+            }
+        }
+
+        if Rig.first-step == 2: VerticalLayout {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding-left: 28px;
+                spacing: 6px;
+                Title { text: @tr("The rig"); }
+                Small { text: @tr("Only what the hardware cannot tell: which components are part of the rig."); }
+            }
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding: 28px;
+                    alignment: start;
+                    Hairline { }
+                    for c in Rig.composition: VerticalLayout {
+                        HorizontalLayout {
+                            padding-top: 12px;
+                            padding-bottom: 12px;
+                            spacing: 16px;
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                Body { text: c.label; }
+                                Small { text: c.detail; }
+                            }
+                            Toggle {
+                                y: 8px;
+                                checked: !c.excluded;
+                                label: c.label;
+                                toggled(on) => { Api.set-excluded(c.address, !on); }
+                            }
+                        }
+                        Hairline { }
+                    }
+                    Rectangle { height: 16px; }
+                    Small { text: @tr("Calibrations and other guided procedures are in the settings of each device."); }
+                }
+            }
+            FlowFooter {
+                Rectangle { horizontal-stretch: 1; }
+                Button {
+                    kind: ButtonKind.primary;
+                    text: @tr("Go to the rig");
+                    clicked => { Api.first-run-done(); }
+                }
+            }
+        }
+    }
+}

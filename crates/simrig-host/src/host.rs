@@ -72,6 +72,23 @@ impl Default for HostOptions {
     }
 }
 
+impl HostOptions {
+    /// The same options with every path made absolute (from the current directory).
+    pub fn absolute(&self) -> Self {
+        let abs = |p: &Path| std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
+        Self {
+            plugin_dirs: self.plugin_dirs.iter().map(|d| abs(d)).collect(),
+            exec_dirs: self.exec_dirs.iter().map(|d| abs(d)).collect(),
+            usb_root: abs(&self.usb_root),
+            config_dir: abs(&self.config_dir),
+            data_dir: abs(&self.data_dir),
+            dev_state_dir: abs(&self.dev_state_dir),
+            helper: self.helper.as_deref().map(abs),
+            ..self.clone()
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PluginState {
     Running,
@@ -168,6 +185,9 @@ pub enum HostEvent {
         session: String,
         state: ProcedureState,
     },
+    /// USB devices were plugged or unplugged, whether a plugin handles them or not (see
+    /// [`Host::usb_devices`]).
+    UsbChanged,
     /// Live inputs of a subscribed component.
     Inputs {
         address: String,
@@ -193,6 +213,8 @@ impl Host {
     /// Problems (bad manifests, failing plugins, conformance violations) are collected in
     /// [`Host::problems`] instead of aborting.
     pub fn start(options: &HostOptions) -> Self {
+        // Hooks and the helper run in other directories: relative paths would point elsewhere.
+        let options = &options.absolute();
         let mut dirs: Vec<(PathBuf, PluginLocation)> = options
             .plugin_dirs
             .iter()
@@ -495,7 +517,21 @@ impl Host {
     /// Applies what changed since the last call: adapters that crashed, devices plugged or
     /// unplugged, rim swaps, virtual devices, descriptions and live inputs. Call it regularly
     /// (the GUI does it on a timer).
+    /// What changed since the last call: plugin notifications and USB hotplug.
     pub fn poll(&mut self) -> Vec<HostEvent> {
+        self.poll_adapters();
+        self.rescan_usb();
+        std::mem::take(&mut self.events)
+    }
+
+    /// Like [`Host::poll`] without scanning USB: cheap enough to run at display rate for live
+    /// inputs, while hotplug is checked by a slower [`Host::poll`].
+    pub fn poll_plugins(&mut self) -> Vec<HostEvent> {
+        self.poll_adapters();
+        std::mem::take(&mut self.events)
+    }
+
+    fn poll_adapters(&mut self) {
         for i in 0..self.plugins.len() {
             let exited = self.plugins[i]
                 .process
@@ -516,8 +552,6 @@ impl Host {
                 self.handle_notification(i, message);
             }
         }
-        self.rescan_usb();
-        std::mem::take(&mut self.events)
     }
 
     fn rescan_usb(&mut self) {
@@ -534,6 +568,10 @@ impl Host {
             .cloned()
             .collect();
         self.usb = current;
+        if !removed.is_empty() || !added.is_empty() {
+            // Also for devices no plugin takes: the app lists them to set up as generic.
+            self.events.push(HostEvent::UsbChanged);
+        }
         for device in removed {
             let info = device.device_info();
             let owner = self.plugins.iter().position(|p| {

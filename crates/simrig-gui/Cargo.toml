@@ -1,0 +1,35 @@
+[package]
+name = "simrig-gui"
+description = "The SimRig desktop app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+# Slint 1.18 needs a newer compiler than the rest of the workspace.
+rust-version = "1.92"
+
+[[bin]]
+name = "simrig"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+toml.workspace = true
+simrig-host.workspace = true
+simrig-model.workspace = true
+slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-femtovg", "renderer-software", "software-renderer-systemfonts", "software-renderer-path", "image-default-formats", "accessibility"] }
+png = "0.17"
+# Already used by Slint: draws rotated layers when the renderer cannot rotate (software).
+resvg = { version = "0.48", default-features = false }
+
+[build-dependencies]
+slint-build = "1.18"
+
+# Like the workspace lints, but `deny` instead of `forbid`: the code Slint generates needs
+# `allow(unsafe_code)`, granted only to the `ui` module.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

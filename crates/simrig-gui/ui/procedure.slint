@@ -1,0 +1,244 @@
+// A guided procedure, step by step. The plugin defines the steps; this screen only draws them.
+
+import { Theme, Icons } from "theme.slint";
+import { Rig, Api, SettingRow, RowKind, StepElement } from "api.slint";
+import { LiveDevice } from "devices.slint";
+import { Button, ButtonKind, Chip, ChipTone, Slider, Segmented, Toggle, Field, Eyebrow, Title, Body, Small, LiveValue, Hairline, BackRow, Notice, Steps } from "widgets.slint";
+
+/// A field of the step, drawn like a setting.
+component StepField inherits HorizontalLayout {
+    in property <SettingRow> field;
+    property <int> index: field.item.to-float();
+    spacing: 24px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    VerticalLayout {
+        width: 200px;
+        spacing: 4px;
+        Body { text: root.field.label; }
+        if root.field.help != "": Small { text: root.field.help; font-size: 13px; }
+    }
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: start;
+        if root.field.kind == RowKind.slider: HorizontalLayout {
+            spacing: 16px;
+            s := Slider {
+                horizontal-stretch: 1;
+                value: root.field.value;
+                minimum: root.field.minimum;
+                maximum: root.field.maximum;
+                step: root.field.step;
+                label: root.field.label;
+                released(v) => { Api.step-number(root.index, v); }
+            }
+            LiveValue {
+                width: 90px;
+                align: right;
+                size: "m";
+                value: root.field.decimals == 0 ? round(s.shown) : s.shown.to-fixed(root.field.decimals);
+            }
+        }
+        if root.field.kind == RowKind.segmented: HorizontalLayout {
+            alignment: start;
+            Segmented {
+                options: root.field.options;
+                selected: root.field.selected;
+                label: root.field.label;
+                picked(i) => { Api.step-choice(root.index, i); }
+            }
+        }
+        if root.field.kind == RowKind.toggle: HorizontalLayout {
+            alignment: start;
+            Toggle {
+                checked: root.field.checked;
+                label: root.field.label;
+                toggled(on) => { Api.step-bool(root.index, on); }
+            }
+        }
+        if root.field.kind == RowKind.text: HorizontalLayout {
+            alignment: start;
+            Field {
+                width: 280px;
+                text: root.field.text;
+                label: root.field.label;
+                edited(t) => { Api.step-text(root.index, t); }
+            }
+        }
+    }
+}
+
+component StepTable inherits VerticalLayout {
+    in property <[string]> columns;
+    in property <[string]> cells;
+    spacing: 0px;
+    HorizontalLayout {
+        padding-bottom: 8px;
+        for c in root.columns: Eyebrow {
+            text: c.to-uppercase();
+            horizontal-alignment: left;
+            horizontal-stretch: 1;
+            preferred-width: 1px;
+        }
+    }
+    Hairline { }
+    for r[i] in root.cells.length / max(root.columns.length, 1): VerticalLayout {
+        HorizontalLayout {
+            padding-top: 10px;
+            padding-bottom: 10px;
+            for c[j] in root.columns: Text {
+                // First column in Barlow, the rest are values (Martian Mono).
+                text: root.cells[r * root.columns.length + j];
+                font-family: j == 0 ? Theme.sans : Theme.mono;
+                font-size: j == 0 ? 15px : 14px;
+                color: Theme.ink;
+                horizontal-alignment: left;
+                horizontal-stretch: 1;
+                // Equal columns, whatever the text.
+                preferred-width: 1px;
+                overflow: elide;
+            }
+        }
+        Hairline { }
+    }
+}
+
+export component ProcedureScreen inherits Rectangle {
+    background: Theme.bg;
+    VerticalLayout {
+        BackRow {
+            label: Rig.procedure.in-flow ? @tr("Back") : @tr("Rig");
+            back => { Api.cancel-procedure(); }
+            if Rig.procedure.in-flow: Steps {
+                y: 16px;
+                steps: [@tr("Connect"), @tr("Driver"), @tr("Set up"), @tr("Done")];
+                current: 2;
+            }
+        }
+        HorizontalLayout {
+            padding-left: 28px;
+            padding-right: 28px;
+            Title { text: Rig.procedure.title; }
+        }
+        HorizontalLayout {
+            vertical-stretch: 0;
+            padding: 28px;
+            padding-top: 32px;
+            spacing: 64px;
+            if Rig.procedure.has-device: LiveDevice {
+                width: 340px;
+                height: 300px;
+                device: Rig.current;
+            }
+            if !Rig.procedure.has-device: Rectangle {
+                width: 200px;
+                height: 200px;
+                border-radius: 100px;
+                border-width: 1px;
+                border-color: Theme.line;
+                Rectangle {
+                    width: 76px;
+                    height: 76px;
+                    border-radius: 38px;
+                    background: Theme.raised;
+                    Image {
+                        source: Icons.usb;
+                        colorize: Theme.ink;
+                        width: 32px;
+                        height: 32px;
+                    }
+                }
+            }
+            VerticalLayout {
+                max-width: 560px;
+                horizontal-stretch: 1;
+                spacing: 18px;
+                alignment: start;
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+                    if Rig.procedure.waiting && !Rig.procedure.finished: Chip {
+                        text: @tr("Waiting for the device");
+                        dot: true;
+                        tone: ChipTone.warning;
+                    }
+                    if Rig.procedure.busy: Chip { text: @tr("Working…"); }
+                    if Rig.procedure.progress-text != "": Small {
+                        text: Rig.procedure.progress-text;
+                        vertical-alignment: center;
+                    }
+                }
+                if Rig.procedure.text != "": Text {
+                    text: Rig.procedure.text;
+                    font-family: Theme.sans;
+                    font-size: 16px;
+                    color: Theme.ink2;
+                    wrap: word-wrap;
+                }
+                if Rig.procedure.message != "": Notice {
+                    text: Rig.procedure.message;
+                    level: "success";
+                }
+                if Rig.procedure.error != "": Notice {
+                    text: Rig.procedure.error;
+                    level: "error";
+                }
+                for e in Rig.procedure.elements: VerticalLayout {
+                    if e.element == "field": StepField { field: e.row; }
+                    if e.element == "value": VerticalLayout {
+                        spacing: 4px;
+                        Eyebrow { text: e.label.to-uppercase(); }
+                        LiveValue { value: e.value-text; unit: e.unit; }
+                    }
+                    if e.element == "table": StepTable {
+                        columns: e.columns;
+                        cells: e.cells;
+                    }
+                    if e.element == "notice": Notice {
+                        text: e.text;
+                        level: e.level;
+                    }
+                }
+                if !Rig.procedure.finished: Small {
+                    text: Rig.procedure.source;
+                    font-size: 13px;
+                    color: Theme.ink3;
+                }
+            }
+        }
+        Rectangle { vertical-stretch: 1; }
+        Rectangle {
+            height: 1px;
+            background: Theme.line;
+        }
+        // Actions: cancel at the bottom left, the primary one at the bottom right.
+        HorizontalLayout {
+            padding-left: 28px;
+            padding-right: 28px;
+            padding-top: 14px;
+            padding-bottom: 14px;
+            spacing: 12px;
+            if !Rig.procedure.finished: Button {
+                kind: ButtonKind.quiet;
+                text: @tr("Cancel");
+                clicked => { Api.cancel-procedure(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            if Rig.procedure.finished: Button {
+                kind: ButtonKind.primary;
+                text: @tr("Done");
+                clicked => { Api.close-procedure(); }
+            }
+            if !Rig.procedure.finished && Rig.procedure.actions.length == 0 && Rig.procedure.waiting: Small {
+                text: @tr("Moves on by itself when it detects the device");
+                vertical-alignment: center;
+            }
+            for a in Rig.procedure.actions: Button {
+                kind: a.role == "primary" ? ButtonKind.primary : a.role == "cancel" ? ButtonKind.quiet : ButtonKind.secondary;
+                text: a.label;
+                enabled: !Rig.procedure.busy;
+                clicked => { Api.submit-step(a.id); }
+            }
+        }
+    }
+}

@@ -28,3 +28,14 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+# The interface draws vector images on the CPU in some cases (software renderer): keep those
+# crates fast in development builds too.
+[profile.dev.package.tiny-skia]
+opt-level = 3
+
+[profile.dev.package.resvg]
+opt-level = 3
+
+[profile.dev.package.usvg]
+opt-level = 3

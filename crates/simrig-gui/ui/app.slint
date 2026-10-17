@@ -1,0 +1,172 @@
+// SimRig: the main window.
+
+import { Theme, Icons } from "theme.slint";
+import { Rig, Api } from "api.slint";
+import { Geometry } from "devices.slint";
+import { Button, ButtonKind, Notice } from "widgets.slint";
+import { Home } from "home.slint";
+import { ComponentScreen } from "component.slint";
+import { ProcedureScreen } from "procedure.slint";
+import { AddScreen, PluginsScreen, SettingsScreen, FirstRunScreen } from "flows.slint";
+
+export { Theme, Rig, Api, Geometry }
+
+export enum Screen { home, component, procedure, add, plugins, settings, first-run }
+
+/// Thin top bar: the mark and the name on the left; Settings, Plugins and Add device on the right.
+component TopBar inherits Rectangle {
+    in property <Screen> screen;
+    in property <bool> actions: true;
+    callback settings;
+    callback plugins;
+    callback add;
+    height: 44px;
+    background: Theme.surface;
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 12px;
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 10px;
+            horizontal-stretch: 0;
+            Image {
+                source: Icons.mark;
+                width: 22px;
+                height: 22px;
+                y: (parent.height - 22px) / 2;
+                accessible-role: AccessibleRole.image;
+                accessible-label: "SimRig";
+            }
+            Text {
+                text: "SimRig";
+                font-family: Theme.sans;
+                font-size: 17px;
+                font-weight: 600;
+                color: Theme.ink;
+                vertical-alignment: center;
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        if root.actions: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Button {
+                kind: ButtonKind.quiet;
+                icon: Icons.gear;
+                text: @tr("Settings");
+                active: root.screen == Screen.settings;
+                clicked => { root.settings(); }
+            }
+        }
+        if root.actions: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Button {
+                kind: ButtonKind.quiet;
+                icon: Icons.plug;
+                text: @tr("Plugins");
+                active: root.screen == Screen.plugins;
+                clicked => { root.plugins(); }
+            }
+        }
+        if root.actions: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            padding-left: 4px;
+            Button {
+                kind: ButtonKind.outline;
+                icon: Icons.add-device;
+                text: @tr("Add device");
+                active: root.screen == Screen.add;
+                clicked => { root.add(); }
+            }
+        }
+    }
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.line;
+    }
+}
+
+export component AppWindow inherits Window {
+    in-out property <Screen> screen: Screen.home;
+    callback navigate(Screen);
+
+    title: "SimRig";
+    icon: Icons.mark;
+    min-width: 1100px;
+    min-height: 700px;
+    preferred-width: 1440px;
+    preferred-height: 900px;
+    background: Theme.bg;
+    default-font-family: "Barlow";
+    default-font-size: 16px;
+
+    FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape && root.screen != Screen.home {
+                Api.go-home();
+                return accept;
+            }
+            reject
+        }
+
+        VerticalLayout {
+            TopBar {
+                screen: root.screen;
+                actions: root.screen != Screen.first-run;
+                settings => { root.navigate(Screen.settings); }
+                plugins => { root.navigate(Screen.plugins); }
+                add => { Api.start-add(); }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                if root.screen == Screen.home: Home { }
+                if root.screen == Screen.component: ComponentScreen { }
+                if root.screen == Screen.procedure: ProcedureScreen { }
+                if root.screen == Screen.add: AddScreen { }
+                if root.screen == Screen.plugins: PluginsScreen { }
+                if root.screen == Screen.settings: SettingsScreen { }
+                if root.screen == Screen.first-run: FirstRunScreen { }
+            }
+        }
+    }
+
+    // Toasts: confirmations and errors, bottom right, never modal.
+    toasts := VerticalLayout {
+        x: parent.width - self.width - 24px;
+        y: parent.height - self.height - 24px;
+        width: 420px;
+        height: self.preferred-height;
+        spacing: 8px;
+        for t[i] in Rig.toasts: Rectangle {
+            height: n.preferred-height + 28px;
+            border-radius: 10px;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.dark ? Theme.rule : Theme.line;
+            drop-shadow-blur: Theme.float-blur;
+            drop-shadow-offset-y: 12px;
+            drop-shadow-color: Theme.float-shadow;
+            n := Notice {
+                x: 16px;
+                width: parent.width - 32px - 24px;
+                text: t.text;
+                level: t.level;
+            }
+            TouchArea {
+                x: parent.width - 36px;
+                width: 28px;
+                mouse-cursor: pointer;
+                clicked => { Api.dismiss-toast(i); }
+                Image {
+                    source: Icons.x;
+                    colorize: Theme.ink2;
+                    width: 16px;
+                    height: 16px;
+                }
+            }
+        }
+    }
+}

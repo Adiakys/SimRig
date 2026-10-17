@@ -220,8 +220,8 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 | Phase | Content | Done when |
 |---|---|---|
 | **M0** ✅ | Core: domain model, plugin protocol and SDK, host (hotplug and events, driver contract and privileged helper, persistence, rig composition, presets, catalog, system check, plugin-defined guided procedures, generic plugins), CLI, simulated rig with fake driver, end-to-end tests | Everything the GUI needs works from `simrig-cli` on the simulated rig; CI green |
-| **M1** | GUI on the core: rig view, live inputs, parameters, wizard, presets | Full wizard and daily use work on the simulated rig |
-| **M2** | Generic USB plugin: any unbranded device set up and mapped by its own procedure, with a driver service translating raw inputs | A shifter with no usable HID descriptor works in games with the app closed, set up entirely from the app |
+| **M1** (in progress) | GUI on the core: rig view, live inputs, parameters, wizard, presets | Full wizard and daily use work on the simulated rig |
+| **M2** | Generic USB plugin: any unbranded device set up and mapped by its own procedure, with a driver service translating raw inputs | An unbranded device with no usable HID descriptor, set up as any component type the plugin offers (shifter, handbrake, pedals…), works in games with the app closed, set up entirely from the app |
 | **M3** | Fanatec plugin: `hid-fanatecff` + driver recipes (DKMS, udev) + PackageKit prerequisites | From scratch: install the package, the wizard installs the driver and configures the CSL DD; after a reboot, with the app closed, the saved rotation is applied |
 | **M4** | Logitech, Moza, more brands | Each brand has at least one tester with the hardware; a mixed-brand rig (e.g. Fanatec base + Moza pedals) works end to end |
 | **M5** | Multi-distro packages (AUR, OBS, COPR), in-app uninstall | Installation verified on Ubuntu, Fedora, Arch |

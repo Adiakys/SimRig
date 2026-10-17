@@ -1,0 +1,261 @@
+// The state the Rust side publishes and the requests the interface sends back.
+
+import { Device } from "devices.slint";
+
+export enum RowKind {
+    heading,
+    /// The "Advanced · N settings" disclosure.
+    disclosure,
+    slider,
+    toggle,
+    segmented,
+    choice,
+    curve,
+    text,
+    /// A value shown but not editable (firmware, outputs used by games).
+    info,
+    action,
+}
+
+/// One row of a settings screen. Unsupported items keep their row, disabled, with the reason.
+export struct SettingRow {
+    kind: RowKind,
+    /// Standard item key (`rotation`, `brake.curve`) or `custom.<id>`.
+    item: string,
+    label: string,
+    help: string,
+    enabled: bool,
+    reason: string,
+    // Numbers
+    value: float,
+    minimum: float,
+    maximum: float,
+    step: float,
+    value-text: string,
+    unit: string,
+    decimals: int,
+    quick: [float],
+    // Choices (segmented, choice, toggle)
+    options: [string],
+    selected: int,
+    checked: bool,
+    text: string,
+    // Curves: points in 0..1 and the polyline in a 100×100 box
+    curve-x: [float],
+    curve-y: [float],
+    curve-path: string,
+    /// How long the value lasts: "Kept with the app closed", "Until unplugged"…
+    persistence: string,
+    unsaved: bool,
+    /// Actions: the text to confirm before running (effects that move the wheel).
+    confirm: string,
+    expanded: bool,
+    count: int,
+}
+
+export struct ChipData {
+    text: string,
+    /// neutral, success, warning, error
+    tone: string,
+}
+
+export struct PresetItem {
+    name: string,
+    current: bool,
+}
+
+/// One element of a procedure step, rendered generically.
+export struct StepElement {
+    /// field, value, table, notice
+    element: string,
+    row: SettingRow,
+    label: string,
+    value-text: string,
+    unit: string,
+    columns: [string],
+    /// Table cells, row by row, `columns.length` per row.
+    cells: [string],
+    level: string,
+    text: string,
+}
+
+export struct StepAction {
+    id: string,
+    label: string,
+    /// primary, secondary, cancel
+    role: string,
+    confirm: string,
+}
+
+export struct Procedure {
+    session: string,
+    title: string,
+    text: string,
+    elements: [StepElement],
+    actions: [StepAction],
+    waiting: bool,
+    progress-text: string,
+    progress: float,
+    /// The plugin that defines it, shown as "Step defined by …".
+    source: string,
+    finished: bool,
+    message: string,
+    busy: bool,
+    error: string,
+    /// The target, drawn live on the left (empty for devices without components yet).
+    has-device: bool,
+    /// Runs inside the add-device flow: shows the steps of the flow.
+    in-flow: bool,
+}
+
+/// A USB device in the add-device flow.
+export struct FoundDevice {
+    key: string,
+    name: string,
+    detail: string,
+    /// ready, driver, generic, unknown
+    state: string,
+    plugin: string,
+    plugin-name: string,
+    is-new: bool,
+    /// The device drawn live, when it has components.
+    preview: Device,
+}
+
+export struct PluginRow {
+    id: string,
+    name: string,
+    version: string,
+    origin: string,
+    state: string,
+    /// running, idle, failed
+    tone: string,
+    error: string,
+    devices: string,
+    description: string,
+    has-driver: bool,
+    driver-text: string,
+    /// installed, missing, reboot, system
+    driver-state: string,
+    driver-tone: string,
+    privileged: bool,
+    busy: bool,
+}
+
+export struct SystemCheck {
+    label: string,
+    value: string,
+    /// success, warning, error, neutral
+    tone: string,
+    note: string,
+}
+
+export struct ExcludedRow {
+    address: string,
+    label: string,
+    detail: string,
+    excluded: bool,
+}
+
+export struct Toast {
+    text: string,
+    level: string,
+}
+
+export global Rig {
+    // Home
+    in property <[Device]> top;
+    in property <[Device]> bottom;
+    in property <[Device]> side;
+    in property <int> device-count;
+    in property <string> status-text;
+    in property <string> status-tone;
+    in property <bool> starting: true;
+    in property <[PresetItem]> presets;
+    in property <string> preset;
+    in property <string> preset-note;
+
+    // Settings of one component
+    in property <Device> current;
+    in property <string> current-title;
+    in property <[ChipData]> current-chips;
+    in property <[SettingRow]> rows;
+    in property <[SettingRow]> live-values;
+    in property <bool> unsaved;
+    in property <bool> save-privileged;
+    in property <string> save-note;
+    in property <bool> current-gone;
+
+    // Procedure in progress
+    in property <Procedure> procedure;
+
+    // Add a device
+    in property <[FoundDevice]> found;
+    in property <int> add-step;
+    in property <FoundDevice> adding;
+    in property <string> add-driver-name;
+    in property <bool> add-busy;
+    in property <string> add-error;
+    in property <[Device]> add-done;
+    /// What the plugin said when the setup finished.
+    in property <string> add-done-message;
+    in property <bool> show-all;
+    in property <bool> add-privileged;
+
+    // Plugins, settings, first run
+    in property <[PluginRow]> plugins;
+    in property <[string]> problems;
+    in property <[SystemCheck]> system;
+    in property <[ExcludedRow]> composition;
+    in property <int> drivers-missing;
+    in property <int> theme-index;
+    in property <bool> reduced-motion;
+    in property <int> first-step;
+    in property <[FoundDevice]> first-found;
+    in property <bool> first-busy;
+
+    in property <[Toast]> toasts;
+}
+
+export global Api {
+    callback open-component(string);
+    callback go-home();
+    callback set-number(string, float);
+    callback set-choice(string, int);
+    callback set-bool(string, bool);
+    callback set-text(string, string);
+    callback set-curve-point(string, int, float);
+    callback toggle-advanced(string);
+    callback run-action(string);
+    callback save-all();
+    callback reset-values();
+    callback start-procedure(string);
+    callback submit-step(string);
+    callback step-number(int, float);
+    callback step-choice(int, int);
+    callback step-bool(int, bool);
+    callback step-text(int, string);
+    callback cancel-procedure();
+    callback close-procedure();
+    callback apply-preset(string);
+    callback save-preset(string);
+    callback delete-preset(string);
+    callback start-add();
+    callback add-choose(string);
+    callback add-generic(string);
+    callback add-install-driver();
+    callback add-finish();
+    callback install-driver(string);
+    callback remove-driver(string);
+    callback restart-plugin(string);
+    callback set-excluded(string, bool);
+    callback set-theme(int);
+    callback set-reduced-motion(bool);
+    callback first-run-done();
+    callback first-install-drivers();
+    callback first-next();
+    callback first-back();
+    callback add-show-all(bool);
+    callback add-open-settings();
+    callback dismiss-toast(int);
+}

@@ -1,7 +1,7 @@
 // Renders the core's generic device images with their live state, following
 // assets/devices/devices.toml. Used by the mockups; the Slint app implements the same rules.
 const DEVICES = {
-  pedals: { view: [600, 380], pedal: { size: [120, 300], hinge: [60, 290], pressedScaleY: 0.62 },
+  pedals: { view: [600, 380], pedal: { size: [120, 300], hinge: [60, 290] },
             hinges: { 3: { clutch: [175, 290], brake: [300, 290], throttle: [425, 290] },
                       2: { brake: [238, 290], throttle: [362, 290] }, 1: { throttle: [300, 290] } } },
   shifter: { view: [320, 320], gate: { o: [56, 264], u: [208, 0], v: [0, -208] }, knob: { size: [100, 100] } },
@@ -55,7 +55,7 @@ function shifterOverlay(assets, gears, reverse, engaged, accent) {
   </svg>`;
 }
 
-/** Pedal layers over the frame, for the pedals the component declares; values 0..1 per pedal. */
+/** Pedal layers over the frame, for the pedals the component declares (they do not move). */
 function pedalLayers(assets, values) {
   const d = DEVICES.pedals, s = d.pedal;
   const roles = ['clutch', 'brake', 'throttle'].filter(r => r in values);
@@ -63,9 +63,7 @@ function pedalLayers(assets, values) {
   return roles.map(role => {
     const h = hinges[role];
     const box = `left:${(h[0] - s.hinge[0]) / d.view[0] * 100}%;top:${(h[1] - s.hinge[1]) / d.view[1] * 100}%;width:${s.size[0] / d.view[0] * 100}%;height:${s.size[1] / d.view[1] * 100}%`;
-    const scale = 1 - (1 - s.pressedScaleY) * values[role];
-    const origin = `${s.hinge[0] / s.size[0] * 100}% ${s.hinge[1] / s.size[1] * 100}%`;
-    return `<img class="pedal" src="${assets}pedal.svg" alt="" style="${box};transform-origin:${origin};transform:scaleY(${scale.toFixed(3)})">`;
+    return `<img class="pedal" src="${assets}pedal.svg" alt="" style="${box}">`;
   }).join('');
 }
 
