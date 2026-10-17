@@ -1,13 +1,11 @@
-# Build the packages on every published GitHub Release and publish them twice:
-#   - as assets of the release (.deb, .rpm, Arch .pkg.tar.zst, .tar.gz, SHA256SUMS);
-#   - in GitHub Packages, as one OCI artifact at ghcr.io/<owner>/simrig:<version> (GitHub
-#     Packages has no apt or rpm registry: OCI is how files show up under the repo's Packages
-#     tab). Fetch them with `oras pull ghcr.io/<owner>/simrig:<version>`.
+# Build the packages on every published GitHub Release and attach them to it: .deb, .rpm, Arch
+# .pkg.tar.zst, .tar.gz and SHA256SUMS. (Not in GitHub Packages: it has no registry for these
+# formats, only for containers, npm, Maven, NuGet and RubyGems.)
 #
 # The release tag is the version: `v1.2.3` builds 1.2.3 (prereleases such as `v1.2.3-rc.1`
-# too). Stable releases also re-tag `latest` in GHCR; prereleases don't.
+# too).
 #
-# No secrets needed: GHCR and the release use the built-in GITHUB_TOKEN.
+# No secrets needed: the release uses the built-in GITHUB_TOKEN.
 
 name: Release — build and publish packages
 
@@ -24,8 +22,6 @@ on:
 permissions:
   # Upload the release assets.
   contents: write
-  # Push to ghcr.io via GITHUB_TOKEN.
-  packages: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,10 +36,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             tag="${{ inputs.tag }}"
-            prerelease=false
           else
             tag="${{ github.event.release.tag_name }}"
-            prerelease="${{ github.event.release.prerelease }}"
           fi
           version="${tag#v}"
           echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || {
@@ -52,7 +46,6 @@ jobs:
           }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         with:
@@ -92,39 +85,3 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${{ steps.ref.outputs.tag }}" dist/packages/* --clobber
-
-      - uses: oras-project/setup-oras@v2
-
-      - name: Publish to GitHub Packages (ghcr.io)
-        env:
-          VERSION: ${{ steps.ref.outputs.version }}
-        run: |
-          # GHCR rejects upper-case names.
-          image="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/simrig"
-          echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
-          cd dist/packages
-          files=""
-          for f in *; do
-            case "$f" in
-              *.deb) type=application/vnd.debian.binary-package ;;
-              *.rpm) type=application/x-rpm ;;
-              *.pkg.tar.zst) type=application/zstd ;;
-              *.tar.gz) type=application/gzip ;;
-              *) type=text/plain ;;
-            esac
-            files="$files $f:$type"
-          done
-          tags="$VERSION"
-          if [ "${{ steps.ref.outputs.prerelease }}" != "true" ]; then
-            tags="$tags,latest"
-          fi
-          # The source annotation links the package to this repository. GitHub shows every
-          # package as a container ("docker pull"): the description says how to get the files.
-          # shellcheck disable=SC2086
-          oras push "$image:$tags" \
-            --artifact-type application/vnd.simrig.packages \
-            --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-            --annotation "org.opencontainers.image.description=SimRig $VERSION packages (deb, rpm, Arch, tar.gz). Not a container image, so docker pull does not work: download them with oras pull $image:$VERSION, or from the GitHub release." \
-            --annotation "org.opencontainers.image.licenses=GPL-3.0-or-later" \
-            --annotation "org.opencontainers.image.version=$VERSION" \
-            $files

@@ -123,8 +123,8 @@ Set `SIMRIG_PLUGIN_LOG=1` to see plugins' stderr.
 ## Releases
 
 Publishing a GitHub Release (tag `v1.2.3`) runs `.github/workflows/release.yml`: it stamps the
-version, tests, builds, and publishes the packages (.deb, .rpm, Arch, .tar.gz) as release assets
-and in GitHub Packages (`ghcr.io/<owner>/simrig`, an OCI artifact). Locally, with
+version, tests, builds, and attaches the packages (.deb, .rpm, Arch, .tar.gz) to the release.
+Locally, with
 [nfpm](https://nfpm.goreleaser.com) installed:
 
 ```sh
