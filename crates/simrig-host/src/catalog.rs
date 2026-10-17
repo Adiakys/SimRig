@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use simrig_model::ComponentKind;
+use simrig_model::{Appearance, ComponentKind, RimShape};
 
 use crate::manifest::UsbMatch;
 
@@ -19,7 +19,9 @@ pub struct CatalogEntry {
     pub kind: ComponentKind,
     #[serde(default)]
     pub usb: Vec<UsbMatch>,
-    /// Image path relative to the plugin directory.
+    /// The plugin's own picture of the model, relative to the plugin directory: a single image
+    /// (static; a rim turns as a whole), or a folder with the same layers as the core's set and
+    /// its own `devices.toml`, animated with the same rules.
     #[serde(default)]
     pub image: Option<String>,
     #[serde(default)]
@@ -46,8 +48,12 @@ pub enum Image {
     User(PathBuf),
     /// The model's image shipped by the plugin.
     Model(PathBuf),
-    /// No picture: the app draws its generic illustration of the type.
-    Generic(ComponentKind),
+    /// No picture: the app draws the core's generic drawing of the type
+    /// (`assets/devices/devices.toml`), in the rim shape the plugin asked for.
+    Generic {
+        kind: ComponentKind,
+        rim: Option<RimShape>,
+    },
 }
 
 #[derive(Clone, Debug, Default)]
@@ -108,11 +114,12 @@ impl Catalog {
     }
 
     /// Image for a component: the user's picture for the model, then the model's image, then
-    /// the generic illustration of `kind`.
+    /// the core's generic drawing of `kind` (with the plugin's appearance hints).
     pub fn image(
         &self,
         model: Option<&str>,
         kind: ComponentKind,
+        appearance: &Appearance,
         user_images: Option<&Path>,
     ) -> Image {
         if let (Some(model), Some(dir)) = (model, user_images) {
@@ -127,10 +134,15 @@ impl Catalog {
         let shipped = model
             .and_then(|m| self.model(m))
             .and_then(|m| m.entry.image.as_ref().map(|i| m.plugin_dir.join(i)))
-            .filter(|p| p.is_file());
+            .filter(|p| p.exists());
         match shipped {
             Some(path) => Image::Model(path),
-            None => Image::Generic(kind),
+            None => Image::Generic {
+                kind,
+                rim: appearance
+                    .rim
+                    .filter(|_| kind == ComponentKind::SteeringWheel),
+            },
         }
     }
 }

@@ -20,7 +20,10 @@ pub use component::{
     Unit, WheelBaseAction, WheelBaseInput, WheelBaseParam,
 };
 pub use custom::{Condition, CustomParam};
-pub use describe::{ActionOutcome, ActionSpec, ComponentDescription, ItemDescription, ItemSpec};
+pub use describe::{
+    ActionOutcome, ActionSpec, Appearance, ComponentDescription, ItemDescription, ItemSpec,
+    RimShape,
+};
 pub use device::{Bus, DeviceInfo};
 pub use param::{ChoiceOption, ParamSpec, ParamType, Persistence, ValueError};
 pub use procedure::{

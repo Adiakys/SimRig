@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!-- Generic formula steering wheel (display, RPM LEDs, side grips), front view. Rotates around (200,200). -->
+  <defs>
+    <linearGradient id="fBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b3e43"/>
+      <stop offset="1" stop-color="#26282b"/>
+    </linearGradient>
+    <linearGradient id="fGrip" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1d1e20"/>
+      <stop offset="0.5" stop-color="#2c2e32"/>
+      <stop offset="1" stop-color="#1d1e20"/>
+    </linearGradient>
+  </defs>
+  <!-- paddles, behind -->
+  <g fill="#8f959b" stroke="#5d6268" stroke-width="1.2">
+    <path d="M64 142l-26 -18 6 -12 34 16z"/>
+    <path d="M336 142l26 -18 -6 -12 -34 16z"/>
+  </g>
+  <!-- grips -->
+  <path d="M40 132q-18 70 -2 168q6 34 34 36q30 2 34 -30l8 -120q2 -44 -30 -58z" fill="url(#fGrip)" stroke="#5d6268" stroke-width="1.5"/>
+  <path d="M360 132q18 70 2 168q-6 34 -34 36q-30 2 -34 -30l-8 -120q-2 -44 30 -58z" fill="url(#fGrip)" stroke="#5d6268" stroke-width="1.5"/>
+  <g stroke="#3a3c40" stroke-width="1">
+    <path d="M52 190h44M50 210h46M50 230h46M52 250h44M54 270h40"/>
+    <path d="M304 190h44M304 210h46M304 230h46M304 250h44M306 270h40"/>
+  </g>
+  <!-- body -->
+  <path d="M84 118Q86 96 110 96H290Q314 96 316 118L322 276Q324 300 300 304H100Q76 300 78 276Z"
+        fill="url(#fBody)" stroke="#5d6268" stroke-width="1.5"/>
+  <!-- top marker -->
+  <rect x="192" y="96" width="16" height="10" rx="2" fill="#f0c53a"/>
+  <!-- RPM LEDs -->
+  <g>
+    <circle cx="134" cy="122" r="5" fill="#3ccf6b"/><circle cx="148" cy="122" r="5" fill="#3ccf6b"/>
+    <circle cx="162" cy="122" r="5" fill="#3ccf6b"/><circle cx="176" cy="122" r="5" fill="#3ccf6b"/>
+    <circle cx="190" cy="122" r="5" fill="#ef5a4f"/><circle cx="204" cy="122" r="5" fill="#ef5a4f"/>
+    <circle cx="218" cy="122" r="5" fill="#ef5a4f"/><circle cx="232" cy="122" r="5" fill="#ef5a4f"/>
+    <circle cx="246" cy="122" r="5" fill="#2e3034"/><circle cx="260" cy="122" r="5" fill="#2e3034"/>
+    <circle cx="274" cy="122" r="5" fill="#2e3034"/><circle cx="288" cy="122" r="5" fill="#2e3034"/>
+  </g>
+  <!-- display -->
+  <rect x="140" y="138" width="120" height="74" rx="8" fill="#0f1113" stroke="#4a4e54" stroke-width="1.5"/>
+  <text x="200" y="192" font-family="Martian Mono, monospace" font-size="40" font-weight="600" fill="#e9eaec" text-anchor="middle">3</text>
+  <rect x="152" y="148" width="28" height="5" rx="2" fill="#3ccf6b" opacity="0.9"/>
+  <rect x="220" y="148" width="28" height="5" rx="2" fill="#4b9cf0" opacity="0.9"/>
+  <!-- buttons -->
+  <g fill="#4a4e54" stroke="#6b7076" stroke-width="1">
+    <circle cx="112" cy="150" r="10"/><circle cx="112" cy="180" r="10"/><circle cx="112" cy="210" r="10"/>
+    <circle cx="288" cy="150" r="10"/><circle cx="288" cy="180" r="10"/><circle cx="288" cy="210" r="10"/>
+  </g>
+  <g fill="none" stroke-width="2.2" opacity="0.85">
+    <circle cx="112" cy="150" r="10" stroke="#4b9cf0"/>
+    <circle cx="288" cy="150" r="10" stroke="#f0c53a"/>
+  </g>
+  <!-- rotary switches -->
+  <g>
+    <circle cx="150" cy="258" r="20" fill="#1d1e20" stroke="#8f959b" stroke-width="2"/>
+    <line x1="150" y1="258" x2="140" y2="242" stroke="#dfe2e4" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="250" cy="258" r="20" fill="#1d1e20" stroke="#8f959b" stroke-width="2"/>
+    <line x1="250" y1="258" x2="266" y2="250" stroke="#dfe2e4" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="200" cy="246" r="12" fill="#303236" stroke="#6b7076" stroke-width="1.5"/>
+  </g>
+</svg>

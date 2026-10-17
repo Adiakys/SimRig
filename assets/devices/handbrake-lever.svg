@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 380" width="320" height="380">
+  <!-- Handbrake lever, side view, at rest. Rotates around (170,236); pulled = towards the driver (see devices.toml). -->
+  <defs>
+    <linearGradient id="hArm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6f757b"/>
+      <stop offset="0.5" stop-color="#b9bec3"/>
+      <stop offset="1" stop-color="#6f757b"/>
+    </linearGradient>
+  </defs>
+  <g transform="rotate(-18 170 236)">
+    <rect x="160" y="60" width="20" height="186" rx="8" fill="url(#hArm)" stroke="#5d6268" stroke-width="1.2"/>
+    <rect x="152" y="18" width="36" height="104" rx="16" fill="#232427" stroke="#5d6268" stroke-width="1.5"/>
+    <g stroke="#3b3e43" stroke-width="2"><path d="M156 44h28M156 56h28M156 68h28M156 80h28M156 92h28M156 104h28"/></g>
+    <rect x="162" y="8" width="16" height="12" rx="4" fill="#f0c53a"/>
+  </g>
+  <circle cx="170" cy="236" r="14" fill="#8f959b" stroke="#5d6268" stroke-width="1.5"/>
+  <circle cx="170" cy="236" r="5" fill="#26282b"/>
+</svg>

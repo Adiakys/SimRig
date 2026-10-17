@@ -26,6 +26,46 @@ pub struct ComponentDescription {
     /// Guided procedures the plugin offers on this component.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub procedures: Vec<ProcedureDescriptor>,
+    /// Hints for the core's generic picture (e.g. the shape of a rim).
+    #[serde(default, skip_serializing_if = "Appearance::is_default")]
+    pub appearance: Appearance,
+}
+
+/// How the core draws a component when the plugin ships no picture of its own.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Appearance {
+    /// Shape of a steering wheel; the core draws a round wheel when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rim: Option<RimShape>,
+}
+
+impl Appearance {
+    pub fn rim(shape: RimShape) -> Self {
+        Self { rim: Some(shape) }
+    }
+
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RimShape {
+    Round,
+    /// GT3-style: cut flat at the top and bottom, grips on the sides.
+    Gt,
+    Formula,
+}
+
+impl RimShape {
+    pub fn key(self) -> &'static str {
+        match self {
+            RimShape::Round => "round",
+            RimShape::Gt => "gt",
+            RimShape::Formula => "formula",
+        }
+    }
 }
 
 impl ComponentDescription {

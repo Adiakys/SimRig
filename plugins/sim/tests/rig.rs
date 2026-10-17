@@ -32,7 +32,18 @@ fn starts_a_conforming_rig() {
     // No image shipped: the app draws the generic one of the type.
     assert_eq!(
         host.image("base").unwrap(),
-        Image::Generic(ComponentKind::WheelBase)
+        Image::Generic {
+            kind: ComponentKind::WheelBase,
+            rim: None
+        }
+    );
+    // The plugin tells the rim shape: the core picks the matching drawing.
+    assert_eq!(
+        host.image("wheel").unwrap(),
+        Image::Generic {
+            kind: ComponentKind::SteeringWheel,
+            rim: Some(simrig_model::RimShape::Formula)
+        }
     );
 }
 

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <!-- Generic shifter, top view. The app draws the gate of the current configuration inside the
+       gate area of devices.toml; the knob (shifter-knob.svg) sits on the engaged slot. -->
+  <defs>
+    <linearGradient id="sPlate" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b3e43"/>
+      <stop offset="1" stop-color="#1d1e20"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="14" width="292" height="292" rx="34" fill="url(#sPlate)" stroke="#5d6268" stroke-width="1.5"/>
+  <rect x="36" y="36" width="248" height="248" rx="22" fill="#232427" stroke="#3b3e43" stroke-width="1"/>
+  <g fill="#8f959b" stroke="#5d6268" stroke-width="1">
+    <circle cx="36" cy="36" r="6"/><circle cx="284" cy="36" r="6"/><circle cx="36" cy="284" r="6"/><circle cx="284" cy="284" r="6"/>
+  </g>
+  <g stroke="#45484d" stroke-width="1.5"><path d="M33 36h6M281 36h6M33 284h6M281 284h6"/></g>
+</svg>

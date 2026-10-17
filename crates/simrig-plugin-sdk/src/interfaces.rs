@@ -24,6 +24,11 @@ pub trait Component {
         None
     }
 
+    /// Hints for the core's generic picture, e.g. the rim shape of a steering wheel.
+    fn appearance(&self) -> simrig_model::Appearance {
+        simrig_model::Appearance::default()
+    }
+
     /// Parameters beyond the standard interface, with their current values.
     fn custom_params(&mut self) -> Vec<CustomParam> {
         Vec::new()

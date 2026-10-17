@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!-- Generic round steering wheel, front view. Rotates around (200,200). -->
+  <defs>
+    <linearGradient id="spoke" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c3c8cd"/>
+      <stop offset="0.5" stop-color="#8f959b"/>
+      <stop offset="1" stop-color="#6f757b"/>
+    </linearGradient>
+    <linearGradient id="rimLight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3c3f44"/>
+      <stop offset="0.55" stop-color="#26282b"/>
+      <stop offset="1" stop-color="#1d1e20"/>
+    </linearGradient>
+  </defs>
+  <!-- spokes -->
+  <g fill="url(#spoke)" stroke="#5d6268" stroke-width="1.5">
+    <rect x="196" y="186" width="160" height="30" rx="9" transform="rotate(8 200 200)"/>
+    <rect x="196" y="186" width="160" height="30" rx="9" transform="rotate(172 200 200)"/>
+    <rect x="186" y="196" width="30" height="156" rx="9"/>
+  </g>
+  <g fill="#4a4e54" opacity="0.55">
+    <rect x="230" y="198" width="110" height="6" rx="3" transform="rotate(8 200 200)"/>
+    <rect x="230" y="198" width="110" height="6" rx="3" transform="rotate(172 200 200)"/>
+  </g>
+  <!-- rim -->
+  <path fill="url(#rimLight)" fill-rule="evenodd" stroke="#5d6268" stroke-width="1.5"
+        d="M200 18a182 182 0 1 0 0.01 0zM200 50a150 150 0 1 1 -0.01 0z"/>
+  <path d="M74 120a150 150 0 0 1 90 -66" fill="none" stroke="#4a4e54" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <!-- stitching -->
+  <circle cx="200" cy="200" r="166" fill="none" stroke="#45484d" stroke-width="1.2" stroke-dasharray="3 5"/>
+  <!-- top marker -->
+  <rect x="192" y="18" width="16" height="32" rx="2" fill="#f0c53a"/>
+  <!-- hub -->
+  <circle cx="200" cy="200" r="60" fill="#303236" stroke="#5d6268" stroke-width="1.5"/>
+  <circle cx="200" cy="200" r="42" fill="#3b3e43"/>
+  <g fill="#b9bec3">
+    <circle cx="200" cy="170" r="4"/><circle cx="226" cy="185" r="4"/><circle cx="226" cy="215" r="4"/>
+    <circle cx="200" cy="230" r="4"/><circle cx="174" cy="215" r="4"/><circle cx="174" cy="185" r="4"/>
+  </g>
+  <circle cx="200" cy="200" r="16" fill="#1d1e20" stroke="#4a4e54" stroke-width="1.5"/>
+</svg>

@@ -1,0 +1,52 @@
+# Generic device images of the core, one set per component type. Every image is a stack of
+# layers sharing a view box; moving layers declare how they move. Plugins may ship their own
+# sets with the same structure for their models (see docs/architecture.md, Catalog and images).
+#
+# Coordinates are in view-box units. Angles in degrees, clockwise.
+
+[wheel_base]
+view_box = [380, 360]
+layers = ["base.svg"]              # three-quarter view, static
+# Front face of the quick-release hub: the app may draw a marker on this ellipse that turns
+# with the steering angle (useful when no rim is mounted).
+hub = { center = [122, 230], radii = [30, 34], rotation = 11 }
+
+[steering_wheel]
+view_box = [400, 400]
+pivot = [200, 200]                 # front view, drawn on its own; rotates with the steering angle
+# The plugin may tell the rim shape; default "round".
+shapes = { round = "wheel-round.svg", gt = "wheel-gt.svg", formula = "wheel-formula.svg" }
+
+[pedals]
+view_box = [600, 380]
+layers = ["pedals-frame.svg"]       # seen from the driver's seat
+# Only the pedals the component declares are drawn (e.g. no clutch on a two-pedal set), on the
+# hinge points for that count, left to right. Each pedal.svg is placed with its hinge on the
+# point; pressing scales it vertically towards the hinge (1 = released, pressed_scale_y = fully pressed).
+pedal = { file = "pedal.svg", size = [120, 300], hinge = [60, 290], pressed_scale_y = 0.62 }
+hinges.3 = { clutch = [175, 290], brake = [300, 290], throttle = [425, 290] }
+hinges.2 = { brake = [238, 290], throttle = [362, 290] }
+hinges.1 = { throttle = [300, 290] }
+
+[shifter]
+view_box = [320, 320]
+layers = ["shifter-plate.svg"]      # top view
+# The app draws the gate of the shifter's current configuration on the plate and puts the knob
+# on the engaged slot, so the picture always matches it (6+R, 7+R, sequential). Gate
+# coordinates (a, b) in 0..1 map to origin + a*u + b*v; b = 1 is "up" (away from the driver),
+# b = 0.5 the neutral lane.
+#
+# H-pattern, from the `gears` and `reverse_position` parameters:
+# - forward gears go in pairs, one column each: 1 up / 2 down, 3 up / 4 down, …;
+# - `right_down`: reverse takes the free bottom slot of the last column (7+R), or a new
+#   column on the right, bottom (6+R);
+# - `left_up`: reverse takes a new column on the left, top;
+# - columns are evenly spaced, at a = (i + 0.5) / columns; slots at b = 0.92 (up) and 0.08 (down).
+# Sequential: one column, + at the top and - at the bottom.
+gate = { origin = [56, 264], u = [208, 0], v = [0, -208] }
+knob = { file = "shifter-knob.svg", size = [100, 100] }
+
+[handbrake]
+view_box = [320, 380]
+layers = ["handbrake-body.svg"]     # side view
+lever = { file = "handbrake-lever.svg", pivot = [170, 236], pulled_angle = 34 }

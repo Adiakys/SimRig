@@ -1073,9 +1073,11 @@ impl Host {
     pub fn image(&self, address: &str) -> Result<Image, HostError> {
         let c = self.find(address)?;
         let user_images = self.options.data_dir.join("images");
+        let d = &c.description;
         Ok(self.catalog.image(
-            c.description.model.as_deref(),
-            c.description.kind,
+            d.model.as_deref(),
+            d.kind,
+            &d.appearance,
             Some(&user_images),
         ))
     }

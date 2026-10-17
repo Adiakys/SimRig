@@ -153,6 +153,7 @@ mod tests {
             items,
             custom: vec![],
             procedures: vec![],
+            appearance: Default::default(),
         }
     }
 

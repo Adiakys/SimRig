@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 360" width="380" height="360">
+  <!-- Generic direct-drive wheel base, three-quarter view (flat-shaded, 2D).
+       Faces: front (turned slightly to the right), top, right side. The quick-release hub
+       protrudes from the front face; devices.toml gives its ellipse for the rotation marker. -->
+  <defs>
+    <linearGradient id="bFront" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3f4247"/>
+      <stop offset="1" stop-color="#2c2e32"/>
+    </linearGradient>
+    <linearGradient id="bTop" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#55595f"/>
+      <stop offset="1" stop-color="#474a50"/>
+    </linearGradient>
+    <linearGradient id="bSide" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#26282b"/>
+      <stop offset="1" stop-color="#1d1e20"/>
+    </linearGradient>
+    <linearGradient id="hubMetal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d5d9dc"/>
+      <stop offset="0.5" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#6f757b"/>
+    </linearGradient>
+  </defs>
+  <!-- mounting slab -->
+  <path d="M40 300L214 334L334 280L160 252Z" fill="#232427" stroke="#5d6268" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M40 300L214 334V350L40 316Z" fill="#1d1e20" stroke="#5d6268" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M214 334L334 280V296L214 350Z" fill="#17181a" stroke="#5d6268" stroke-width="1.5" stroke-linejoin="round"/>
+  <g fill="#8f959b"><circle cx="70" cy="306" r="3.5"/><circle cx="190" cy="330" r="3.5"/><circle cx="300" cy="286" r="3.5"/></g>
+  <!-- housing: right side, top, front -->
+  <path d="M212 158L316 112V276L212 322Z" fill="url(#bSide)" stroke="#5d6268" stroke-width="1.5" stroke-linejoin="round"/>
+  <g stroke="#34363a" stroke-width="3" stroke-linecap="round">
+    <path d="M232 170L298 141M232 190L298 161M232 210L298 181M232 230L298 201M232 250L298 221M232 270L298 241"/>
+  </g>
+  <path d="M60 128L160 84L316 112L212 158Z" fill="url(#bTop)" stroke="#5d6268" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M96 124L170 92M120 130L194 98M144 136L218 104M168 142L242 110" stroke="#3f4247" stroke-width="2" stroke-linecap="round"/>
+  <path d="M60 128L212 158V322L60 292Z" fill="url(#bFront)" stroke="#5d6268" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M74 146L198 170V306L74 282Z" fill="none" stroke="#4a4e54" stroke-width="1"/>
+  <!-- front bearing ring -->
+  <ellipse cx="136" cy="226" rx="58" ry="64" transform="rotate(11 136 226)" fill="#232427" stroke="#5d6268" stroke-width="1.5"/>
+  <ellipse cx="136" cy="226" rx="48" ry="53" transform="rotate(11 136 226)" fill="none" stroke="#8f959b" stroke-width="3"/>
+  <!-- quick-release hub (a short cylinder towards the viewer) -->
+  <path d="M100 214L88 220L88 246L100 240Z" fill="#6f757b"/>
+  <ellipse cx="130" cy="226" rx="30" ry="34" transform="rotate(11 130 226)" fill="#5d6268"/>
+  <ellipse cx="122" cy="230" rx="30" ry="34" transform="rotate(11 122 230)" fill="url(#hubMetal)" stroke="#5d6268" stroke-width="1.2"/>
+  <ellipse cx="122" cy="230" rx="18" ry="20" transform="rotate(11 122 230)" fill="#3b3e43"/>
+  <ellipse cx="122" cy="230" rx="7" ry="8" transform="rotate(11 122 230)" fill="#1d1e20"/>
+  <!-- status LED -->
+  <circle cx="190" cy="294" r="4" fill="#3ccf6b"/>
+</svg>

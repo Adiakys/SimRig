@@ -209,7 +209,7 @@ fn standard_items(kind: ComponentKind, pedals: &[PedalRole]) -> Vec<(String, Ite
 pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
     let kind = c.kind();
     let pedals = c.pedals();
-    let (id, name, model, custom, procedures) = {
+    let (id, name, model, custom, procedures, appearance) = {
         let base = c.component_mut();
         (
             base.id(),
@@ -217,6 +217,7 @@ pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
             base.model(),
             base.custom_params(),
             base.procedures(),
+            base.appearance(),
         )
     };
     let mut f = facade(c);
@@ -246,6 +247,7 @@ pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
         items,
         custom,
         procedures,
+        appearance,
     }
 }
 

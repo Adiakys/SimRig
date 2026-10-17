@@ -113,8 +113,11 @@ pub fn image(host: &Host, component: &str) -> Result<()> {
     match host.image(component)? {
         Image::User(path) => println!("user picture {}", path.display()),
         Image::Model(path) => println!("model image {}", path.display()),
-        Image::Generic(kind) => {
-            println!("generic illustration of a {}", kind.label().to_lowercase())
+        Image::Generic { kind, rim } => {
+            let shape = rim
+                .map(|r| format!(", {} rim", r.key()))
+                .unwrap_or_default();
+            println!("core drawing of a {}{shape}", kind.label().to_lowercase())
         }
     }
     Ok(())

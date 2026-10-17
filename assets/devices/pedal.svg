@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 300" width="120" height="300">
+  <!-- One pedal: mount, arm and plate. Placed with its hinge (60,290) on a hinge point of the
+       frame; pressing scales it vertically towards the hinge (devices.toml). -->
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c3c8cd"/>
+      <stop offset="1" stop-color="#7f858b"/>
+    </linearGradient>
+    <linearGradient id="arm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5d6268"/>
+      <stop offset="0.5" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#5d6268"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="276" width="110" height="18" rx="5" fill="#3b3e43" stroke="#5d6268" stroke-width="1"/>
+  <rect x="52" y="120" width="16" height="168" rx="5" fill="url(#arm)" stroke="#4a4e54" stroke-width="1"/>
+  <rect x="34" y="272" width="52" height="22" rx="9" fill="#303236" stroke="#5d6268" stroke-width="1.2"/>
+  <rect x="14" y="18" width="92" height="126" rx="12" fill="url(#plate)" stroke="#5d6268" stroke-width="1.5"/>
+  <g fill="#5d6268" opacity="0.65">
+    <rect x="26" y="34" width="68" height="5" rx="2.5"/><rect x="26" y="50" width="68" height="5" rx="2.5"/>
+    <rect x="26" y="66" width="68" height="5" rx="2.5"/><rect x="26" y="82" width="68" height="5" rx="2.5"/>
+    <rect x="26" y="98" width="68" height="5" rx="2.5"/><rect x="26" y="114" width="68" height="5" rx="2.5"/>
+  </g>
+</svg>

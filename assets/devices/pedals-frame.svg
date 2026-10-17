@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380">
+  <!-- Generic pedal set frame, seen from the driver's seat. Each pedal the component declares
+       (pedal.svg) stands on a hinge point of devices.toml. -->
+  <defs>
+    <linearGradient id="pFloor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26282b"/>
+      <stop offset="1" stop-color="#1d1e20"/>
+    </linearGradient>
+  </defs>
+  <path d="M92 128H508L566 346Q568 362 552 362H48Q32 362 34 346Z" fill="url(#pFloor)" stroke="#5d6268" stroke-width="1.5"/>
+  <path d="M108 142H492" stroke="#3b3e43" stroke-width="2"/>
+  <!-- heel rest -->
+  <rect x="170" y="322" width="260" height="28" rx="8" fill="#303236" stroke="#5d6268" stroke-width="1.2"/>
+  <g stroke="#26282b" stroke-width="2"><path d="M190 330v12M210 330v12M230 330v12M250 330v12M270 330v12M290 330v12M310 330v12M330 330v12M350 330v12M370 330v12M390 330v12M410 330v12"/></g>
+  <g fill="#8f959b"><circle cx="60" cy="346" r="4"/><circle cx="540" cy="346" r="4"/><circle cx="104" cy="138" r="3.5"/><circle cx="496" cy="138" r="3.5"/></g>
+</svg>

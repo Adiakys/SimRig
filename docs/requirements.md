@@ -118,7 +118,9 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 
 ### Catalog and images
 - **FR-40** Model catalog as data files, extensible without recompiling.
-- **FR-41** Every model has an image; when missing, the generic illustration of its type is used.
+- **FR-41** The core ships a generic, brandless, animatable drawing for each component type (base;
+  round, GT and formula wheels; pedals; shifter; handbrake). Plugins tell the rim shape and may
+  ship their own pictures for their models.
 - **FR-42** The user can replace an image with their own (e.g. a photo of their rig).
 - **FR-43** "Rig view" with component images animated live (the wheel rotates, pedals fill up,
   the engaged gear lights up).

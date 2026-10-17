@@ -70,6 +70,15 @@ impl Component for SimWheel {
         )
     }
 
+    fn appearance(&self) -> simrig_plugin_sdk::model::Appearance {
+        use simrig_plugin_sdk::model::{Appearance, RimShape};
+        Appearance::rim(if self.gt {
+            RimShape::Gt
+        } else {
+            RimShape::Formula
+        })
+    }
+
     fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
         self.shared.save(&self.id(), item, value, host)
     }

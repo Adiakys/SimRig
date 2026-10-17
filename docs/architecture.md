@@ -67,7 +67,7 @@ there is no background agent.
 | Settings | `set`, `param`, `save`, `run_action`, `write_output`, `read_inputs`, `subscribe` |
 | Composition | `set_excluded`, `choose_plugin`, `set_planned`, `usb_devices`, `devices`, `rig_config` |
 | Procedures | `target`, `procedures`, `start_procedure`, `submit_procedure`, `cancel_procedure`; updates arrive as `HostEvent::ProcedureUpdated` |
-| Catalog | `catalog`, `image` (user picture → model image → generic illustration) |
+| Catalog | `catalog`, `image` (user picture → plugin picture → core drawing with the rim shape) |
 | Drivers | `driver_status`, `install_driver`, `uninstall_driver`, `installed_drivers`, `restart_plugin` |
 | Presets | `presets()` (list, get, save, delete, export, import), `capture_preset`, `apply_preset` |
 | Wizard | `system()`: distribution, kernel, Secure Boot, session, systemd, pkexec |
@@ -284,7 +284,7 @@ what their hardware can and cannot do.
 
 ## 4. Catalog and images
 
-The catalog is **data** provided by plugins, plus the core's generic entries:
+The catalog is **data** provided by plugins:
 
 ```toml
 # plugins/fanatec/catalog/csl-dd.toml
@@ -293,19 +293,43 @@ vendor     = "Fanatec"
 name       = "CSL DD"
 kind       = "wheel_base"
 usb        = [{ vid = 0x0eb7, pid = 0x0020 }]
-image      = "images/csl-dd.webp"
+image      = "images/csl-dd"                # optional: the plugin's own picture (file or layer folder)
 image_license = "CC-BY-4.0, illustration by <author>"
-driver     = "hid-fanatec"                 # → the plugin's driver.toml, §6.1
-provides   = ["wheel-base", "steering-wheel?", "pedals?"]   # ? = optional, the wizard asks
-
-[overlay]                                  # anchor points to animate the rig view
-rotation_center = [0.50, 0.46]
+provides   = ["wheel_base", "steering_wheel?", "pedals?"]   # ? = optional, the wizard asks
 ```
 
-- **Images**: the user's own picture first (`~/.local/share/simrig/images/<vendor>_<model>.{svg,webp,png,jpg}`),
-  then the model image shipped by the plugin, then the app's generic illustration of the type.
-- **Anchors** (`overlay`): where to rotate the wheel, fill the pedals, light up the gear.
-- **Licensing**: no manufacturer photos without permission; license declared per entry.
+### 4.1 Device pictures
+
+**The core ships one generic drawing per component type** (`assets/devices`): invented but
+realistic devices with no brand, drawn as layered SVG so the moving parts can be animated from
+live inputs, also in Slint, which cannot animate inside a single SVG:
+
+| Type | Drawing | Live animation |
+|---|---|---|
+| Wheel base | three-quarter view, static | marker on the hub ellipse (when no rim is mounted) |
+| Steering wheel | front view, drawn on its own; **round, GT (GT3-style, cut top and bottom) or formula** | turns around its centre with the steering angle |
+| Pedals | frame + one pedal drawing per pedal, from the driver's seat | each pedal shortens towards its hinge as it is pressed; only the pedals the component declares are drawn (2-pedal sets have no clutch) |
+| Shifter | top view of the plate + knob | the app draws the gate of the current configuration (6+R, 7+R, reverse position, sequential) and puts the knob on the engaged slot |
+| Handbrake | side view, body + lever | the lever turns on its pivot |
+
+`assets/devices/devices.toml` is the contract between the drawings and the renderer: view boxes,
+layers, pivots, hinge points, gate geometry and the rules to draw a gate. `docs/design/devices.js`
+implements the same rules for the mockups.
+
+**Plugins give hints, the core picks the drawing.** A component's description carries an
+`appearance`; today it has the rim shape (`round`, `gt`, `formula`), so a plugin gets the right
+wheel without shipping any image.
+
+**Plugins may ship their own pictures** for their models (`image` in the catalog): a single
+image (static; a rim still turns as a whole) or a folder with the same layers as the core's set
+and its own `devices.toml`, animated with the same rules.
+
+Resolution (`Host::image`): the user's own picture
+(`~/.local/share/simrig/images/<vendor>_<model>.{svg,webp,png,jpg}`), then the plugin's picture of
+the model, then the core's generic drawing with the plugin's appearance hints.
+
+- **Licensing**: no manufacturer photos without permission; license declared per entry. The
+  core's drawings are original work under the project license.
 - The catalog also lists models that are not plugged in: they can be added to the rig (and their
   drivers installed) before connecting them.
 
@@ -760,6 +784,7 @@ Whether the tuning menu really persists in the base's memory must be **verified 
 | D14 | Any mix of brands; each device belongs to exactly one plugin (most specific match); components addressed by plugin, never by type alone | no constraint on how users build their rig |
 | D15 | No privileges at runtime: live settings, tests and presets go through the drivers' interfaces; authorization only for system changes, through pkexec + `simrig-helper` | the app is always started as a normal user; the password is asked only when it is really needed |
 | D16 | Guided procedures (calibration, mapping, setup) are defined by plugins; the core only renders generic steps | new procedures without touching the core, like custom parameters |
+| D17 | The core ships generic layered drawings per component type; plugins give appearance hints (rim shape) or their own pictures | every device looks right without a single brand asset; brand-agnostic by construction |
 
 ## 13. Risks
 
