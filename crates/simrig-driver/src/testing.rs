@@ -145,7 +145,17 @@ impl Sandbox {
         for (key, value) in args {
             cmd.env(format!("SIMRIG_ARG_{}", key.to_ascii_uppercase()), value);
         }
-        let out = cmd.output().unwrap();
+        // A stub or hook just written may be busy for an instant (see `hooks::spawn`).
+        let mut attempt = 0;
+        let out = loop {
+            match cmd.output() {
+                Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && attempt < 20 => {
+                    attempt += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                result => break result.unwrap(),
+            }
+        };
         (
             out.status.success(),
             String::from_utf8_lossy(&out.stdout).into_owned(),

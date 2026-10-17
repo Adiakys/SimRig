@@ -56,7 +56,7 @@ pub fn run_hook(
             value,
         );
     }
-    let mut child = command.spawn()?;
+    let mut child = spawn(&mut command)?;
     let read = |pipe: Option<Box<dyn Read + Send>>| {
         thread::spawn(move || {
             let mut text = String::new();
@@ -102,4 +102,19 @@ pub fn run_hook(
         });
     }
     Ok(output)
+}
+
+/// Starts a hook. A hook file another thread of this process has just written may still be
+/// open, for an instant, in a child being started (Linux: "Text file busy"): it is retried.
+fn spawn(command: &mut Command) -> std::io::Result<std::process::Child> {
+    let mut attempt = 0;
+    loop {
+        match command.spawn() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && attempt < 20 => {
+                attempt += 1;
+                thread::sleep(Duration::from_millis(5));
+            }
+            result => return result,
+        }
+    }
 }
