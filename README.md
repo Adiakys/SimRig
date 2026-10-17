@@ -39,6 +39,10 @@ Your devices keep working in every game with SimRig closed.
 Features depend on the device and its driver: SimRig shows, for every setting, whether your
 hardware supports it.
 
+The drivers are open source projects of their own communities, credited with their licenses in
+[THIRD-PARTY.md](THIRD-PARTY.md). A driver you installed yourself is kept as it is: SimRig only
+adds its access rules next to it.
+
 ## Install
 
 Download the package for your distribution from the
@@ -80,23 +84,6 @@ needs to run in the background.
 Settings you change apply at once. **Save as default** stores them in the driver or in the
 device, so they come back every time you plug it in. **Presets** save the whole rig and switch
 it in one click.
-
-## Drivers
-
-SimRig builds on open source drivers maintained by their own communities. They are bundled
-pinned to a tested version, installed on your machine by the app when you add a device, and
-credited with their licenses in [THIRD-PARTY.md](THIRD-PARTY.md).
-
-| Plugin | Driver | Upstream | License |
-|---|---|---|---|
-| Fanatec | hid-fanatecff, kernel module (force feedback, tuning menu, LEDs, display), built with DKMS | [github.com/gotzl/hid-fanatecff](https://github.com/gotzl/hid-fanatecff) | GPL-2.0 |
-| Moza | hid-universal-pidff, kernel module (force feedback): the kernel's from Linux 6.15, built with DKMS on older kernels. udev rules for the devices' serial port (settings) | [github.com/JacKeTUs/universal-pidff](https://github.com/JacKeTUs/universal-pidff); serial protocol from [github.com/Lawstorant/boxflat](https://github.com/Lawstorant/boxflat) | GPL-2.0; GPL-3.0 |
-| Logitech | the kernel's drivers (G920, G923 for Xbox); new-lg4ff, kernel module for the G29 family (more effects, gain, autocenter, effect levels, LEDs); the TrueForce driver, kernel module for the G PRO and RS50. Both built with DKMS only for the wheels plugged in | [github.com/berarma/new-lg4ff](https://github.com/berarma/new-lg4ff); [github.com/mescon/logitech-trueforce-linux-driver](https://github.com/mescon/logitech-trueforce-linux-driver) | GPL-2.0 |
-| Thrustmaster | hid-tmff2, kernel module (force feedback, rotation, gain, effect levels), with hid-tminit, which starts the wheels up in place of the kernel's hid-thrustmaster; built with DKMS | [github.com/Kimplul/hid-tmff2](https://github.com/Kimplul/hid-tmff2) | GPL-2.0-or-later |
-| Generic USB | SimRig's own userspace service (hidraw in, uinput out) | this repository | GPL-3.0-or-later |
-
-A driver you installed yourself (a distribution package, a newer version built by hand) is
-kept as it is: SimRig only adds its access rules next to it.
 
 ## Contributing
 
