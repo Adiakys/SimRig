@@ -7,3 +7,4 @@ pub mod components;
 pub mod device;
 pub mod models;
 pub mod tuning;
+pub mod unlock;

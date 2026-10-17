@@ -10,7 +10,10 @@ use simrig_plugin_kit::pedals::Layout;
 use simrig_plugin_kit::sysfs;
 use simrig_plugin_sdk::prelude::*;
 
+use std::time::Instant;
+
 use crate::models::{Kind, Model};
+use crate::unlock::{Menu, Slots, Unlock};
 
 pub const BINDING: Binding = Binding {
     vendor: "0EB7",
@@ -22,8 +25,9 @@ pub const BINDING: Binding = Binding {
 };
 
 /// What to do when the driver has not received the tuning menu from the base.
-pub const TUNING_UNREAD: &str = "The base has not sent its settings to the driver yet: open \
-     the tuning menu on the wheel and change any value (then set it back).";
+pub const TUNING_UNREAD: &str = "The base has not sent its settings to the driver yet. SimRig \
+     asks for them; if they do not arrive, open the tuning menu on the wheel and change any \
+     value (then set it back).";
 
 /// The pedals plugged into a base: throttle ABS_Z, brake ABS_RZ, clutch ABS_Y, at the top of
 /// their travel when released (checked on a CSL DD; the same table as Oversteer's).
@@ -36,6 +40,9 @@ pub const BASE_PEDALS: Layout = &[
 pub struct FanatecDevice {
     pub hid: HidDevice,
     pub model: &'static Model,
+    /// Getting the tuning menu from the base, while the driver has not received it.
+    unlock: Unlock,
+    slots: Slots,
 }
 
 pub type Shared = Rc<RefCell<FanatecDevice>>;
@@ -63,7 +70,13 @@ impl FanatecDevice {
         if base {
             hid = hid.with_layout(BASE_PEDALS);
         }
-        Self { hid, model }
+        let slots = Slots::for_config(&hid.config);
+        Self {
+            hid,
+            model,
+            unlock: Unlock::Idle,
+            slots,
+        }
     }
 
     /// An entry of the tuning menu (`ftec_tuning/<name>/<entry>`), when the base has it.
@@ -71,6 +84,32 @@ impl FanatecDevice {
         let dir = sysfs::first_dir(&self.hid.hid.as_ref()?.join("ftec_tuning"))?;
         let path = dir.join(name);
         path.exists().then_some(path)
+    }
+
+    /// Asks the base for its tuning menu while the driver has not received it, and remembers
+    /// the slot in use once it has (switching the menu's mode selects slot 1: the slot is put
+    /// back). Called at every poll.
+    pub fn tick(&mut self) {
+        let Some(dir) = self
+            .hid
+            .hid
+            .as_ref()
+            .and_then(|h| sysfs::first_dir(&h.join("ftec_tuning")))
+        else {
+            // Unbound, or no tuning menu: start over when it comes.
+            self.unlock = Unlock::Idle;
+            return;
+        };
+        let menu = Menu { dir: &dir };
+        let key = format!("{:04x}", self.model.pid);
+        self.unlock = self
+            .unlock
+            .step(&menu, Instant::now(), self.slots.get(&key));
+        if self.unlock == Unlock::Done {
+            if let Some(slot) = sysfs::read_int(&dir.join("SLOT")).filter(|s| *s != 0) {
+                self.slots.set(&key, slot);
+            }
+        }
     }
 
     /// The base has a tuning menu that the driver has not received yet: the base sends it only

@@ -150,7 +150,11 @@ impl Adapter for FanatecAdapter {
     fn take_changes(&mut self) -> Vec<Change> {
         let mut changes = Vec::new();
         for (id, (device, shape)) in &mut self.devices {
-            device.borrow_mut().hid.refresh();
+            {
+                let mut d = device.borrow_mut();
+                d.hid.refresh();
+                d.tick();
+            }
             let now = Self::shape(device);
             if now == *shape {
                 continue;

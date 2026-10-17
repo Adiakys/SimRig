@@ -825,9 +825,14 @@ USB pedal sets are mapped while they are added, by pressing each pedal; a mappin
 is kept in the user's configuration (`fanatec.toml`). The
 tuning menu lives in the base's memory, and the base sends it to the driver only when it is used
 on the wheel: hid-fanatecff cannot ask for it ([#75](https://github.com/gotzl/hid-fanatecff/discussions/75)),
-and refuses to change it, the rotation included, until then. The adapter shows those settings
-as unavailable meanwhile, saying to open the tuning menu on the wheel and change a value, and
-updates them as soon as the menu arrives; the rotation is saved as the driver's `init_range`
+and refuses to change it, the rotation included, until then. The adapter gets it by itself
+(`plugins/fanatec/src/unlock.rs`): switching the menu between standard and advanced mode is a
+change the driver lets through, and the base answers it with the whole menu; the adapter then
+switches it back (waiting for the base, which ignores a second switch sent right away) and
+selects again the slot the user was on, which it remembers (`fanatec.slots`), since switching
+modes goes back to slot 1. Checked on a CSL DD. Meanwhile those settings show as unavailable,
+saying what is going on (and, if the base does not answer, to open the tuning menu on the wheel
+and change a value), and they show up as soon as the menu arrives; the rotation is saved as the driver's `init_range`
 option (`save-range`, a privileged operation writing `/etc/modprobe.d/simrig-fanatec.conf`).
 What the driver does not expose (a tuning entry an older driver lacks, centering, pedal dead
 zones and curves) stays visible, unsupported, with the reason. Tested end to end on a fake

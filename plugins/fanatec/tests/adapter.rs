@@ -376,3 +376,42 @@ fn what_the_driver_creates_later_shows_up() {
         "{inputs:?}"
     );
 }
+
+/// SimRig gets the tuning menu by itself: it switches the menu's mode (the base answers with the
+/// whole menu, in the other mode and on slot 1), switches it back, and selects the slot the user
+/// was on.
+#[test]
+fn the_tuning_menu_is_asked_for_and_the_slot_kept() {
+    let env = Env::new("unlock");
+    env.plug(true);
+    let menu = env.hid("ftec_tuning/0003:0EB7:0020.0001");
+    fs::write(menu.join("SLOT"), "0\n").unwrap();
+    fs::write(menu.join("advanced_mode"), "0\n").unwrap();
+    // The user was on slot 2.
+    fs::write(env.env.root.join("fanatec.slots"), "0020 2\n").unwrap();
+    let mut host = env.start();
+
+    // The base: answers the first switch with its menu, now in standard mode on slot 1.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while fs::read_to_string(menu.join("advanced_mode")).unwrap() != "1\n" {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the menu was not asked for"
+        );
+        host.poll();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    fs::write(menu.join("advanced_mode"), "0\n").unwrap();
+    fs::write(menu.join("SLOT"), "1\n").unwrap();
+
+    // Switched back to advanced, and back on slot 2.
+    until(&mut host, "slot 2 again", |_| {
+        fs::read_to_string(menu.join("SLOT")).unwrap() == "2\n"
+    });
+    assert_eq!(
+        fs::read_to_string(menu.join("advanced_mode")).unwrap(),
+        "1\n"
+    );
+    let base = host.find("base").unwrap().address.clone();
+    assert!(reason(&mut host, &base, "rotation").is_empty());
+}
