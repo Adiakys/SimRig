@@ -1,6 +1,6 @@
 # simrig — Architecture
 
-> Draft 0.7 (2026-10-17). Core implemented (M0). Companion to [requirements.md](requirements.md).
+> Draft 0.8 (2026-10-17). Core implemented (M0). Companion to [requirements.md](requirements.md).
 
 ## 1. Principles
 
@@ -65,7 +65,8 @@ there is no background agent.
 | Rig | `start`, `components`, `find`, `describe`, `plugins`, `problems` |
 | Changes | `poll()` → `HostEvent`: plugin started/stopped/failed, device added/removed, components changed (rim swap), description changed, live inputs |
 | Settings | `set`, `param`, `save`, `run_action`, `write_output`, `read_inputs`, `subscribe` |
-| Composition | `set_excluded`, `choose_plugin`, `set_planned`, `usb_devices`, `rig_config` |
+| Composition | `set_excluded`, `choose_plugin`, `set_planned`, `usb_devices`, `devices`, `rig_config` |
+| Procedures | `target`, `procedures`, `start_procedure`, `submit_procedure`, `cancel_procedure`; updates arrive as `HostEvent::ProcedureUpdated` |
 | Catalog | `catalog`, `image` (user picture → model image → generic illustration) |
 | Drivers | `driver_status`, `install_driver`, `uninstall_driver`, `installed_drivers`, `restart_plugin` |
 | Presets | `presets()` (list, get, save, delete, export, import), `capture_preset`, `apply_preset` |
@@ -345,7 +346,9 @@ exec    = "simrig-plugin-fanatec"         # file name inside the plugin director
 driver  = "driver/driver.toml"            # optional: absent when the stock kernel is enough
 
 [match]
-usb = [{ vid = 0x0eb7 }]                  # pid optional; `virtual = true` for plugin-provided devices
+usb = [{ vid = 0x0eb7 }]                  # pid optional
+# virtual = true                          # the plugin provides devices itself (simulated rig)
+# on_request = true                       # generic plugin: only USB devices the user assigns to it
 ```
 
 ### 5.3 Adapter protocol
@@ -370,6 +373,9 @@ usb = [{ vid = 0x0eb7 }]                  # pid optional; `virtual = true` for p
 | app → plugin | `shutdown` | the app is closing |
 | plugin → app | `components/changed` | components of a device changed (rim swap), with their descriptions |
 | plugin → app | `devices/changed` | the plugin's virtual devices changed |
+| app → plugin | `procedures/list` | guided procedures offered on a device (component ones come with `component/describe`) |
+| app → plugin | `procedure/start` `procedure/submit` `procedure/cancel` | run a guided procedure step by step (§5.5) |
+| plugin → app | `procedure/update` | the procedure moved on by itself (live value, detected input…) |
 | app → plugin | `param/save` | make the current value of a persistent item the one restored at plug-in, the way the driver decides (§6.3) |
 | plugin → app | `privileged/request` | during a request, run one of the driver's privileged operations (§6.1); the host runs the helper and answers |
 
@@ -388,6 +394,8 @@ pub trait Adapter {
     fn attach(&mut self, device: &DeviceInfo) -> Result<Vec<AnyComponent>>;  // AnyComponent::WheelBase(Box<dyn WheelBase>), ...
     fn detach(&mut self, _device_id: &str) {}
     fn take_changes(&mut self) -> Vec<Change> { Vec::new() }       // e.g. a rim swap
+    fn device_procedures(&mut self, _device_id: &str) -> Vec<ProcedureDescriptor> { Vec::new() }
+    fn start_device_procedure(&mut self, _device_id: &str, _id: &str) -> Result<Box<dyn Procedure>> { … }
 }
 
 // On every component: saving goes through the host when the driver needs privileges.
@@ -407,6 +415,50 @@ real in production, recorded or simulated in tests.
   (official / third-party).
 - **Drivers**: become system code, with the same trust as a distro package. The helper runs a
   driver's operations **only from plugins in system directories** (root-owned), never from home.
+
+### 5.5 Guided procedures
+
+Calibrations, input mappings, the first setup of a generic device… are **defined by plugins**.
+The core only provides a generic engine: it knows nothing about what a procedure does, and a
+plugin can add any procedure without touching the core.
+
+- A plugin declares procedures on a **component** (e.g. "Calibrate the brake") or on a **device**
+  (e.g. "Set up this device", for a device that has no components until it is configured). Each
+  has a label, help and an availability with a reason, like any other item.
+- **The plugin drives, the app renders.** Every step is made of generic elements:
+
+  | Element | Use |
+  |---|---|
+  | `Field` | something the user fills, typed like a parameter (`ParamType`) |
+  | `Value` | a read-only value, live when the plugin sends updates (e.g. raw position) |
+  | `Table` | e.g. the summary of a mapping |
+  | `Notice` | info, success, warning, error |
+  | actions | buttons with a role (primary, secondary, cancel) and an optional confirmation |
+
+  A step can be **waiting**: the plugin moves on by itself (e.g. "move the lever to 3rd gear",
+  then it detects the input) and notifies `procedure/update`.
+- The SDK keeps the sessions, validates the fields of the current step before the plugin sees
+  them, and applies the values a finished procedure returns to its component (`apply`), validated
+  like any change. During a step the plugin may run privileged operations of its driver (e.g. to
+  save a mapping) and change its components (a generic device becomes a shifter).
+- Sessions of devices or components that go away are cancelled.
+
+```rust
+pub trait Procedure {
+    fn start(&mut self, host: &mut HostLink<'_>) -> Result<Outcome>;
+    fn submit(&mut self, action: &str, values: &BTreeMap<String, Value>, host: &mut HostLink<'_>) -> Result<Outcome>;
+    fn poll(&mut self) -> Option<Outcome> { None }   // move on by itself
+    fn cancel(&mut self) {}
+}
+pub enum Outcome { Step(Step), Finished { message: Option<String>, apply: Vec<(String, Value)> }, Cancelled }
+```
+
+### 5.6 Generic plugins
+
+A plugin with `match.on_request = true` never gets devices on its own: only the USB devices the
+user assigns to it (`choose_plugin`, applied at once). This is how a plugin for unbranded devices
+works: the user picks any connected device, then the plugin's own setup procedure asks what it is
+and maps its inputs. Hubs are never offered.
 
 ## 6. Drivers
 
@@ -519,7 +571,7 @@ wizard ──▶ hooks/status (user) → not installed
   development directories run the helper as the user with a private state directory
   (`~/.local/state/simrig/dev`), so the whole flow works without privileges; plugins in the user's
   home may not install drivers.
-- **Prerequisites** (`requires`) through PackageKit: not implemented yet (M2); the app asks the
+- **Prerequisites** (`requires`) through PackageKit: not implemented yet (M3); the app asks the
   user to install them.
 - **Upgrades**: when a plugin ships a new driver version, the app offers the upgrade when opened
   (old `uninstall` → new `install`, or an `upgrade` hook if the driver declares one). Kernel
@@ -595,8 +647,12 @@ ffb_scaling = 1
   and a **fake driver** (`plugins/sim/driver`) with install, status, uninstall and a
   `save-setting` privileged operation that only touches its data directory: saved settings are
   restored by the next session.
-- `--id`, `--devices` and `--usb-pedals` options let tests run it as a second "brand" handling
-  USB devices from a fake sysfs tree.
+- **Procedures**: a guided calibration on each pedal (the simulated pedal follows the
+  instructions), and an unconfigured device (`generic0`) whose setup procedure turns it into a
+  shifter or a handbrake, detecting each position live and saving the setup through the fake
+  driver.
+- `--id`, `--devices`, `--usb-pedals` and `--usb-generic` options let tests run it as a second
+  "brand" or as a generic plugin handling USB devices from a fake sysfs tree.
 - **Conformance checks** (`simrig-host::conformance`): every standard item present once with the
   right class and value kind, valid current values, known `DependsOn` targets, unique and valid
   custom parameters, `test_effect` ⇒ `stop_force`. The host runs them on every attach.
@@ -639,7 +695,8 @@ simrig/
 │   └── simrig-gui/                 (M1) Slint
 ├── plugins/                        official plugins: same repo and release, separate packages
 │   ├── sim/                        simulated rig, fake driver, catalog, end-to-end tests
-│   └── fanatec/                    (M2) adapter + driver/ (hid-fanatecff submodule + hooks)
+│   ├── generic-usb/                (M2) setup and mapping procedures + driver service translating raw inputs
+│   └── fanatec/                    (M3) adapter + driver/ (hid-fanatecff submodule + hooks)
 ├── packaging/polkit/               polkit action of the helper
 └── docs/
 ```
@@ -702,6 +759,7 @@ Whether the tuning menu really persists in the base's memory must be **verified 
 | D13 | Unsupported items shown disabled with a reason, never hidden | the user understands what the hardware can do and how to enable missing features |
 | D14 | Any mix of brands; each device belongs to exactly one plugin (most specific match); components addressed by plugin, never by type alone | no constraint on how users build their rig |
 | D15 | No privileges at runtime: live settings, tests and presets go through the drivers' interfaces; authorization only for system changes, through pkexec + `simrig-helper` | the app is always started as a normal user; the password is asked only when it is really needed |
+| D16 | Guided procedures (calibration, mapping, setup) are defined by plugins; the core only renders generic steps | new procedures without touching the core, like custom parameters |
 
 ## 13. Risks
 

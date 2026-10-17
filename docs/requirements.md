@@ -1,6 +1,6 @@
 # simrig — Requirements
 
-> Working project name. Status: draft 0.7 (2026-10-17). See also [architecture.md](architecture.md).
+> Working project name. Status: draft 0.8 (2026-10-17). See also [architecture.md](architecture.md).
 
 ## 1. Vision
 
@@ -68,7 +68,9 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 - **FR-03** Determine the components each device provides, including hot changes (e.g. rim swap).
 - **FR-04** Let the user confirm or correct the device → components mapping (e.g. where the pedals
   are plugged in).
-- **FR-05** Handle unknown devices as "generic HID": the user maps axes and buttons to components.
+- **FR-05** Unbranded devices are supported by generic plugins: the user assigns any connected USB
+  device to such a plugin, which then sets it up (type of component, input mapping) with its own
+  guided procedure. Generic plugins never take devices on their own.
 - **FR-06** A rig may combine devices of **any brands**, with no constraint between plugins (e.g. a
   Fanatec base and wheel with Moza pedals), and several components of the same type (two pedal
   sets, an H-pattern and a sequential shifter).
@@ -76,6 +78,10 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
   reported, and the user can override the choice.
 - **FR-08** The user can exclude from the rig an optional component a device exposes but that is
   not in use (e.g. the pedal inputs of a base when other pedals are used), and re-enable it.
+- **FR-09** Plugins may define **guided procedures** (calibration, input mapping, device setup…) on
+  components or devices. The core provides only a generic engine (steps with fields, live values,
+  tables, notices and actions; steps that advance by themselves); the app renders them without
+  knowing them. New procedures never require changes to the core.
 
 ### Inputs (read)
 - **FR-10** Show the live state of every component (angle, pedals, gear, buttons…).
@@ -211,11 +217,12 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 
 | Phase | Content | Done when |
 |---|---|---|
-| **M0** ✅ | Core: domain model, plugin protocol and SDK, host (hotplug and events, driver contract and privileged helper, persistence, rig composition, presets, catalog, system check), CLI, simulated rig with fake driver, end-to-end tests | Everything the GUI needs works from `simrig-cli` on the simulated rig; CI green |
+| **M0** ✅ | Core: domain model, plugin protocol and SDK, host (hotplug and events, driver contract and privileged helper, persistence, rig composition, presets, catalog, system check, plugin-defined guided procedures, generic plugins), CLI, simulated rig with fake driver, end-to-end tests | Everything the GUI needs works from `simrig-cli` on the simulated rig; CI green |
 | **M1** | GUI on the core: rig view, live inputs, parameters, wizard, presets | Full wizard and daily use work on the simulated rig |
-| **M2** | Fanatec plugin: `hid-fanatecff` + driver recipes (DKMS, udev) + PackageKit prerequisites | From scratch: install the package, the wizard installs the driver and configures the CSL DD; after a reboot, with the app closed, the saved rotation is applied |
-| **M3** | Catalog-driven generic HID, Logitech, Moza… | Each brand has at least one tester with the hardware; a mixed-brand rig (e.g. Fanatec base + Moza pedals) works end to end |
-| **M4** | Multi-distro packages (AUR, OBS, COPR), in-app uninstall | Installation verified on Ubuntu, Fedora, Arch |
+| **M2** | Generic USB plugin: any unbranded device set up and mapped by its own procedure, with a driver service translating raw inputs | A shifter with no usable HID descriptor works in games with the app closed, set up entirely from the app |
+| **M3** | Fanatec plugin: `hid-fanatecff` + driver recipes (DKMS, udev) + PackageKit prerequisites | From scratch: install the package, the wizard installs the driver and configures the CSL DD; after a reboot, with the app closed, the saved rotation is applied |
+| **M4** | Logitech, Moza, more brands | Each brand has at least one tester with the hardware; a mixed-brand rig (e.g. Fanatec base + Moza pedals) works end to end |
+| **M5** | Multi-distro packages (AUR, OBS, COPR), in-app uninstall | Installation verified on Ubuntu, Fedora, Arch |
 
 ## 8. Open questions
 

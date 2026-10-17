@@ -4,7 +4,8 @@ Configure your sim-racing rig on Linux — wheel base, steering wheel, pedals, s
 handbrake — whatever the brand, from one polished app.
 
 > **Status: early development.** The core (M0) is done and tested on a simulated rig: plugins,
-> hotplug, drivers with a privileged helper, saved settings, rig composition, presets, catalog.
+> hotplug, drivers with a privileged helper, saved settings, rig composition, presets, catalog,
+> guided procedures defined by plugins, generic plugins for unbranded devices.
 > The GUI comes next, then the first real hardware (Fanatec).
 
 ## How it works
@@ -46,6 +47,9 @@ simrig-cli set base rotation 540 --save           # restored by the driver next 
 simrig-cli get base rotation
 simrig-cli preset capture GT3 && simrig-cli preset show GT3
 simrig-cli exclude handbrake && simrig-cli list
+simrig-cli configure pedals calibrate-brake       # a guided procedure defined by the plugin
+simrig-cli devices                                # generic0 has no components yet…
+simrig-cli configure sim/generic0 setup           # …until its setup procedure maps it
 simrig-cli monitor                                # rig changes as they happen
 simrig-cli driver uninstall sim                   # leaves nothing behind
 ```

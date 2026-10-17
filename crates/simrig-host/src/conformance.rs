@@ -88,6 +88,16 @@ pub fn check(desc: &ComponentDescription) -> Vec<String> {
         fail("test_effect is supported but stop_force is not".into());
     }
 
+    let mut procedure_ids = HashSet::new();
+    for p in &desc.procedures {
+        if p.id.trim().is_empty() || !procedure_ids.insert(&p.id) {
+            fail(format!("procedure '{}' has an empty or repeated id", p.id));
+        }
+        if p.label.trim().is_empty() {
+            fail(format!("procedure '{}' has no label", p.id));
+        }
+    }
+
     let mut custom_ids = HashSet::new();
     for param in &desc.custom {
         let id = &param.id;
@@ -142,6 +152,7 @@ mod tests {
             pedals: vec![],
             items,
             custom: vec![],
+            procedures: vec![],
         }
     }
 

@@ -9,6 +9,7 @@ pub mod custom;
 pub mod describe;
 pub mod device;
 pub mod param;
+pub mod procedure;
 pub mod support;
 pub mod value;
 
@@ -22,6 +23,10 @@ pub use custom::{Condition, CustomParam};
 pub use describe::{ActionOutcome, ActionSpec, ComponentDescription, ItemDescription, ItemSpec};
 pub use device::{Bus, DeviceInfo};
 pub use param::{ChoiceOption, ParamSpec, ParamType, Persistence, ValueError};
+pub use procedure::{
+    ActionRole, Element, Level, ProcedureDescriptor, ProcedureState, ProcedureTarget, Step,
+    StepAction,
+};
 pub use support::{Reason, Support, Unsupported};
 pub use value::{Axis, CurvePoint, Gear, Value, ValueKind};
 

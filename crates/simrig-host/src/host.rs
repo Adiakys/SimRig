@@ -4,12 +4,15 @@ use std::time::{Duration, Instant};
 
 use simrig_model::{
     ActionOutcome, Bus, CUSTOM_PREFIX, ComponentDescription, DeviceInfo, ItemSpec, ParamSpec,
-    ParamType, Persistence, Reason, Support, Value,
+    ParamType, Persistence, ProcedureDescriptor, ProcedureState, ProcedureTarget, Reason, Support,
+    Value,
 };
 use simrig_protocol::{
     API_VERSION, ActionParams, AttachParams, AttachResult, ComponentParams, ComponentsChanged,
-    DetachParams, DevicesChanged, DiscoverResult, InitializeParams, InitializeResult, InputState,
-    ItemParams, Message, ParamsChanged, SetParams, SubscribeParams, method,
+    DetachParams, DeviceParams, DevicesChanged, DiscoverResult, InitializeParams, InitializeResult,
+    InputState, ItemParams, Message, ParamsChanged, ProcedureCancelParams, ProcedureSession,
+    ProcedureStartParams, ProcedureSubmitParams, ProceduresResult, SetParams, SubscribeParams,
+    method,
 };
 
 use crate::catalog::{Catalog, Image};
@@ -120,6 +123,15 @@ pub struct HostComponent {
     pub excluded: bool,
 }
 
+/// What a procedure runs on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    /// A component, by address.
+    Component(String),
+    /// A device of a plugin, e.g. one that has no components until it is set up.
+    Device { plugin: String, device: String },
+}
+
 /// Something that changed in the rig, reported by [`Host::poll`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum HostEvent {
@@ -150,6 +162,11 @@ pub enum HostEvent {
     /// The description of a component changed (values, availability, custom parameters).
     DescriptionChanged {
         address: String,
+    },
+    /// A running procedure moved on by itself (live value, detected input, finished…).
+    ProcedureUpdated {
+        session: String,
+        state: ProcedureState,
     },
     /// Live inputs of a subscribed component.
     Inputs {
@@ -596,6 +613,15 @@ impl Host {
                     }
                 }
             }
+            Some(method::PROCEDURE_UPDATE) => {
+                if let Some(update) = parse::<ProcedureSession>(&message) {
+                    let session = format!("{plugin}:{}", update.session);
+                    self.event(HostEvent::ProcedureUpdated {
+                        session,
+                        state: update.state,
+                    });
+                }
+            }
             Some(method::INPUT_STATE) => {
                 if let Some(state) = parse::<InputState>(&message) {
                     let address = format!("{plugin}/{}", state.component);
@@ -838,6 +864,9 @@ impl Host {
 
     /// Chooses which plugin handles a device (`usb:vvvv:pppp[:serial]`), or clears the
     /// choice. Takes effect the next time the device is plugged in or the app starts.
+    /// Chooses which plugin handles a device (`usb:vvvv:pppp[:serial]`), or clears the
+    /// choice. A generic plugin (`on_request`) gets a device only this way. Applied at once if
+    /// the device is connected, and remembered for the next time.
     pub fn choose_plugin(
         &mut self,
         device_key: &str,
@@ -852,7 +881,42 @@ impl Host {
                 self.rig.device_plugins.remove(device_key);
             }
         }
-        self.rig.save(&self.options.config_dir)
+        self.rig.save(&self.options.config_dir)?;
+        let connected: Vec<UsbDevice> = self
+            .usb
+            .iter()
+            .filter(|d| d.keys().iter().any(|k| k == device_key))
+            .cloned()
+            .collect();
+        for device in connected {
+            let info = device.device_info();
+            if let Some(owner) = self
+                .plugins
+                .iter()
+                .position(|p| p.devices.iter().any(|d| d.id == info.id))
+            {
+                self.detach(owner, &info.id);
+                if self.plugins[owner].devices.is_empty()
+                    && !self.plugins[owner].manifest.matching.virtual_devices
+                {
+                    self.stop_plugin(owner);
+                }
+            }
+            for (i, devices) in self
+                .assign(std::slice::from_ref(&device))
+                .into_iter()
+                .enumerate()
+            {
+                for device in devices {
+                    if self.plugins[i].state == PluginState::Running {
+                        self.attach(i, device.device_info());
+                    } else {
+                        self.start_plugin(i, vec![device.device_info()]);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Adds a catalog model to the rig before it is plugged in (or removes it).
@@ -884,6 +948,119 @@ impl Host {
                 (d.clone(), owner)
             })
             .collect()
+    }
+
+    /// Devices attached to running plugins (USB and virtual), as `(plugin, device)`.
+    pub fn devices(&self) -> Vec<(String, DeviceInfo)> {
+        self.plugins
+            .iter()
+            .flat_map(|p| {
+                p.devices
+                    .iter()
+                    .map(move |d| (p.manifest.id.clone(), d.clone()))
+            })
+            .collect()
+    }
+
+    // ---------------------------------------------------------------- procedures
+
+    /// Resolves a procedure target: a component (address or unique suffix) or a device
+    /// (`<plugin>/<device id>`).
+    pub fn target(&self, query: &str) -> Result<Target, HostError> {
+        if let Ok(c) = self.find(query) {
+            return Ok(Target::Component(c.address.clone()));
+        }
+        let (plugin, device) = query
+            .split_once('/')
+            .ok_or_else(|| HostError::NotFound(format!("no component or device '{query}'")))?;
+        let i = self.index(plugin)?;
+        if !self.plugins[i].devices.iter().any(|d| d.id == device) {
+            return Err(HostError::NotFound(format!("no device '{query}'")));
+        }
+        Ok(Target::Device {
+            plugin: plugin.into(),
+            device: device.into(),
+        })
+    }
+
+    /// Procedures offered on a target. Component procedures also come with its description.
+    pub fn procedures(&mut self, target: &Target) -> Result<Vec<ProcedureDescriptor>, HostError> {
+        match target {
+            Target::Component(address) => Ok(self.describe(address)?.procedures.clone()),
+            Target::Device { plugin, device } => {
+                let i = self.index(plugin)?;
+                let result: ProceduresResult = self.plugins[i].call(
+                    method::PROCEDURES,
+                    DeviceParams {
+                        device: device.clone(),
+                    },
+                )?;
+                Ok(result.procedures)
+            }
+        }
+    }
+
+    /// Starts a procedure; returns the session id (`<plugin>:<session>`) and its first state.
+    pub fn start_procedure(
+        &mut self,
+        target: &Target,
+        procedure: &str,
+    ) -> Result<(String, ProcedureState), HostError> {
+        let (i, target) = match target {
+            Target::Component(address) => {
+                let (i, local) = self.route(address)?;
+                (i, ProcedureTarget::Component(local))
+            }
+            Target::Device { plugin, device } => {
+                (self.index(plugin)?, ProcedureTarget::Device(device.clone()))
+            }
+        };
+        let started: ProcedureSession = self.plugins[i].call(
+            method::PROCEDURE_START,
+            ProcedureStartParams {
+                target,
+                procedure: procedure.into(),
+            },
+        )?;
+        let plugin = self.plugins[i].manifest.id.clone();
+        self.drain(&plugin);
+        Ok((format!("{plugin}:{}", started.session), started.state))
+    }
+
+    /// Sends the user's action and field values for the current step.
+    pub fn submit_procedure(
+        &mut self,
+        session: &str,
+        action: &str,
+        values: BTreeMap<String, Value>,
+    ) -> Result<ProcedureState, HostError> {
+        let (i, local) = self.session(session)?;
+        let state: ProcedureState = self.plugins[i].call(
+            method::PROCEDURE_SUBMIT,
+            ProcedureSubmitParams {
+                session: local,
+                action: action.into(),
+                values,
+            },
+        )?;
+        let plugin = self.plugins[i].manifest.id.clone();
+        self.drain(&plugin);
+        Ok(state)
+    }
+
+    pub fn cancel_procedure(&mut self, session: &str) -> Result<(), HostError> {
+        let (i, local) = self.session(session)?;
+        self.plugins[i].call(
+            method::PROCEDURE_CANCEL,
+            ProcedureCancelParams { session: local },
+        )
+    }
+
+    fn session(&self, session: &str) -> Result<(usize, String), HostError> {
+        let (plugin, local) = session
+            .split_once(':')
+            .ok_or_else(|| HostError::NotFound(format!("no procedure session '{session}'")))?;
+        Ok((self.index(plugin)?, local.into()))
     }
 
     // ---------------------------------------------------------------- catalog

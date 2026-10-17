@@ -12,6 +12,50 @@ use simrig_plugin_sdk::prelude::*;
 
 pub const NO_RIM: &str = "none";
 
+/// Id, name and catalog model of a simulated component.
+#[derive(Clone, Debug)]
+pub struct Identity {
+    pub id: String,
+    pub name: String,
+    pub model: String,
+}
+
+impl Identity {
+    pub fn new(id: impl Into<String>, name: &str, model: &str) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            model: model.into(),
+        }
+    }
+}
+
+/// How a generic (unconfigured) device was set up by its setup procedure.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Setup {
+    Shifter { gears: i64 },
+    Handbrake,
+}
+
+impl Setup {
+    pub fn to_text(&self) -> String {
+        match self {
+            Setup::Shifter { gears } => format!("shifter:{gears}"),
+            Setup::Handbrake => "handbrake".into(),
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.split_once(':') {
+            Some(("shifter", gears)) => Some(Setup::Shifter {
+                gears: gears.parse().ok()?,
+            }),
+            None if text == "handbrake" => Some(Setup::Handbrake),
+            _ => None,
+        }
+    }
+}
+
 /// The simulated driver: it remembers saved settings in its data directory (given by the host
 /// in `SIMRIG_DRIVER_DATA`), written by its `save-setting` privileged operation.
 pub struct SimDriver {
@@ -53,6 +97,11 @@ pub struct SimState {
     pub driver: Option<SimDriver>,
     /// Settings saved by the driver, `<component id>.<item>` → text value.
     pub saved: BTreeMap<String, String>,
+    /// Generic devices that were set up, by device id.
+    pub setups: BTreeMap<String, Setup>,
+    /// During a guided calibration the simulated pedal follows the instructions: `(pedal
+    /// index, position 0..1)`.
+    pub pedal_override: Option<(usize, f64)>,
     rng: u64,
 }
 
@@ -72,8 +121,15 @@ impl Default for SimState {
             demo_filter: 3,
             rim: "formula".into(),
             handbrake_connected: true,
+            setups: saved
+                .iter()
+                .filter_map(|(k, v)| {
+                    Some((k.strip_suffix(".setup")?.to_string(), Setup::parse(v)?))
+                })
+                .collect(),
             driver,
             saved,
+            pedal_override: None,
             rng: 0x2545_f491_4f6c_dd1d,
         }
     }

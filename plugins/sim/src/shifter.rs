@@ -1,6 +1,6 @@
 use simrig_plugin_sdk::prelude::*;
 
-use crate::sim::{Shared, as_choice, as_f64};
+use crate::sim::{Identity, Shared, as_choice, as_f64};
 
 const H_PATTERN: &str = "h_pattern";
 const SEQUENTIAL: &str = "sequential";
@@ -9,6 +9,7 @@ const SEQUENTIAL: &str = "sequential";
 /// sense in one mode are reported as `DependsOn` the mode in the other.
 pub struct SimShifter {
     shared: Shared,
+    identity: Identity,
     mode: String,
     gears: i64,
     reverse_position: String,
@@ -16,11 +17,12 @@ pub struct SimShifter {
 }
 
 impl SimShifter {
-    pub fn new(shared: Shared) -> Self {
+    pub fn new(shared: Shared, identity: Identity, gears: i64) -> Self {
         Self {
             shared,
+            identity,
             mode: H_PATTERN.into(),
-            gears: 6,
+            gears,
             reverse_position: "left_up".into(),
             engage_threshold: 50.0,
         }
@@ -75,15 +77,15 @@ impl SimShifter {
 
 impl Component for SimShifter {
     fn id(&self) -> String {
-        format!("{}/shifter", crate::SHIFTER)
+        self.identity.id.clone()
     }
 
     fn name(&self) -> String {
-        "Simulated H/sequential shifter".into()
+        self.identity.name.clone()
     }
 
     fn model(&self) -> Option<String> {
-        Some("sim/shifter".into())
+        Some(self.identity.model.clone())
     }
     fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
         self.shared.save(&self.id(), item, value, host)

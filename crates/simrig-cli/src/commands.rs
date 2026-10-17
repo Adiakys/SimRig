@@ -1,5 +1,7 @@
 //! Rig composition, drivers, presets, catalog, system and monitoring commands.
 
+use std::collections::BTreeMap;
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
@@ -8,6 +10,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use clap::Subcommand;
 use simrig_host::{ApplyOutcome, Host, HostEvent, Image, PluginLocation};
+use simrig_model::{Element, Level, ParamType, ProcedureState, Step, Value};
 
 #[derive(Subcommand)]
 pub enum DriverCommand {
@@ -51,14 +54,33 @@ pub enum PresetCommand {
 }
 
 pub fn devices(host: &Host) {
+    println!("Attached devices");
+    for (plugin, device) in host.devices() {
+        let components = host
+            .components()
+            .iter()
+            .filter(|c| c.plugin == plugin && c.device.id == device.id)
+            .count();
+        let note = if components == 0 {
+            "  (no components: see `procedures`)"
+        } else {
+            ""
+        };
+        println!(
+            "  {:<28} {}{note}",
+            format!("{plugin}/{}", device.id),
+            device.name
+        );
+    }
+    println!("USB devices");
     let devices = host.usb_devices();
     if devices.is_empty() {
-        println!("no USB devices");
+        println!("  none");
     }
     for (device, plugin) in devices {
         let keys = device.keys();
         println!(
-            "{:<22} {:<40} {}",
+            "  {:<28} {:<40} {}",
             keys.first().map(String::as_str).unwrap_or_default(),
             device.name,
             plugin
@@ -260,9 +282,214 @@ pub fn monitor(host: &mut Host, seconds: Option<f64>) -> Result<()> {
                     println!("~ components of {plugin}/{device} changed")
                 }
                 HostEvent::DescriptionChanged { address } => println!("~ {address} updated"),
+                HostEvent::ProcedureUpdated { session, .. } => {
+                    println!("~ procedure {session} moved on")
+                }
             }
         }
         thread::sleep(Duration::from_millis(200));
     }
     Ok(())
+}
+
+pub fn procedures(host: &mut Host, target: &str) -> Result<()> {
+    let target = host.target(target)?;
+    let procedures = host.procedures(&target)?;
+    if procedures.is_empty() {
+        println!("no procedures");
+    }
+    for p in procedures {
+        let availability = match &p.availability {
+            simrig_model::Support::Supported(()) => String::new(),
+            simrig_model::Support::Unsupported(u) => format!("  ✗ unavailable — {}", u.explain()),
+        };
+        println!("{:<22} {}{availability}", p.id, p.label);
+        if let Some(help) = p.help {
+            println!("{:<22} {help}", "");
+        }
+    }
+    Ok(())
+}
+
+fn render(step: &Step) {
+    let progress = step
+        .progress
+        .map(|[n, total]| format!(" ({n}/{total})"))
+        .unwrap_or_default();
+    println!("\n── {}{progress}", step.title);
+    if let Some(text) = &step.text {
+        println!("{text}");
+    }
+    for element in &step.elements {
+        match element {
+            Element::Field { .. } => {}
+            Element::Value { label, value, unit } => {
+                let unit = unit.as_deref().map(|u| format!(" {u}")).unwrap_or_default();
+                println!("  {label}: {value}{unit}");
+            }
+            Element::Table { columns, rows } => {
+                let widths: Vec<usize> = (0..columns.len())
+                    .map(|i| {
+                        rows.iter()
+                            .map(|r| r.get(i).map_or(0, |c| c.chars().count()))
+                            .chain([columns[i].chars().count()])
+                            .max()
+                            .unwrap_or(0)
+                    })
+                    .collect();
+                let line = |cells: &[String]| {
+                    let cells: Vec<String> = cells
+                        .iter()
+                        .zip(&widths)
+                        .map(|(c, w)| format!("{c:<w$}"))
+                        .collect();
+                    println!("  {}", cells.join("  "));
+                };
+                line(columns);
+                for row in rows {
+                    line(row);
+                }
+            }
+            Element::Notice { level, text } => {
+                let mark = match level {
+                    Level::Info => "ℹ",
+                    Level::Success => "✓",
+                    Level::Warning => "⚠",
+                    Level::Error => "✗",
+                };
+                println!("  {mark} {text}");
+            }
+        }
+    }
+}
+
+fn prompt(question: &str) -> Result<String> {
+    print!("{question}");
+    io::stdout().flush()?;
+    let mut answer = String::new();
+    if io::stdin().lock().read_line(&mut answer)? == 0 {
+        anyhow::bail!("input closed");
+    }
+    Ok(answer.trim().to_string())
+}
+
+/// Asks the step's fields, then which action to take.
+fn answer(step: &Step) -> Result<(String, BTreeMap<String, Value>)> {
+    let mut values = step.defaults();
+    for element in &step.elements {
+        let Element::Field {
+            id,
+            label,
+            ty,
+            value,
+            help,
+        } = element
+        else {
+            continue;
+        };
+        if let Some(help) = help {
+            println!("  {help}");
+        }
+        let choices = match ty {
+            ParamType::Choice { options } => {
+                format!(
+                    " ({})",
+                    options
+                        .iter()
+                        .map(|o| format!("{} = {}", o.id, o.label))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            _ => String::new(),
+        };
+        loop {
+            let text = prompt(&format!("  {label}{choices} [{}]: ", value.to_text()))?;
+            if text.is_empty() {
+                break;
+            }
+            match ty.parse(&text) {
+                Ok(v) => {
+                    values.insert(id.clone(), v);
+                    break;
+                }
+                Err(e) => println!("  {e}"),
+            }
+        }
+    }
+    for (i, action) in step.actions.iter().enumerate() {
+        println!("  {}) {}", i + 1, action.label);
+    }
+    loop {
+        let text = prompt("  choose [1]: ")?;
+        let index = if text.is_empty() {
+            Some(0)
+        } else {
+            text.parse::<usize>().ok().and_then(|n| n.checked_sub(1))
+        };
+        if let Some(action) = index.and_then(|i| step.actions.get(i)) {
+            if let Some(confirm) = &action.confirm {
+                if !prompt(&format!("  {confirm} Type 'yes' to continue: "))?
+                    .eq_ignore_ascii_case("yes")
+                {
+                    continue;
+                }
+            }
+            return Ok((action.id.clone(), values));
+        }
+    }
+}
+
+/// Latest update of a session, waiting for the plugin to move on.
+fn wait_update(host: &mut Host, session: &str) -> Result<ProcedureState> {
+    loop {
+        let mut latest = host.poll().into_iter().filter_map(|e| match e {
+            HostEvent::ProcedureUpdated { session: s, state } if s == session => Some(state),
+            _ => None,
+        });
+        if let Some(state) = latest.next_back() {
+            return Ok(state);
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// Runs a plugin's procedure interactively, rendering its steps generically.
+pub fn configure(host: &mut Host, target: &str, procedure: &str) -> Result<()> {
+    if !io::stdin().is_terminal() {
+        anyhow::bail!("procedures are interactive: run this command in a terminal");
+    }
+    let target = host.target(target)?;
+    let (session, mut state) = host.start_procedure(&target, procedure)?;
+    loop {
+        let step = match state {
+            ProcedureState::Finished { message } => {
+                println!("\n✓ {}", message.unwrap_or_else(|| "done".into()));
+                return Ok(());
+            }
+            ProcedureState::Cancelled => {
+                println!("\ncancelled");
+                return Ok(());
+            }
+            ProcedureState::Step(step) => step,
+        };
+        render(&step);
+        if step.waiting {
+            println!("  (waiting, Ctrl+C to abort)");
+            state = wait_update(host, &session)?;
+            continue;
+        }
+        let (action, values) = answer(&step)?;
+        state = match host.submit_procedure(&session, &action, values) {
+            Ok(next) => {
+                // Drop live updates of the step we just left.
+                host.poll();
+                next
+            }
+            Err(e) => {
+                println!("  {e}");
+                ProcedureState::Step(step)
+            }
+        };
+    }
 }

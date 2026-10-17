@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::component::{ComponentKind, ItemClass, PedalRole};
 use crate::custom::CustomParam;
 use crate::param::{ParamSpec, ParamType};
+use crate::procedure::ProcedureDescriptor;
 use crate::support::Support;
 
 /// Everything the app needs to render a component: the state of every standard item
@@ -22,6 +23,9 @@ pub struct ComponentDescription {
     pub items: Vec<ItemDescription>,
     #[serde(default)]
     pub custom: Vec<CustomParam>,
+    /// Guided procedures the plugin offers on this component.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub procedures: Vec<ProcedureDescriptor>,
 }
 
 impl ComponentDescription {

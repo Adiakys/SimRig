@@ -29,12 +29,14 @@
 mod dispatch;
 mod error;
 mod interfaces;
+mod procedures;
 mod server;
 
 pub use error::{Error, Result};
 pub use interfaces::{
     AnyComponent, Component, Handbrake, Pedals, Shifter, SteeringWheel, WheelBase,
 };
+pub use procedures::{Outcome, Procedure};
 pub use server::{HostLink, Server, run};
 pub use simrig_model as model;
 pub use simrig_protocol::PluginInfo;
@@ -61,6 +63,17 @@ pub trait Adapter {
     fn take_changes(&mut self) -> Vec<Change> {
         Vec::new()
     }
+
+    /// Guided procedures offered on an attached device, e.g. the setup of a device that has no
+    /// components yet.
+    fn device_procedures(&mut self, _device_id: &str) -> Vec<model::ProcedureDescriptor> {
+        Vec::new()
+    }
+
+    /// Starts one of [`Adapter::device_procedures`]; called only for available ones.
+    fn start_device_procedure(&mut self, _device_id: &str, id: &str) -> Result<Box<dyn Procedure>> {
+        Err(Error::NotFound(format!("unknown procedure '{id}'")))
+    }
 }
 
 /// A change of an attached device's components.
@@ -77,14 +90,15 @@ pub enum Change {
 /// Everything a plugin author usually needs.
 pub mod prelude {
     pub use crate::model::{
-        ActionOutcome, ActionSpec, Axis, ChoiceOption, CurvePoint, CustomParam, Degrees,
-        DeviceInfo, Gear, HandbrakeAction, HandbrakeParam, Kilograms, ParamSpec, ParamType,
-        PedalAction, PedalParam, PedalRole, Percent, Persistence, Reason, ShifterAction,
-        ShifterParam, SteeringWheelAction, SteeringWheelOutput, SteeringWheelParam, Support,
-        Unsupported, Value, WheelBaseAction, WheelBaseParam,
+        ActionOutcome, ActionRole, ActionSpec, Axis, ChoiceOption, CurvePoint, CustomParam,
+        Degrees, DeviceInfo, Element, Gear, HandbrakeAction, HandbrakeParam, Kilograms, Level,
+        ParamSpec, ParamType, PedalAction, PedalParam, PedalRole, Percent, Persistence,
+        ProcedureDescriptor, Reason, ShifterAction, ShifterParam, SteeringWheelAction,
+        SteeringWheelOutput, SteeringWheelParam, Step, StepAction, Support, Unsupported, Value,
+        WheelBaseAction, WheelBaseParam,
     };
     pub use crate::{
-        Adapter, AnyComponent, Change, Component, Error, Handbrake, HostLink, Pedals, PluginInfo,
-        Result, Shifter, SteeringWheel, WheelBase,
+        Adapter, AnyComponent, Change, Component, Error, Handbrake, HostLink, Outcome, Pedals,
+        PluginInfo, Procedure, Result, Shifter, SteeringWheel, WheelBase,
     };
 }

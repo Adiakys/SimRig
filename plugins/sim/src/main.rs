@@ -13,6 +13,7 @@
 mod base;
 mod handbrake;
 mod pedals;
+mod procedures;
 mod shifter;
 mod sim;
 mod wheel;
@@ -22,27 +23,32 @@ use std::process::ExitCode;
 use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
-use crate::sim::{NO_RIM, Shared};
+use std::collections::BTreeMap;
+
+use crate::sim::{Identity, NO_RIM, Setup, Shared};
 
 pub const RIG: &str = "rig0";
 pub const PEDALS: &str = "pedals0";
 pub const SHIFTER: &str = "shifter0";
 pub const HANDBRAKE: &str = "hb0";
+pub const GENERIC: &str = "generic0";
 
 struct Options {
     id: String,
     devices: Vec<String>,
     usb_pedals: bool,
+    usb_generic: bool,
 }
 
 impl Options {
     fn parse() -> Self {
         let mut options = Options {
             id: "sim".into(),
-            devices: ["base", "pedals", "shifter", "handbrake"]
+            devices: ["base", "pedals", "shifter", "handbrake", "generic"]
                 .map(String::from)
                 .to_vec(),
             usb_pedals: false,
+            usb_generic: false,
         };
         let mut args = std::env::args().skip(1);
         while let Some(arg) = args.next() {
@@ -57,6 +63,7 @@ impl Options {
                         .collect();
                 }
                 "--usb-pedals" => options.usb_pedals = true,
+                "--usb-generic" => options.usb_generic = true,
                 other => eprintln!("ignoring unknown option {other}"),
             }
         }
@@ -74,6 +81,8 @@ struct SimAdapter {
     rig_attached: bool,
     /// The rim mounted on the attached base.
     mounted_rim: String,
+    /// Attached generic devices and the setup their components reflect.
+    generic: BTreeMap<String, Option<Setup>>,
 }
 
 impl SimAdapter {
@@ -97,6 +106,31 @@ impl SimAdapter {
             }
         }
         component
+    }
+
+    /// The component of a generic device, once it was set up.
+    fn generic_component(&self, device: &str, setup: &Setup) -> AnyComponent {
+        let s = self.shared.clone();
+        let component = match setup {
+            Setup::Shifter { gears } => AnyComponent::Shifter(Box::new(shifter::SimShifter::new(
+                s,
+                Identity::new(
+                    format!("{device}/shifter"),
+                    "Generic shifter",
+                    "sim/generic-shifter",
+                ),
+                *gears,
+            ))),
+            Setup::Handbrake => AnyComponent::Handbrake(Box::new(handbrake::SimHandbrake::new(
+                s,
+                Identity::new(
+                    format!("{device}/handbrake"),
+                    "Generic handbrake",
+                    "sim/generic-handbrake",
+                ),
+            ))),
+        };
+        self.restore(component)
     }
 
     fn wheel(&self, rim: &str) -> Option<AnyComponent> {
@@ -132,6 +166,9 @@ impl Adapter for SimAdapter {
         if self.options.has("handbrake") && self.shared.get().handbrake_connected {
             devices.push(Self::device(HANDBRAKE, "Simulated handbrake"));
         }
+        if self.options.has("generic") {
+            devices.push(Self::device(GENERIC, "Simulated unconfigured USB device"));
+        }
         devices
     }
 
@@ -153,12 +190,37 @@ impl Adapter for SimAdapter {
                 "Simulated load-cell pedals",
                 "sim/pedals",
             )))],
-            (Bus::Virtual, SHIFTER) => vec![AnyComponent::Shifter(Box::new(
-                shifter::SimShifter::new(s.clone()),
-            ))],
+            (Bus::Virtual, SHIFTER) => {
+                vec![AnyComponent::Shifter(Box::new(shifter::SimShifter::new(
+                    s.clone(),
+                    Identity::new(
+                        format!("{SHIFTER}/shifter"),
+                        "Simulated H/sequential shifter",
+                        "sim/shifter",
+                    ),
+                    6,
+                )))]
+            }
             (Bus::Virtual, HANDBRAKE) => vec![AnyComponent::Handbrake(Box::new(
-                handbrake::SimHandbrake::new(s.clone()),
+                handbrake::SimHandbrake::new(
+                    s.clone(),
+                    Identity::new(
+                        format!("{HANDBRAKE}/handbrake"),
+                        "Simulated handbrake",
+                        "sim/handbrake",
+                    ),
+                ),
             ))],
+            (Bus::Virtual, GENERIC) | (Bus::Usb { .. }, _)
+                if device.id == GENERIC || self.options.usb_generic =>
+            {
+                let setup = s.get().setups.get(&device.id).cloned();
+                self.generic.insert(device.id.clone(), setup.clone());
+                return Ok(setup
+                    .map(|setup| self.generic_component(&device.id, &setup))
+                    .into_iter()
+                    .collect());
+            }
             (Bus::Usb { .. }, _) if self.options.usb_pedals => {
                 vec![AnyComponent::Pedals(Box::new(pedals::SimPedals::new(
                     s.clone(),
@@ -176,14 +238,61 @@ impl Adapter for SimAdapter {
         if device_id == RIG {
             self.rig_attached = false;
         }
+        self.generic.remove(device_id);
+    }
+
+    fn device_procedures(&mut self, device_id: &str) -> Vec<ProcedureDescriptor> {
+        match self.generic.get(device_id) {
+            Some(setup) => {
+                let label = if setup.is_some() {
+                    "Set up again"
+                } else {
+                    "Set up this device"
+                };
+                vec![ProcedureDescriptor::new("setup", label).help(
+                    "Choose what the device is, then map its inputs by moving it when asked.",
+                )]
+            }
+            None => Vec::new(),
+        }
+    }
+
+    fn start_device_procedure(&mut self, device_id: &str, id: &str) -> Result<Box<dyn Procedure>> {
+        if id != "setup" || !self.generic.contains_key(device_id) {
+            return Err(Error::NotFound(format!("unknown procedure '{id}'")));
+        }
+        Ok(Box::new(procedures::DeviceSetup::new(
+            self.shared.clone(),
+            device_id,
+        )))
     }
 
     fn take_changes(&mut self) -> Vec<Change> {
+        let mut changes = Vec::new();
+        // Generic devices that were (re)configured by their setup procedure.
+        let setups = self.shared.get().setups.clone();
+        for (device, attached) in self.generic.clone() {
+            let current = setups.get(&device).cloned();
+            if current == attached {
+                continue;
+            }
+            for kind in ["shifter", "handbrake"] {
+                changes.push(Change::ComponentRemoved {
+                    component: format!("{device}/{kind}"),
+                });
+            }
+            if let Some(setup) = &current {
+                changes.push(Change::ComponentAdded {
+                    device: device.clone(),
+                    component: self.generic_component(&device, setup),
+                });
+            }
+            self.generic.insert(device, current);
+        }
         let rim = self.shared.get().rim.clone();
         if !self.rig_attached || rim == self.mounted_rim {
-            return Vec::new();
+            return changes;
         }
-        let mut changes = Vec::new();
         if self.mounted_rim != NO_RIM {
             changes.push(Change::ComponentRemoved {
                 component: format!("{RIG}/wheel"),
@@ -208,5 +317,6 @@ fn main() -> ExitCode {
         shared,
         rig_attached: false,
         mounted_rim,
+        generic: BTreeMap::new(),
     })
 }

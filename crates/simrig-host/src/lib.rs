@@ -17,7 +17,7 @@ pub mod usb;
 
 pub use catalog::{Catalog, CatalogEntry, Image, Model};
 pub use error::HostError;
-pub use host::{Host, HostComponent, HostEvent, HostOptions, Plugin, PluginState};
+pub use host::{Host, HostComponent, HostEvent, HostOptions, Plugin, PluginState, Target};
 pub use manifest::{Manifest, PluginLocation};
 pub use presets::{ApplyEntry, ApplyOutcome, Preset, PresetStore};
 pub use rig::RigConfig;

@@ -1,6 +1,6 @@
 use simrig_plugin_sdk::prelude::*;
 
-use crate::sim::{AxisShape, RAW_MAX, Shared, as_choice, as_f64, raw_from_unit};
+use crate::sim::{AxisShape, Identity, RAW_MAX, Shared, as_choice, as_f64, raw_from_unit};
 
 const ANALOG: &str = "analog";
 const BUTTON: &str = "button";
@@ -8,15 +8,17 @@ const BUTTON: &str = "button";
 /// Simulated handbrake with an analog and a button mode.
 pub struct SimHandbrake {
     shared: Shared,
+    identity: Identity,
     shape: AxisShape,
     mode: String,
     button_threshold: Percent,
 }
 
 impl SimHandbrake {
-    pub fn new(shared: Shared) -> Self {
+    pub fn new(shared: Shared, identity: Identity) -> Self {
         Self {
             shared,
+            identity,
             shape: AxisShape::default(),
             mode: ANALOG.into(),
             button_threshold: 50.0,
@@ -41,15 +43,15 @@ impl SimHandbrake {
 
 impl Component for SimHandbrake {
     fn id(&self) -> String {
-        format!("{}/handbrake", crate::HANDBRAKE)
+        self.identity.id.clone()
     }
 
     fn name(&self) -> String {
-        "Simulated handbrake".into()
+        self.identity.name.clone()
     }
 
     fn model(&self) -> Option<String> {
-        Some("sim/handbrake".into())
+        Some(self.identity.model.clone())
     }
     fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
         self.shared.save(&self.id(), item, value, host)

@@ -209,9 +209,15 @@ fn standard_items(kind: ComponentKind, pedals: &[PedalRole]) -> Vec<(String, Ite
 pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
     let kind = c.kind();
     let pedals = c.pedals();
-    let (id, name, model, custom) = {
+    let (id, name, model, custom, procedures) = {
         let base = c.component_mut();
-        (base.id(), base.name(), base.model(), base.custom_params())
+        (
+            base.id(),
+            base.name(),
+            base.model(),
+            base.custom_params(),
+            base.procedures(),
+        )
     };
     let mut f = facade(c);
     let items = standard_items(kind, &pedals)
@@ -239,6 +245,7 @@ pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
         pedals,
         items,
         custom,
+        procedures,
     }
 }
 
@@ -352,5 +359,13 @@ pub(crate) fn apply_text(c: &mut AnyComponent, item: &str, text: &str) -> Result
     match item.strip_prefix(CUSTOM_PREFIX) {
         Some(id) => set_custom(c, id, &value),
         None => set_param(c, item, &value),
+    }
+}
+
+/// Sets a standard parameter or `custom.<id>` with validation (values produced by procedures).
+pub(crate) fn apply(c: &mut AnyComponent, item: &str, value: &Value) -> Result<()> {
+    match item.strip_prefix(CUSTOM_PREFIX) {
+        Some(id) => set_custom(c, id, value),
+        None => set_param(c, item, value),
     }
 }

@@ -14,7 +14,17 @@ pub struct SimPedals {
     brake_max_force: Kilograms,
 }
 
-fn index(pedal: PedalRole) -> usize {
+/// Raw position of a simulated pedal: a wave, or what a guided calibration asks for.
+pub fn raw(shared: &Shared, pedal: PedalRole) -> i64 {
+    let mut s = shared.get();
+    let unit = match s.pedal_override {
+        Some((i, position)) if i == index(pedal) => position,
+        _ => s.unit_wave(index(pedal) as f64 / 3.0),
+    } + s.jitter() * 0.05;
+    raw_from_unit(unit)
+}
+
+pub fn index(pedal: PedalRole) -> usize {
     match pedal {
         PedalRole::Throttle => 0,
         PedalRole::Brake => 1,
@@ -35,9 +45,7 @@ impl SimPedals {
     }
 
     fn raw(&self, pedal: PedalRole) -> i64 {
-        let mut s = self.shared.get();
-        let unit = s.unit_wave(index(pedal) as f64 / 3.0) + s.jitter() * 0.05;
-        raw_from_unit(unit)
+        raw(&self.shared, pedal)
     }
 }
 
@@ -52,6 +60,27 @@ impl Component for SimPedals {
 
     fn model(&self) -> Option<String> {
         Some(self.model.clone())
+    }
+
+    fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
+        PedalRole::ALL
+            .iter()
+            .map(|p| {
+                ProcedureDescriptor::new(&format!("calibrate-{}", p.key()), &format!("Calibrate the {} (guided)", p.key()))
+                    .help("Release and press the pedal when asked; the result is applied as its calibration.")
+            })
+            .collect()
+    }
+
+    fn start_procedure(&mut self, id: &str) -> Result<Box<dyn Procedure>> {
+        let pedal = id
+            .strip_prefix("calibrate-")
+            .and_then(PedalRole::from_key)
+            .ok_or_else(|| Error::NotFound(format!("unknown procedure '{id}'")))?;
+        Ok(Box::new(crate::procedures::PedalCalibration::new(
+            self.shared.clone(),
+            pedal,
+        )))
     }
 
     fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {

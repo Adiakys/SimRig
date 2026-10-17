@@ -40,6 +40,10 @@ pub struct Match {
     /// The plugin provides devices by itself (e.g. the simulated rig).
     #[serde(default, rename = "virtual")]
     pub virtual_devices: bool,
+    /// The plugin handles any USB device the user assigns to it explicitly (generic plugins).
+    /// It never gets devices on its own.
+    #[serde(default)]
+    pub on_request: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -94,11 +98,12 @@ pub fn assign_usb(
             .filter_map(|(i, m)| m.matching.usb_claim(device.vid, device.pid).map(|s| (i, s)))
             .collect();
         let chosen = device.keys().iter().find_map(|k| overrides.get(k).cloned());
+        // The user's choice wins if that plugin claims the device or takes devices on request.
         let chosen = chosen.and_then(|p| {
-            claims
+            manifests
                 .iter()
-                .find(|(i, _)| manifests[*i].id == p)
-                .map(|(i, _)| *i)
+                .position(|m| m.id == p)
+                .filter(|i| manifests[*i].matching.on_request || claims.iter().any(|(c, _)| c == i))
         });
         if let Some(i) = chosen {
             assigned[i].push(device.clone());
@@ -266,6 +271,7 @@ mod tests {
             matching: Match {
                 usb,
                 virtual_devices: false,
+                on_request: false,
             },
             driver: None,
         }
@@ -344,6 +350,22 @@ mod tests {
         let (assigned, problems) = assign_usb(&[&a, &b], &[device(0x0eb7, 0x0020)], &overrides);
         assert_eq!((assigned[0].len(), assigned[1].len()), (0, 1));
         assert!(problems.is_empty());
+    }
+
+    #[test]
+    fn generic_plugins_get_only_devices_assigned_to_them() {
+        let mut generic = manifest("generic-usb", vec![]);
+        generic.matching.on_request = true;
+        let unknown = device(0x1234, 0x0001);
+        let (assigned, _) = assign_usb(
+            &[&generic],
+            std::slice::from_ref(&unknown),
+            &Default::default(),
+        );
+        assert!(assigned[0].is_empty());
+        let overrides = [("usb:1234:0001".to_string(), "generic-usb".to_string())].into();
+        let (assigned, _) = assign_usb(&[&generic], &[unknown], &overrides);
+        assert_eq!(assigned[0].len(), 1);
     }
 
     #[test]

@@ -47,6 +47,7 @@ impl UsbDevice {
 }
 
 pub const DEFAULT_ROOT: &str = SYSFS_USB;
+const HUB_CLASS: &str = "09";
 
 /// Connected USB devices (not interfaces, not hubs' ports).
 pub fn scan() -> Vec<UsbDevice> {
@@ -67,6 +68,10 @@ pub fn scan_dir(root: &Path) -> Vec<UsbDevice> {
                     .ok()
                     .map(|s| s.trim().to_string())
             };
+            // Hubs are infrastructure, never a rig device.
+            if read("bDeviceClass").as_deref() == Some(HUB_CLASS) {
+                return None;
+            }
             let vid = u16::from_str_radix(&read("idVendor")?, 16).ok()?;
             let pid = u16::from_str_radix(&read("idProduct")?, 16).ok()?;
             let name = match (read("manufacturer"), read("product")) {
@@ -102,6 +107,11 @@ mod tests {
         fs::write(dev.join("idProduct"), "0020\n").unwrap();
         fs::write(dev.join("product"), "FANATEC CSL DD\n").unwrap();
         fs::create_dir_all(root.join("1-2:1.0")).unwrap(); // an interface: no idVendor
+        let hub = root.join("usb1");
+        fs::create_dir_all(&hub).unwrap();
+        fs::write(hub.join("idVendor"), "1d6b\n").unwrap();
+        fs::write(hub.join("idProduct"), "0002\n").unwrap();
+        fs::write(hub.join("bDeviceClass"), "09\n").unwrap();
         let devices = scan_dir(&root);
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(devices.len(), 1);

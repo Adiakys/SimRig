@@ -102,6 +102,10 @@ enum Command {
     },
     /// Where the picture of a component comes from.
     Image { component: String },
+    /// Guided procedures a plugin offers on a component or a device (`<plugin>/<device>`).
+    Procedures { target: String },
+    /// Run a guided procedure interactively (calibration, device setup…).
+    Configure { target: String, procedure: String },
     /// Drivers of plugins.
     #[command(subcommand)]
     Driver(commands::DriverCommand),
@@ -279,6 +283,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
             );
         }
         Command::Image { component } => commands::image(&host, &component)?,
+        Command::Procedures { target } => commands::procedures(&mut host, &target)?,
+        Command::Configure { target, procedure } => {
+            commands::configure(&mut host, &target, &procedure)?
+        }
         Command::Driver(command) => return commands::driver(&mut host, command),
         Command::Preset(command) => commands::preset(&mut host, command)?,
         Command::System => commands::system(&host),

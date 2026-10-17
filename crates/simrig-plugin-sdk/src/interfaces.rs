@@ -8,7 +8,9 @@ use simrig_model::{
 };
 
 use crate::error::{Error, Result};
+use crate::procedures::Procedure;
 use crate::server::HostLink;
+use simrig_model::ProcedureDescriptor;
 
 /// Shared by all component types.
 pub trait Component {
@@ -37,6 +39,16 @@ pub trait Component {
     /// the driver: device memory, a file, a privileged operation through `host`…
     fn save(&mut self, _item: &str, _value: &Value, _host: &mut HostLink<'_>) -> Result<()> {
         Err(Error::unsupported())
+    }
+
+    /// Guided procedures offered on this component (calibrations, mappings…).
+    fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
+        Vec::new()
+    }
+
+    /// Starts one of [`Component::procedures`]; called only for available ones.
+    fn start_procedure(&mut self, id: &str) -> Result<Box<dyn Procedure>> {
+        Err(Error::NotFound(format!("unknown procedure '{id}'")))
     }
 }
 

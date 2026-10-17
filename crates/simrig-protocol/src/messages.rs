@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use simrig_model::{ComponentDescription, DeviceInfo, Value};
+use simrig_model::{
+    ComponentDescription, DeviceInfo, ProcedureDescriptor, ProcedureState, ProcedureTarget, Value,
+};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InitializeParams {
@@ -118,4 +120,42 @@ pub struct PrivilegedRequest {
 pub struct PrivilegedResult {
     /// What the operation printed on stdout.
     pub output: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DeviceParams {
+    pub device: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProceduresResult {
+    pub procedures: Vec<ProcedureDescriptor>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProcedureStartParams {
+    pub target: ProcedureTarget,
+    pub procedure: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProcedureSession {
+    /// Plugin-local session id.
+    pub session: String,
+    pub state: ProcedureState,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProcedureSubmitParams {
+    pub session: String,
+    /// Id of the chosen step action.
+    pub action: String,
+    /// Values of the step's fields.
+    #[serde(default)]
+    pub values: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProcedureCancelParams {
+    pub session: String,
 }

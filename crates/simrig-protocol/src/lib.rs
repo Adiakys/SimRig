@@ -44,6 +44,15 @@ pub mod method {
     /// host → plugin: make the current value of a persistent item the one the driver restores
     /// when the device is plugged in.
     pub const SAVE: &str = "param/save";
+    /// host → plugin: procedures the plugin offers on a device (component procedures come with
+    /// `component/describe`).
+    pub const PROCEDURES: &str = "procedures/list";
+    /// host → plugin: start a procedure; returns the session and its first state.
+    pub const PROCEDURE_START: &str = "procedure/start";
+    /// host → plugin: the user chose an action of the current step.
+    pub const PROCEDURE_SUBMIT: &str = "procedure/submit";
+    /// host → plugin: abandon a procedure (e.g. its window was closed).
+    pub const PROCEDURE_CANCEL: &str = "procedure/cancel";
     /// host → plugin: the app is closing; the plugin must exit.
     pub const SHUTDOWN: &str = "shutdown";
 
@@ -56,6 +65,9 @@ pub mod method {
     pub const COMPONENTS_CHANGED: &str = "components/changed";
     /// plugin → host notification: custom parameters or ranges of a component changed.
     pub const PARAMS_CHANGED: &str = "params/changed";
+    /// plugin → host notification: a running procedure moved on by itself (live values, a
+    /// detected input…).
+    pub const PROCEDURE_UPDATE: &str = "procedure/update";
     /// plugin → host notification: the plugin's virtual devices changed.
     pub const DEVICES_CHANGED: &str = "devices/changed";
 }

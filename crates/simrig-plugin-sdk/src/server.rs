@@ -21,7 +21,13 @@ use simrig_protocol::{
 use crate::dispatch;
 use crate::error::{Error, Result};
 use crate::interfaces::AnyComponent;
+use crate::procedures::{Outcome, Session, Sessions, split};
 use crate::{Adapter, Change};
+use simrig_model::{ActionRole, ProcedureState, ProcedureTarget, Support};
+use simrig_protocol::{
+    DeviceParams, ProcedureCancelParams, ProcedureSession, ProcedureStartParams,
+    ProcedureSubmitParams, ProceduresResult,
+};
 
 /// How often the adapter is asked for changes when nothing else happens.
 const CHANGE_POLL: Duration = Duration::from_millis(250);
@@ -129,6 +135,7 @@ pub struct Server<A: Adapter> {
     discovered: Option<Vec<DeviceInfo>>,
     backlog: VecDeque<Incoming>,
     next_id: u64,
+    procedures: Sessions,
     initialized: bool,
 }
 
@@ -144,6 +151,7 @@ impl<A: Adapter> Server<A> {
             discovered: None,
             backlog: VecDeque::new(),
             next_id: 1,
+            procedures: Sessions::default(),
             initialized: false,
         }
     }
@@ -308,6 +316,33 @@ impl<A: Adapter> Server<A> {
                 dispatch::save(c, &p.item, &mut link).map_err(rpc)?;
                 reply(())
             }
+            method::PROCEDURES => {
+                let p: DeviceParams = parse(params)?;
+                if !self.devices.contains(&p.device) {
+                    return Err(RpcError::new(
+                        code::NOT_FOUND,
+                        format!("unknown device '{}'", p.device),
+                    ));
+                }
+                reply(ProceduresResult {
+                    procedures: self.adapter.device_procedures(&p.device),
+                })
+            }
+            method::PROCEDURE_START => {
+                let p: ProcedureStartParams = parse(params)?;
+                self.start_procedure(p, rx, out)
+            }
+            method::PROCEDURE_SUBMIT => {
+                let p: ProcedureSubmitParams = parse(params)?;
+                self.submit_procedure(p, rx, out)
+            }
+            method::PROCEDURE_CANCEL => {
+                let p: ProcedureCancelParams = parse(params)?;
+                if let Some(mut session) = self.procedures.remove(&p.session) {
+                    session.procedure.cancel();
+                }
+                reply(())
+            }
             method::ACTION_RUN => {
                 let p: ActionParams = parse(params)?;
                 let c = self.component(&p.component)?;
@@ -391,8 +426,175 @@ impl<A: Adapter> Server<A> {
             self.components.retain(|a| a.device != device);
             self.adapter.detach(device);
         }
+        self.forget_vanished();
+    }
+
+    /// Drops subscriptions and procedure sessions of devices and components that went away.
+    fn forget_vanished(&mut self) {
         let live: Vec<String> = self.components.iter().map(|a| a.component.id()).collect();
         self.subscriptions.retain(|id, _| live.contains(id));
+        let devices = &self.devices;
+        self.procedures.retain_targets(|t| match t {
+            ProcedureTarget::Device(d) => devices.contains(d),
+            ProcedureTarget::Component(c) => live.contains(c),
+        });
+    }
+
+    fn start_procedure(
+        &mut self,
+        p: ProcedureStartParams,
+        rx: &Receiver<Incoming>,
+        out: &mut impl Write,
+    ) -> Reply {
+        let rpc = |e: Error| e.to_rpc();
+        let descriptors = match &p.target {
+            ProcedureTarget::Device(d) if self.devices.contains(d) => {
+                self.adapter.device_procedures(d)
+            }
+            ProcedureTarget::Component(c) => self.component(c)?.component_mut().procedures(),
+            ProcedureTarget::Device(d) => {
+                return Err(RpcError::new(
+                    code::NOT_FOUND,
+                    format!("unknown device '{d}'"),
+                ));
+            }
+        };
+        let descriptor = descriptors
+            .into_iter()
+            .find(|d| d.id == p.procedure)
+            .ok_or_else(|| {
+                RpcError::new(
+                    code::NOT_FOUND,
+                    format!("unknown procedure '{}'", p.procedure),
+                )
+            })?;
+        if let Support::Unsupported(u) = descriptor.availability {
+            return Err(Error::Unsupported(u).to_rpc());
+        }
+        let mut procedure = match &p.target {
+            ProcedureTarget::Device(d) => self.adapter.start_device_procedure(d, &p.procedure),
+            ProcedureTarget::Component(c) => self
+                .component(c)?
+                .component_mut()
+                .start_procedure(&p.procedure),
+        }
+        .map_err(rpc)?;
+        let outcome = {
+            let Server {
+                backlog, next_id, ..
+            } = self;
+            let mut link = HostLink {
+                rx,
+                out,
+                next_id,
+                backlog,
+            };
+            procedure.start(&mut link).map_err(rpc)?
+        };
+        let session = self.procedures.insert(Session {
+            target: p.target,
+            procedure,
+            step: None,
+        });
+        let state = self
+            .settle(&session, outcome, out)
+            .map_err(|e| RpcError::new(code::INTERNAL, e.to_string()))?;
+        reply(ProcedureSession { session, state })
+    }
+
+    fn submit_procedure(
+        &mut self,
+        p: ProcedureSubmitParams,
+        rx: &Receiver<Incoming>,
+        out: &mut impl Write,
+    ) -> Reply {
+        let rpc = |e: Error| e.to_rpc();
+        let Server {
+            procedures,
+            backlog,
+            next_id,
+            ..
+        } = self;
+        let session = procedures.get_mut(&p.session).ok_or_else(|| {
+            RpcError::new(
+                code::NOT_FOUND,
+                format!("unknown procedure session '{}'", p.session),
+            )
+        })?;
+        let step = session
+            .step
+            .as_ref()
+            .ok_or_else(|| RpcError::new(code::INVALID_REQUEST, "nothing to submit"))?;
+        let action = step
+            .actions
+            .iter()
+            .find(|a| a.id == p.action)
+            .ok_or_else(|| {
+                RpcError::new(
+                    code::INVALID_PARAMS,
+                    format!("unknown action '{}'", p.action),
+                )
+            })?;
+        if action.role != ActionRole::Cancel {
+            step.validate(&p.values)
+                .map_err(|e| RpcError::new(code::INVALID_VALUE, e))?;
+        }
+        let mut link = HostLink {
+            rx,
+            out,
+            next_id,
+            backlog,
+        };
+        let outcome = session
+            .procedure
+            .submit(&p.action, &p.values, &mut link)
+            .map_err(rpc)?;
+        let state = self
+            .settle(&p.session, outcome, out)
+            .map_err(|e| RpcError::new(code::INTERNAL, e.to_string()))?;
+        reply(state)
+    }
+
+    /// Records a session's new outcome: keeps the step, or ends the session and applies the
+    /// values a finished procedure produced to its component.
+    fn settle(
+        &mut self,
+        id: &str,
+        outcome: Outcome,
+        out: &mut impl Write,
+    ) -> io::Result<ProcedureState> {
+        let (state, apply) = split(outcome);
+        match &state {
+            ProcedureState::Step(step) => {
+                if let Some(session) = self.procedures.get_mut(id) {
+                    session.step = Some(step.clone());
+                }
+                Ok(state)
+            }
+            _ => {
+                let Some(session) = self.procedures.remove(id) else {
+                    return Ok(state);
+                };
+                let ProcedureTarget::Component(component) = session.target else {
+                    return Ok(state);
+                };
+                if apply.is_empty() {
+                    return Ok(state);
+                }
+                if let Ok(c) = self.component(&component) {
+                    for (item, value) in &apply {
+                        if let Err(e) = dispatch::apply(c, item, value) {
+                            let message = format!("could not apply {item}: {e}");
+                            return Ok(ProcedureState::Finished {
+                                message: Some(message),
+                            });
+                        }
+                    }
+                }
+                self.notify_params_changed(&component, out)?;
+                Ok(state)
+            }
+        }
     }
 
     fn component(&mut self, id: &str) -> std::result::Result<&mut AnyComponent, RpcError> {
@@ -401,6 +603,20 @@ impl<A: Adapter> Server<A> {
 
     /// Applies the adapter's own changes and tells the host.
     fn flush_changes(&mut self, out: &mut impl Write) -> io::Result<()> {
+        for id in self.procedures.ids() {
+            let outcome = self
+                .procedures
+                .get_mut(&id)
+                .and_then(|s| s.procedure.poll());
+            if let Some(outcome) = outcome {
+                let state = self.settle(&id, outcome, out)?;
+                let update = ProcedureSession { session: id, state };
+                write_message(
+                    out,
+                    &Message::notification(method::PROCEDURE_UPDATE, update),
+                )?;
+            }
+        }
         if let Some(previous) = &self.discovered {
             let devices = self.adapter.discover();
             if &devices != previous {
@@ -430,10 +646,12 @@ impl<A: Adapter> Server<A> {
                         .position(|a| a.component.id() == component)
                     {
                         touched.push(self.components.remove(i).device);
-                        self.subscriptions.remove(&component);
                     }
                 }
             }
+        }
+        if !touched.is_empty() {
+            self.forget_vanished();
         }
         touched.sort();
         touched.dedup();
@@ -528,6 +746,12 @@ mod tests {
         fn name(&self) -> String {
             "Test base".into()
         }
+        fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
+            vec![ProcedureDescriptor::new("tune", "Tune rotation")]
+        }
+        fn start_procedure(&mut self, _id: &str) -> Result<Box<dyn Procedure>> {
+            Ok(Box::new(Tune { waiting: false }))
+        }
         fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
             let output = host.privileged(
                 "save-setting",
@@ -557,6 +781,57 @@ mod tests {
         fn set_param(&mut self, _param: WheelBaseParam, value: &Value) -> Result<()> {
             self.rotation = value.as_f64().unwrap_or(self.rotation);
             Ok(())
+        }
+    }
+
+    /// Asks for a rotation, or waits for a simulated input and finishes by itself.
+    struct Tune {
+        waiting: bool,
+    }
+
+    impl Procedure for Tune {
+        fn start(&mut self, _host: &mut HostLink<'_>) -> Result<Outcome> {
+            Ok(Outcome::Step(
+                Step::new("Rotation")
+                    .element(Element::field(
+                        "rotation",
+                        "Rotation",
+                        ParamType::Float {
+                            min: 90.0,
+                            max: 1080.0,
+                            step: 10.0,
+                        },
+                        Value::Float(900.0),
+                    ))
+                    .action(StepAction::finish())
+                    .action(StepAction::new("detect", "Detect", ActionRole::Secondary))
+                    .action(StepAction::cancel()),
+            ))
+        }
+        fn submit(
+            &mut self,
+            action: &str,
+            values: &BTreeMap<String, Value>,
+            _host: &mut HostLink<'_>,
+        ) -> Result<Outcome> {
+            Ok(match action {
+                "finish" => Outcome::Finished {
+                    message: Some("tuned".into()),
+                    apply: vec![("rotation".into(), values["rotation"].clone())],
+                },
+                "detect" => {
+                    self.waiting = true;
+                    Outcome::Step(
+                        Step::new("Turn the wheel")
+                            .waiting()
+                            .action(StepAction::cancel()),
+                    )
+                }
+                _ => Outcome::Cancelled,
+            })
+        }
+        fn poll(&mut self) -> Option<Outcome> {
+            std::mem::take(&mut self.waiting).then(|| Outcome::finished("detected"))
         }
     }
 
@@ -690,6 +965,99 @@ mod tests {
         // ffb_strength is volatile: it cannot be saved
         let refused = replies.iter().find(|m| m.id == Some(4)).unwrap();
         assert_eq!(refused.error.as_ref().unwrap().code, code::INVALID_VALUE);
+    }
+
+    fn start_tune(id: u64) -> Message {
+        let target = ProcedureTarget::Component("base".into());
+        Message::request(
+            id,
+            method::PROCEDURE_START,
+            ProcedureStartParams {
+                target,
+                procedure: "tune".into(),
+            },
+        )
+    }
+
+    fn submit(id: u64, session: &str, action: &str, rotation: f64) -> Message {
+        let values = BTreeMap::from([("rotation".to_string(), Value::Float(rotation))]);
+        let p = ProcedureSubmitParams {
+            session: session.into(),
+            action: action.into(),
+            values,
+        };
+        Message::request(id, method::PROCEDURE_SUBMIT, p)
+    }
+
+    #[test]
+    fn procedures_validate_and_apply() {
+        let replies = exchange(vec![
+            init(),
+            attach(),
+            start_tune(3),
+            submit(4, "p1", "finish", 5000.0),
+            submit(5, "p1", "finish", 720.0),
+            submit(6, "p1", "finish", 720.0),
+        ]);
+        let attach: AttachResult =
+            serde_json::from_value(replies[1].result.clone().unwrap()).unwrap();
+        assert_eq!(attach.components[0].procedures[0].id, "tune");
+        let by_id = |id: u64| {
+            replies
+                .iter()
+                .find(|m| m.id == Some(id) && m.method.is_none())
+                .unwrap()
+        };
+        let started: ProcedureSession =
+            serde_json::from_value(by_id(3).result.clone().unwrap()).unwrap();
+        assert!(matches!(started.state, ProcedureState::Step(_)));
+        assert_eq!(by_id(4).error.as_ref().unwrap().code, code::INVALID_VALUE);
+        let finished: ProcedureState =
+            serde_json::from_value(by_id(5).result.clone().unwrap()).unwrap();
+        assert_eq!(
+            finished,
+            ProcedureState::Finished {
+                message: Some("tuned".into())
+            }
+        );
+        // the session is over
+        assert_eq!(by_id(6).error.as_ref().unwrap().code, code::NOT_FOUND);
+        // the value was applied to the component
+        let changed = replies
+            .iter()
+            .rev()
+            .find(|m| m.method.as_deref() == Some(method::PARAMS_CHANGED))
+            .unwrap();
+        let changed: ParamsChanged =
+            serde_json::from_value(changed.params.clone().unwrap()).unwrap();
+        match &changed.component.item("rotation").unwrap().support {
+            Support::Supported(simrig_model::ItemSpec::Param(spec)) => {
+                assert_eq!(spec.value, Value::Float(720.0))
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn procedures_move_on_by_themselves() {
+        let replies = exchange(vec![
+            init(),
+            attach(),
+            start_tune(3),
+            submit(4, "p1", "detect", 900.0),
+        ]);
+        let update = replies
+            .iter()
+            .find(|m| m.method.as_deref() == Some(method::PROCEDURE_UPDATE))
+            .unwrap();
+        let update: ProcedureSession =
+            serde_json::from_value(update.params.clone().unwrap()).unwrap();
+        assert_eq!(
+            update.state,
+            ProcedureState::Finished {
+                message: Some("detected".into())
+            }
+        );
     }
 
     #[test]
