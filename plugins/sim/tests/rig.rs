@@ -313,7 +313,7 @@ fn drivers_install_save_and_uninstall_without_leftovers() {
 }
 
 #[test]
-fn a_driver_that_changed_since_its_install_can_be_updated() {
+fn a_driver_of_another_version_or_revision_can_be_updated() {
     let env = Env::new("driver-update");
     let mut host = env.start();
     // Not installed: nothing to update.
@@ -321,13 +321,32 @@ fn a_driver_that_changed_since_its_install_can_be_updated() {
     host.install_driver("sim").unwrap();
     assert_eq!(host.driver_update("sim").unwrap(), None);
 
-    // The copy installed differs from the driver the plugin ships, as after an update of the
-    // app that changed a hook.
+    // Files of the installed copy that differ do not count: only the version and SimRig's
+    // revision do (a rebuilt service, a recipe used only at install time…).
     let hook = env.root.join("state/drivers/sim/driver/hooks/install");
     let old = fs::read_to_string(&hook).unwrap();
     fs::write(&hook, format!("{old}\n# older\n")).unwrap();
+    assert_eq!(host.driver_update("sim").unwrap(), None);
+
+    // Installed before a new version, then before a new revision of it.
+    let registry = env.root.join("state/installed.toml");
+    let text = fs::read_to_string(&registry).unwrap();
+    fs::write(
+        &registry,
+        text.replace("version = \"1.0\"", "version = \"0.9\""),
+    )
+    .unwrap();
     let update = host.driver_update("sim").unwrap().unwrap();
-    assert_eq!(update.installed, update.available);
+    assert_eq!(
+        (update.installed.as_str(), update.available.as_str()),
+        ("0.9", "1.0")
+    );
+    fs::write(&registry, text.replace("revision = 0", "revision = 3")).unwrap();
+    let update = host.driver_update("sim").unwrap().unwrap();
+    assert_eq!(
+        (update.installed.as_str(), update.available.as_str()),
+        ("1.0 r3", "1.0")
+    );
 
     // Installing again is the update.
     host.install_driver("sim").unwrap();

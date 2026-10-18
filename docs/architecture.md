@@ -558,6 +558,7 @@ privileged operations its adapter may request.
 id       = "hid-fanatec"
 name     = "hid-fanatecff"          # optional: shown with the version in Plugins
 version  = "dd78ef4"
+revision = 0                        # optional: SimRig's revision of this version (§6.4)
 summary  = "hid-fanatecff kernel driver (DKMS) + udev rules"
 license  = "GPL-2.0"
 sources  = [{ name = "hid-fanatecff", url = "https://github.com/gotzl/hid-fanatecff" }]   # optional: upstream projects, linked from Plugins
@@ -715,15 +716,23 @@ wizard ──▶ hooks/status (user) → not installed
   upgrades are handled by DKMS (or whatever the driver chose).
 - **Immutable distros and Flatpak**: instructions only in v1.
 
-**Updates.** A plugin may ship a newer driver than the one installed, typically after an
-update of the app. The host compares a digest of the driver directory the plugin ships with
-the installed copy (`/var/lib/simrig/drivers/<plugin>/driver`): paths, contents and executable
-bits, so a change to SimRig's hooks counts even when the upstream version stays. A difference
-puts a dot on Plugins in the top bar and an "Update driver" button on the plugin; updating is
-installing again, with the same hooks (they replace a version SimRig installed before, e.g.
-`mod_build` removes the previous DKMS package). The driver's data directory, e.g. the devices
-set up with the generic USB driver, is kept. Plugins shows each driver as its name and the
-version installed (`hid-fanatecff 0.2.3-11-gbc2601b`), with links to its upstream projects.
+**Updates.** A plugin may ship another driver than the one installed, typically after an
+update of the app. The registry records each driver's `version` (upstream's, e.g. `git
+describe` of the bundled sources) and `revision` (SimRig's, raised when what an installed
+driver runs changes: its udev rules, a service, the hooks run from the installed copy). When
+the plugin's `driver.toml` says otherwise, Plugins in the top bar gets a dot and the plugin an
+"Update driver" button. A file that differs is not enough: the generic USB service is rebuilt
+by every release and recipes used only at install time change without touching what is
+installed. Updating is installing again, with the same hooks (they replace a version SimRig
+installed before, e.g. `mod_build` removes the previous DKMS package); the driver's data
+directory, e.g. the devices set up with the generic USB driver, is kept. Plugins shows each
+driver as its name and the version installed (`hid-fanatecff 0.2.3-11-gbc2601b`, `… r2` once
+revised), with links to its upstream projects.
+
+So that no change slips by, each official driver keeps the digest of its files in
+`driver.fingerprint`; a test fails when they change, and asks whether to raise the revision
+before recording them again (`SIMRIG_UPDATE_FINGERPRINTS=1 cargo test -p simrig-driver --test
+fingerprints`).
 
 ### 6.5 Uninstallation
 

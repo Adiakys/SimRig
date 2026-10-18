@@ -79,22 +79,26 @@ pub(crate) fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// A digest of what [`copy_dir`] copies from `dir`: paths, contents and executable bits. Tells
-/// the copy of an installed driver from the driver a plugin ships now, also when only SimRig's
-/// hooks changed and the driver keeps its version.
-pub fn digest(dir: &Path) -> std::io::Result<String> {
+/// A digest of the files of a driver directory: paths, contents and executable bits. VCS files
+/// (`.git`) and the top-level entries in `skip` are left out. The repository's tests keep one
+/// per driver to notice changes that may need a new `revision` (see `driver.fingerprint`).
+pub fn digest(dir: &Path, skip: &[&str]) -> std::io::Result<String> {
     use sha2::{Digest, Sha256};
     use std::os::unix::fs::PermissionsExt;
 
-    fn walk(dir: &Path, rel: &str, hasher: &mut Sha256) -> std::io::Result<()> {
+    fn walk(dir: &Path, rel: &str, skip: &[&str], hasher: &mut Sha256) -> std::io::Result<()> {
         let mut entries: Vec<_> = fs::read_dir(dir)?.collect::<Result<_, _>>()?;
         entries.sort_by_key(|e| e.file_name());
         for entry in entries {
             let kind = entry.file_type()?;
-            let name = format!("{rel}/{}", entry.file_name().to_string_lossy());
+            let file_name = entry.file_name().to_string_lossy().into_owned();
+            if file_name == ".git" || (rel.is_empty() && skip.contains(&file_name.as_str())) {
+                continue;
+            }
+            let name = format!("{rel}/{file_name}");
             if kind.is_dir() {
                 hasher.update(format!("d {name}\0"));
-                walk(&entry.path(), &name, hasher)?;
+                walk(&entry.path(), &name, &[], hasher)?;
             } else if kind.is_file() {
                 let exec = entry.metadata()?.permissions().mode() & 0o111 != 0;
                 let data = fs::read(entry.path())?;
@@ -106,7 +110,7 @@ pub fn digest(dir: &Path) -> std::io::Result<String> {
     }
 
     let mut hasher = Sha256::new();
-    walk(dir, "", &mut hasher)?;
+    walk(dir, "", skip, &mut hasher)?;
     Ok(hasher
         .finalize()
         .iter()
@@ -128,16 +132,21 @@ mod digest_tests {
         fs::write(src.join("hooks/install"), "#!/bin/sh").unwrap();
         let copy = root.join("copy");
         copy_dir(&src, &copy).unwrap();
-        assert_eq!(digest(&src).unwrap(), digest(&copy).unwrap());
+        assert_eq!(digest(&src, &[]).unwrap(), digest(&copy, &[]).unwrap());
 
         use std::os::unix::fs::PermissionsExt;
         let hook = src.join("hooks/install");
         fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
-        assert_ne!(digest(&src).unwrap(), digest(&copy).unwrap());
+        assert_ne!(digest(&src, &[]).unwrap(), digest(&copy, &[]).unwrap());
         copy_dir(&src, &copy).unwrap();
-        assert_eq!(digest(&src).unwrap(), digest(&copy).unwrap());
+        assert_eq!(digest(&src, &[]).unwrap(), digest(&copy, &[]).unwrap());
         fs::write(&hook, "#!/bin/sh\necho new").unwrap();
-        assert_ne!(digest(&src).unwrap(), digest(&copy).unwrap());
+        assert_ne!(digest(&src, &[]).unwrap(), digest(&copy, &[]).unwrap());
+        // Skipped entries do not count.
+        assert_eq!(
+            digest(&src, &["hooks"]).unwrap(),
+            digest(&copy, &["hooks"]).unwrap()
+        );
         let _ = fs::remove_dir_all(&root);
     }
 }

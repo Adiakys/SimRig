@@ -71,6 +71,7 @@ pub fn install(
         plugin: plugin.into(),
         driver: contract.id.clone(),
         version: contract.version.clone(),
+        revision: contract.revision,
         state: InstallState::Installing,
         installed_at: SystemTime::now()
             .duration_since(UNIX_EPOCH)

@@ -24,5 +24,7 @@ pub use host::{Host, HostComponent, HostEvent, HostOptions, Plugin, PluginState,
 pub use manifest::{Manifest, PluginLocation};
 pub use presets::{ApplyEntry, ApplyOutcome, Preset, PresetStore};
 pub use rig::RigConfig;
-pub use simrig_driver::{DriverContract, DriverStatus, InstallState, InstalledDriver};
+pub use simrig_driver::{
+    DriverContract, DriverStatus, InstallState, InstalledDriver, version_text,
+};
 pub use system::SystemInfo;

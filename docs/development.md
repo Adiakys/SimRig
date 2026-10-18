@@ -120,6 +120,17 @@ cargo test --workspace
 
 Set `SIMRIG_PLUGIN_LOG=1` to see plugins' stderr.
 
+**Changing a driver** (anything under `plugins/*/driver`) makes the fingerprints test fail on
+purpose. Installed drivers are offered an update only when `version` or `revision` in their
+`driver.toml` changes: raise `revision` when drivers already installed need the change (udev
+rules, a service such as the generic USB one, built from `plugins/generic-usb/src`, hooks run
+from the installed copy: uninstall and privileged operations); leave it for changes that only
+matter to new installations. Then record the files:
+
+```sh
+SIMRIG_UPDATE_FINGERPRINTS=1 cargo test -p simrig-driver --test fingerprints
+```
+
 
 ## Releases
 

@@ -17,6 +17,12 @@ pub struct DriverContract {
     pub name: Option<String>,
     /// The version shipped: upstream's (e.g. `git describe` of the bundled sources).
     pub version: String,
+    /// SimRig's revision of this version: raised when what an installed driver runs changes
+    /// (its rules, its service, the hooks run from the installed copy), so installed drivers
+    /// are offered the update; back to 0 with a new `version`. Changes that only matter to a
+    /// new installation do not raise it.
+    #[serde(default)]
+    pub revision: u32,
     pub summary: String,
     #[serde(default)]
     pub license: Option<String>,
@@ -98,6 +104,15 @@ fn valid_hook_path(path: &str) -> bool {
 
 fn anchored(pattern: &str) -> Result<Regex, regex::Error> {
     Regex::new(&format!("^(?:{pattern})$"))
+}
+
+/// A driver's version as people see it: `0.2.3`, or `0.2.3 r2` once SimRig revised it.
+pub fn version_text(version: &str, revision: u32) -> String {
+    if revision == 0 {
+        version.to_string()
+    } else {
+        format!("{version} r{revision}")
+    }
 }
 
 impl DriverContract {

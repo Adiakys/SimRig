@@ -358,7 +358,7 @@ fn refresh_drivers(host: &Host, drivers: &mut Drivers) {
                             .collect()
                     })
                     .unwrap_or_default(),
-                version: contract.map(|c| c.version),
+                version: contract.map(|c| simrig_host::version_text(&c.version, c.revision)),
             },
         );
     }

@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use simrig_driver::{
     DriverContract, DriverStatus, HookContext, InstalledDriver, Registry, StateLayout, run_hook,
+    version_text,
 };
 
 use crate::error::HostError;
@@ -220,8 +221,8 @@ impl DriverManager {
             .run(&["uninstall".into(), plugin.into()])
     }
 
-    /// The plugin ships a driver different from the one installed (the hooks count, not only
-    /// the version): installing it again updates it.
+    /// The plugin ships another version or revision of the driver installed: installing it
+    /// again updates it.
     pub(crate) fn update(
         &self,
         manifest: &Manifest,
@@ -235,11 +236,10 @@ impl DriverManager {
             .find(&manifest.id)
             .filter(|e| e.state == simrig_driver::InstallState::Installed)?;
         let contract = DriverContract::load(&contract_path).ok()?;
-        let shipped = simrig_driver::digest(contract_path.parent()?).ok()?;
-        let installed = simrig_driver::digest(&layout.driver_copy(&manifest.id)).ok()?;
-        (shipped != installed).then(|| DriverUpdate {
-            installed: entry.version.clone(),
-            available: contract.version,
+        let same = entry.version == contract.version && entry.revision == contract.revision;
+        (!same).then(|| DriverUpdate {
+            installed: version_text(&entry.version, entry.revision),
+            available: version_text(&contract.version, contract.revision),
         })
     }
 

@@ -454,8 +454,9 @@ impl App {
                     Some(s) if s.installed => ("Driver installed", "installed", "success"),
                     _ => ("Driver not installed", "missing", "warning"),
                 };
-                // The driver's version says what runs: the one installed (as recorded when an
-                // update waits, else as its status says), else the one shipped.
+                // The driver's version says what runs: the one recorded at install while an
+                // update waits, the system's own when it provides the driver, else the one
+                // shipped (installed or not).
                 let installed = p
                     .driver_update
                     .as_ref()
@@ -463,7 +464,7 @@ impl App {
                     .or_else(|| {
                         p.driver
                             .as_ref()
-                            .filter(|s| s.installed)
+                            .filter(|s| s.installed && s.provided_by_system)
                             .and_then(|s| s.version.clone())
                     });
                 let version = match (&p.driver_name, installed.or(p.driver_version.clone())) {

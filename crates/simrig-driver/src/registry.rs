@@ -17,6 +17,9 @@ pub struct InstalledDriver {
     pub plugin: String,
     pub driver: String,
     pub version: String,
+    /// The contract's `revision` (0 for drivers installed before revisions existed).
+    #[serde(default)]
+    pub revision: u32,
     pub state: InstallState,
     /// Seconds since the Unix epoch.
     pub installed_at: u64,
