@@ -1,0 +1,128 @@
+name: Hardware report
+description: Tried SimRig with your wheel, pedals, shifter or handbrake? Tell what works and what doesn't.
+title: "[Hardware] <brand> <model>"
+labels: ["hardware report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying SimRig! Most devices have only been tested on simulated hardware, so
+        every report from a real one helps, even "everything works". It takes a couple of minutes.
+
+  - type: dropdown
+    id: brand
+    attributes:
+      label: Brand
+      options:
+        - Fanatec
+        - Moza
+        - Logitech
+        - Thrustmaster
+        - PXN
+        - Other wheel base (Cammus, Asetek, VRS, FFBeast, OpenFFBoard…)
+        - Simagic
+        - A USB shifter or handbrake (generic USB plugin)
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Device
+      description: The model, and the rim or pedals on it if they matter.
+      placeholder: CSL DD with a McLaren GT3 V2 rim, CSL pedals on the base
+    validations:
+      required: true
+
+  - type: input
+    id: usb
+    attributes:
+      label: USB id
+      description: "The line of `lsusb` for the device."
+      placeholder: "Bus 003 Device 007: ID 0eb7:0020 Endor AG FANATEC Wheel"
+
+  - type: input
+    id: system
+    attributes:
+      label: Distribution and kernel
+      description: "For example the first lines of `simrig-cli system`, or your distribution and `uname -r`."
+      placeholder: Ubuntu 26.04, kernel 7.0.0-38-generic, Secure Boot on
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: SimRig version
+      description: "`simrig-cli --version`, or Settings → About in the app."
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How SimRig is installed
+      options:
+        - .deb package
+        - .rpm package
+        - Arch package
+        - .tar.gz
+        - Built from the sources
+    validations:
+      required: true
+
+  - type: dropdown
+    id: driver
+    attributes:
+      label: The device's driver
+      options:
+        - SimRig installed it
+        - I had already installed it myself (package, AUR, by hand)
+        - None needed (it works with the kernel's driver)
+        - It did not get installed (see below)
+        - I don't know
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What works
+      description: Tick what you tried and works; leave the rest empty.
+      options:
+        - label: SimRig finds the device
+        - label: The driver installs (and survives a reboot)
+        - label: Live inputs in the app (the wheel turns, pedals and buttons respond)
+        - label: Changing the rotation
+        - label: The force feedback test
+        - label: Other settings (strength, damper, filters…)
+        - label: Settings are kept after unplugging and plugging back
+        - label: Calibration or mapping procedures
+        - label: Force feedback and inputs in games
+
+  - type: textarea
+    id: games
+    attributes:
+      label: Games
+      description: Which games you tried, native or through Proton (and which Proton).
+      placeholder: Assetto Corsa with Content Manager, GE-Proton9-20
+
+  - type: textarea
+    id: problems
+    attributes:
+      label: What doesn't work
+      description: What you did, what you expected, what happened. Screenshots welcome.
+    validations:
+      required: false
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: |
+        If something didn't work, the output of these commands helps a lot:
+        `simrig-cli devices`, `simrig-cli plugins`, `simrig-cli list`, and
+        `sudo dmesg | grep -iE "hid|usb|ffb" | tail -n 50`.
+      render: text

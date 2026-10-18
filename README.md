@@ -19,7 +19,9 @@ Your devices keep working in every game with SimRig closed.
   with the reason, never hidden.
 
 > **Early development.** SimRig works, but most devices have not been tested on real hardware
-> yet: see the table below, and please report what works and what doesn't.
+> yet: see the table below. Have a Moza, Logitech, Thrustmaster, PXN or another wheel? Try it
+> and [tell how it went](https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml):
+> a couple of minutes, and it moves your device from "Untested" to tested for everyone.
 
 ## Supported devices
 
@@ -92,7 +94,9 @@ it in one click.
 
 ## Contributing
 
-Bug reports, tests on your hardware and plugins for new brands are welcome. To build and run
+The most useful help right now is a test on your hardware: install SimRig, add your devices and
+fill in a [hardware report](https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml),
+even when everything works. Bug reports and plugins for new brands are welcome too. To build and run
 SimRig from the sources, see [docs/development.md](docs/development.md); for its design,
 [docs/architecture.md](docs/architecture.md).
 
