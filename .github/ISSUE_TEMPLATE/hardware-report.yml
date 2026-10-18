@@ -8,6 +8,7 @@ body:
       value: |
         Thanks for trying SimRig! Most devices have only been tested on simulated hardware, so
         every report from a real one helps, even "everything works". It takes a couple of minutes.
+        What to try is in the [call for testers](https://github.com/Adiakys/SimRig/discussions/1).
 
   - type: dropdown
     id: brand

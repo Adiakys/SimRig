@@ -19,9 +19,10 @@ Your devices keep working in every game with SimRig closed.
   with the reason, never hidden.
 
 > **Early development.** SimRig works, but most devices have not been tested on real hardware
-> yet: see the table below. Have a Moza, Logitech, Thrustmaster, PXN or another wheel? Try it
-> and [tell how it went](https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml):
-> a couple of minutes, and it moves your device from "Untested" to tested for everyone.
+> yet: see the table below. Have a Moza, Logitech, Thrustmaster, PXN or another wheel? See the
+> [call for testers](https://github.com/Adiakys/SimRig/discussions/1), try it and
+> [tell how it went](https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml):
+> about 15 minutes, and it moves your device from "Untested" to tested for everyone.
 
 ## Supported devices
 
@@ -94,10 +95,12 @@ it in one click.
 
 ## Contributing
 
-The most useful help right now is a test on your hardware: install SimRig, add your devices and
-fill in a [hardware report](https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml),
-even when everything works. Bug reports and plugins for new brands are welcome too. To build and run
-SimRig from the sources, see [docs/development.md](docs/development.md); for its design,
+The most useful help right now is a test on your hardware: the
+[call for testers](https://github.com/Adiakys/SimRig/discussions/1) lists the devices that need it
+and what to try, then a
+[hardware report](https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml)
+tells how it went, even when everything works. Bug reports and plugins for new brands are
+welcome too. To build and run SimRig from the sources, see [docs/development.md](docs/development.md); for its design,
 [docs/architecture.md](docs/architecture.md).
 
 ## License
