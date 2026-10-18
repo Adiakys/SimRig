@@ -279,3 +279,39 @@ fn contract_version_is_the_bundled_ones() {
         format!("tmff2-{}+t150-{}", version(), t150_version())
     );
 }
+
+/// The Xbox editions xpad takes over are given back to usb-thrustmaster: exactly the wheels
+/// hid-tminit's usb-tminit starts up, never other Xbox devices.
+#[test]
+fn xbox_wheels_are_taken_back_from_xpad() {
+    let rules =
+        fs::read_to_string(Path::new(DRIVER).join("udev/71-simrig-thrustmaster.rules")).unwrap();
+    let line = rules
+        .lines()
+        .find(|l| l.contains(r#"DRIVER=="xpad""#))
+        .expect("an xpad rule");
+    assert!(line.contains(r#"ATTRS{idVendor}=="044f""#), "{line}");
+    let products = line
+        .split(r#"ATTRS{idProduct}==""#)
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .unwrap();
+    let mut in_rule: Vec<&str> = products.split('|').collect();
+    in_rule.sort();
+    let usb = fs::read_to_string(Path::new(DRIVER).join("hid-tmff2/deps/hid-tminit/usb-tminit.c"))
+        .unwrap();
+    let mut started: Vec<String> = usb
+        .lines()
+        .filter_map(|l| l.split("USB_DEVICE(0x044f, 0x").nth(1))
+        .filter_map(|rest| rest.split(')').next())
+        .map(str::to_string)
+        .collect();
+    started.sort();
+    assert_eq!(in_rule, started);
+    // Only when usb-thrustmaster is there, and udev's own `$` escaped.
+    assert!(
+        line.contains("[ -d $$d/usb-thrustmaster ] || exit 0"),
+        "{line}"
+    );
+    assert!(line.contains("echo %k > $$d/xpad/unbind"), "{line}");
+}

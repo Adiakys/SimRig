@@ -1004,7 +1004,10 @@ fixed upstream, both handled by the `dkms` recipe, and it bundles
 wheels in place of the kernel's module; that one is blacklisted while SimRig's hid-tmff2 is
 installed, as upstream recommends (`/etc/modprobe.d/simrig-thrustmaster.conf`), and restored on
 removal. A hid-tmff2 installed by other means is kept, and the user's modprobe configuration
-with it. Settings are saved as options of the module (`save-setting`): hid-tmff2 applies them
+with it. The Xbox editions of the wheels hid-tminit starts up (T128X, T248X, T598) are taken
+by `xpad`, which matches every Thrustmaster Xbox interface, before hid-tminit can: a udev rule
+gives just those wheels back to hid-tminit's `usb-thrustmaster` when it is there, instead of
+blacklisting `xpad` (which would take Xbox controllers away too). Settings are saved as options of the module (`save-setting`): hid-tmff2 applies them
 to every wheel it starts. hid-t150 is built too, like the Logitech driver's modules, only when a
 T150 or TMX is plugged in (or SimRig built it before); its sources lack a usable `dkms.conf`, so
 SimRig ships its own (`dkms/hid-t150.conf`, the `dkms` recipe takes an absolute path). It has no

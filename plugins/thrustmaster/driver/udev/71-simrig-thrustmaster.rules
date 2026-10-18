@@ -8,6 +8,12 @@ SUBSYSTEM=="hid", DRIVER=="tmff2", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w ran
 # hid-t150's settings: rotation, gain, centering.
 SUBSYSTEM=="hid", DRIVER=="hid-t150", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w range gain autocenter enable_autocenter || true'"
 
+# xpad matches every Xbox interface of Thrustmaster's, so it takes the Xbox editions of the
+# wheels hid-tminit starts up (T128X, T248X, T598…) as gamepads before hid-tminit can. Those
+# wheels only, and only when hid-tminit's usb-thrustmaster is there: the wheel goes to it, and
+# Xbox controllers stay with xpad (blacklisting xpad would take them away too).
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_interface", DRIVER=="xpad", ATTRS{idVendor}=="044f", ATTRS{idProduct}=="b69c|b691|b6a5", RUN+="/bin/sh -c 'd=/sys/bus/usb/drivers; [ -d $$d/usb-thrustmaster ] || exit 0; echo %k > $$d/xpad/unbind; echo %k > $$d/usb-thrustmaster/bind'"
+
 # Raw HID, which some games need through Proton: the user at the seat only.
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="044f", TAG+="uaccess"
 
