@@ -18,10 +18,11 @@ pub mod testing;
 pub mod usb;
 
 pub use catalog::{Catalog, CatalogEntry, Image, Model};
+pub use drivers::DriverUpdate;
 pub use error::HostError;
 pub use host::{Host, HostComponent, HostEvent, HostOptions, Plugin, PluginState, Target};
 pub use manifest::{Manifest, PluginLocation};
 pub use presets::{ApplyEntry, ApplyOutcome, Preset, PresetStore};
 pub use rig::RigConfig;
-pub use simrig_driver::{DriverStatus, InstallState, InstalledDriver};
+pub use simrig_driver::{DriverContract, DriverStatus, InstallState, InstalledDriver};
 pub use system::SystemInfo;

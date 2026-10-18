@@ -3,6 +3,7 @@
 # joystick (uinput). Setups are made by the plugin's setup procedure and saved here through
 # privileged operations. Nothing runs while no set-up device is connected.
 id = "generic-usb-service"
+name = "SimRig generic USB service"
 version = "0.1.0"
 summary = "Turns set-up USB devices into standard joysticks (udev + systemd + uinput)"
 license = "GPL-3.0-or-later"

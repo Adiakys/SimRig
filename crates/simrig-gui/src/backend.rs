@@ -8,8 +8,8 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use simrig_host::{
-    ApplyOutcome, DriverStatus, Host, HostComponent, HostEvent, HostOptions, Image, PluginLocation,
-    PluginState, Preset, SystemInfo, Target,
+    ApplyOutcome, DriverStatus, DriverUpdate, Host, HostComponent, HostEvent, HostOptions, Image,
+    PluginLocation, PluginState, Preset, SystemInfo, Target,
 };
 use simrig_model::{DeviceInfo, ProcedureState, Value};
 
@@ -95,6 +95,13 @@ pub struct PluginView {
     pub devices: Vec<DeviceInfo>,
     pub has_driver: bool,
     pub driver: Option<DriverStatus>,
+    /// The plugin ships a newer driver than the one installed.
+    pub driver_update: Option<DriverUpdate>,
+    /// The driver the plugin ships: its name and version.
+    pub driver_name: Option<String>,
+    pub driver_version: Option<String>,
+    /// Upstream projects of the driver's sources: name and page.
+    pub driver_sources: Vec<(String, String)>,
     /// Generic plugins handle a device only when the user assigns it.
     pub on_request: bool,
 }
@@ -198,11 +205,11 @@ struct Dirty {
 fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
     let mut host = Host::start(&options);
     let mut subscribed: HashSet<String> = HashSet::new();
-    let mut drivers: BTreeMap<String, Option<DriverStatus>> = BTreeMap::new();
+    let mut drivers: Drivers = BTreeMap::new();
     let system = host.system();
     resubscribe(&mut host, &mut subscribed);
     refresh_drivers(&host, &mut drivers);
-    let full = |host: &mut Host, drivers: &BTreeMap<String, Option<DriverStatus>>| {
+    let full = |host: &mut Host, drivers: &Drivers| {
         let mut s = snapshot(host, drivers);
         s.system = Some(system.clone());
         Box::new(s)
@@ -316,11 +323,44 @@ fn resubscribe(host: &mut Host, subscribed: &mut HashSet<String>) {
     }
 }
 
-fn refresh_drivers(host: &Host, drivers: &mut BTreeMap<String, Option<DriverStatus>>) {
+/// What the app shows of a plugin's driver.
+#[derive(Clone, Debug, Default)]
+struct DriverView {
+    status: Option<DriverStatus>,
+    update: Option<DriverUpdate>,
+    /// The driver shipped: its name and version.
+    name: Option<String>,
+    version: Option<String>,
+    sources: Vec<(String, String)>,
+}
+
+type Drivers = BTreeMap<String, DriverView>;
+
+fn refresh_drivers(host: &Host, drivers: &mut Drivers) {
     drivers.clear();
     for p in host.plugins() {
-        let status = host.driver_status(&p.manifest.id).ok().flatten();
-        drivers.insert(p.manifest.id.clone(), status);
+        let id = &p.manifest.id;
+        let contract = host.driver_contract(id).ok().flatten();
+        drivers.insert(
+            id.clone(),
+            DriverView {
+                status: host.driver_status(id).ok().flatten(),
+                update: host.driver_update(id).ok().flatten(),
+                name: contract
+                    .as_ref()
+                    .map(|c| c.name.clone().unwrap_or(c.id.clone())),
+                sources: contract
+                    .as_ref()
+                    .map(|c| {
+                        c.sources
+                            .iter()
+                            .map(|s| (s.name.clone(), s.url.clone()))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                version: contract.map(|c| c.version),
+            },
+        );
     }
 }
 
@@ -348,7 +388,7 @@ fn component_view(host: &mut Host, address: &str) -> Option<ComponentView> {
     })
 }
 
-fn snapshot(host: &mut Host, drivers: &BTreeMap<String, Option<DriverStatus>>) -> Snapshot {
+fn snapshot(host: &mut Host, drivers: &Drivers) -> Snapshot {
     let addresses: Vec<String> = host
         .components()
         .iter()
@@ -362,7 +402,7 @@ fn snapshot(host: &mut Host, drivers: &BTreeMap<String, Option<DriverStatus>>) -
     let mut plugins = Vec::new();
     for p in host.plugins() {
         let id = p.manifest.id.clone();
-        let driver = drivers.get(&id).cloned().flatten();
+        let view = drivers.get(&id).cloned().unwrap_or_default();
         plugins.push(PluginView {
             id: id.clone(),
             name: p.manifest.name.clone(),
@@ -372,7 +412,11 @@ fn snapshot(host: &mut Host, drivers: &BTreeMap<String, Option<DriverStatus>>) -
             state: p.state.clone(),
             devices: p.devices.clone(),
             has_driver: p.manifest.driver.is_some(),
-            driver,
+            driver: view.status,
+            driver_update: view.update,
+            driver_name: view.name,
+            driver_version: view.version,
+            driver_sources: view.sources,
             on_request: p.manifest.matching.on_request,
         });
     }
@@ -559,8 +603,14 @@ fn execute(host: &mut Host, command: Command, deliver: &impl Fn(Update), dirty: 
             true
         }
         Command::InstallDriver(plugin) => {
+            let update = host.driver_update(&plugin).ok().flatten().is_some();
             let result = host.install_driver(&plugin);
-            deliver(driver_done(plugin, result, "Driver installed."));
+            let done = if update {
+                "Driver updated."
+            } else {
+                "Driver installed."
+            };
+            deliver(driver_done(plugin, result, done));
             dirty.drivers = true;
             true
         }

@@ -454,10 +454,44 @@ impl App {
                     Some(s) if s.installed => ("Driver installed", "installed", "success"),
                     _ => ("Driver not installed", "missing", "warning"),
                 };
+                // The driver's version says what runs: the one installed (as recorded when an
+                // update waits, else as its status says), else the one shipped.
+                let installed = p
+                    .driver_update
+                    .as_ref()
+                    .map(|u| u.installed.clone())
+                    .or_else(|| {
+                        p.driver
+                            .as_ref()
+                            .filter(|s| s.installed)
+                            .and_then(|s| s.version.clone())
+                    });
+                let version = match (&p.driver_name, installed.or(p.driver_version.clone())) {
+                    (Some(name), Some(v)) => format!("{name} {v}"),
+                    _ => p.version.clone(),
+                };
+                let update_text = match &p.driver_update {
+                    Some(u) if u.installed != u.available => {
+                        format!("Driver update: {} → {}", u.installed, u.available)
+                    }
+                    Some(_) => "Driver update available".to_string(),
+                    None => String::new(),
+                };
                 ui::PluginRow {
                     id: p.id.clone().into(),
                     name: p.name.clone().into(),
-                    version: p.version.clone().into(),
+                    version: version.into(),
+                    update: p.driver_update.is_some(),
+                    sources: ModelRc::new(VecModel::from(
+                        p.driver_sources
+                            .iter()
+                            .map(|(name, url)| ui::Link {
+                                name: name.into(),
+                                url: url.into(),
+                            })
+                            .collect::<Vec<_>>(),
+                    )),
+                    update_text: update_text.into(),
                     origin: match p.location {
                         PluginLocation::System => "Installed with SimRig",
                         PluginLocation::User => "Added by you",
@@ -480,6 +514,7 @@ impl App {
             .collect();
         let window = self.window();
         let rig = window.global::<Rig>();
+        rig.set_drivers_outdated(rows.iter().filter(|r| r.update).count() as i32);
         rig.set_plugins(ModelRc::new(VecModel::from(rows)));
         let problems: Vec<slint::SharedString> =
             self.snapshot.problems.iter().map(Into::into).collect();
@@ -490,6 +525,20 @@ impl App {
         self.flows.first_installing.insert(plugin.to_string());
         self.send(Command::InstallDriver(plugin.to_string()));
         self.refresh_plugins();
+    }
+
+    /// Updates every driver that has an update (one password: polkit keeps it a while).
+    pub fn update_drivers(&mut self) {
+        let outdated: Vec<String> = self
+            .snapshot
+            .plugins
+            .iter()
+            .filter(|p| p.driver_update.is_some())
+            .map(|p| p.id.clone())
+            .collect();
+        for plugin in outdated {
+            self.install_driver(&plugin);
+        }
     }
 
     pub fn remove_driver(&mut self, plugin: &str) {

@@ -3,7 +3,7 @@
 
 import { ScrollView } from "std-widgets.slint";
 import { Theme, Icons } from "theme.slint";
-import { Rig, Api, FoundDevice, PluginRow, SystemCheck, ExcludedRow, PresetItem, UsbRow } from "api.slint";
+import { Rig, Api, Link, FoundDevice, PluginRow, SystemCheck, ExcludedRow, PresetItem, UsbRow } from "api.slint";
 import { Device, LiveDevice } from "devices.slint";
 import { Button, ButtonKind, Chip, ChipTone, Segmented, Toggle, Eyebrow, Title, Heading, Body, Small, Hairline, BackRow, Notice, Steps } from "widgets.slint";
 
@@ -347,6 +347,34 @@ export component AddScreen inherits Rectangle {
     }
 }
 
+component SourceLink inherits TouchArea {
+    in property <Link> link;
+    width: l.preferred-width;
+    height: 22px;
+    mouse-cursor: pointer;
+    accessible-role: AccessibleRole.button;
+    accessible-label: @tr("{} on GitHub", root.link.name);
+    accessible-action-default => { Api.open-url(root.link.url); }
+    clicked => { Api.open-url(root.link.url); }
+    l := HorizontalLayout {
+        spacing: 4px;
+        Text {
+            text: root.link.name;
+            font-family: Theme.sans;
+            font-size: 13px;
+            color: root.has-hover ? Theme.ink : Theme.ink3;
+            vertical-alignment: center;
+        }
+        Image {
+            source: Icons.external;
+            colorize: root.has-hover ? Theme.ink : Theme.ink3;
+            width: 13px;
+            height: 13px;
+            y: (parent.height - self.height) / 2;
+        }
+    }
+}
+
 component PluginLine inherits VerticalLayout {
     in property <PluginRow> plugin;
     property <bool> confirm-remove: false;
@@ -379,6 +407,12 @@ component PluginLine inherits VerticalLayout {
             }
             if root.plugin.description != "": Small { text: root.plugin.description; }
             Small { text: root.plugin.devices; color: Theme.ink; }
+            // The driver's upstream projects: there if wanted, never in the way.
+            if root.plugin.sources.length > 0: HorizontalLayout {
+                alignment: start;
+                spacing: 14px;
+                for s in root.plugin.sources: SourceLink { link: s; }
+            }
             if root.plugin.error != "": Notice { text: root.plugin.error; level: "error"; }
         }
         VerticalLayout {
@@ -396,15 +430,29 @@ component PluginLine inherits VerticalLayout {
             }
             HorizontalLayout {
                 alignment: end;
+                spacing: 8px;
                 Chip {
                     text: root.plugin.driver-text;
                     icon: root.plugin.driver-tone == "success" ? Icons.check : root.plugin.driver-tone == "warning" ? Icons.warn : @image-url("");
                     tone: root.plugin.driver-tone == "success" ? ChipTone.success : root.plugin.driver-tone == "warning" ? ChipTone.warning : ChipTone.neutral;
                 }
             }
+            if root.plugin.update: Small {
+                text: root.plugin.update-text;
+                horizontal-alignment: right;
+            }
             HorizontalLayout {
                 alignment: end;
                 spacing: 8px;
+                if root.plugin.update: Button {
+                    small: true;
+                    kind: ButtonKind.primary;
+                    icon: Icons.update;
+                    privileged: root.plugin.privileged;
+                    text: @tr("Update driver");
+                    enabled: !root.plugin.busy;
+                    clicked => { Api.install-driver(root.plugin.id); }
+                }
                 if root.plugin.tone == "error": Button {
                     small: true;
                     icon: Icons.restart;
@@ -478,6 +526,26 @@ export component PluginsScreen inherits Rectangle {
                 alignment: start;
                 Small {
                     text: @tr("Each brand is supported by a plugin. A plugin may ship a driver: it works with SimRig closed and starts only with its devices.");
+                }
+                if Rig.drivers-outdated > 0: VerticalLayout {
+                    padding-top: 16px;
+                    HorizontalLayout {
+                        spacing: 16px;
+                        Notice {
+                            text: Rig.drivers-outdated == 1
+                                ? @tr("A driver installed by SimRig has a newer version, shipped with this version of SimRig.")
+                                : @tr("{} drivers installed by SimRig have a newer version, shipped with this version of SimRig.", Rig.drivers-outdated);
+                            horizontal-stretch: 1;
+                        }
+                        if Rig.drivers-outdated > 1: Button {
+                            small: true;
+                            kind: ButtonKind.primary;
+                            icon: Icons.update;
+                            privileged: true;
+                            text: @tr("Update all");
+                            clicked => { Api.update-drivers(); }
+                        }
+                    }
                 }
                 Rectangle { height: 12px; }
                 Hairline { }

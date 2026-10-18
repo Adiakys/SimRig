@@ -4,6 +4,7 @@
 
 mod common;
 
+use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
@@ -309,6 +310,30 @@ fn drivers_install_save_and_uninstall_without_leftovers() {
         host.param("base", "rotation").unwrap().value,
         Value::Float(900.0)
     );
+}
+
+#[test]
+fn a_driver_that_changed_since_its_install_can_be_updated() {
+    let env = Env::new("driver-update");
+    let mut host = env.start();
+    // Not installed: nothing to update.
+    assert_eq!(host.driver_update("sim").unwrap(), None);
+    host.install_driver("sim").unwrap();
+    assert_eq!(host.driver_update("sim").unwrap(), None);
+
+    // The copy installed differs from the driver the plugin ships, as after an update of the
+    // app that changed a hook.
+    let hook = env.root.join("state/drivers/sim/driver/hooks/install");
+    let old = fs::read_to_string(&hook).unwrap();
+    fs::write(&hook, format!("{old}\n# older\n")).unwrap();
+    let update = host.driver_update("sim").unwrap().unwrap();
+    assert_eq!(update.installed, update.available);
+
+    // Installing again is the update.
+    host.install_driver("sim").unwrap();
+    assert_eq!(host.driver_update("sim").unwrap(), None);
+    assert_eq!(fs::read_to_string(&hook).unwrap(), old);
+    assert_eq!(host.installed_drivers().len(), 1);
 }
 
 #[test]

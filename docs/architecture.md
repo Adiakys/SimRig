@@ -95,7 +95,8 @@ root-owned directory, refuses packages not named `simrig` and installs with the 
 `apt-get`/`dpkg`, `dnf`/`zypper`/`rpm`, `pacman`, or the archive's `install.sh`. The new
 version takes over when the app restarts; the window offers to restart it.
 
-The update replaces the app and its plugins; the drivers already installed stay as they are.
+The update replaces the app and its plugins; the drivers already installed stay as they are
+until updated from Plugins (§6.4).
 
 ## 3. Domain model
 
@@ -540,9 +541,11 @@ privileged operations its adapter may request.
 ```toml
 # driver/driver.toml
 id       = "hid-fanatec"
+name     = "hid-fanatecff"          # optional: shown with the version in Plugins
 version  = "dd78ef4"
 summary  = "hid-fanatecff kernel driver (DKMS) + udev rules"
 license  = "GPL-2.0"
+sources  = [{ name = "hid-fanatecff", url = "https://github.com/gotzl/hid-fanatecff" }]   # optional: upstream projects, linked from Plugins
 
 # Required hooks: executables in the driver directory, launched with argv (never through a shell)
 install   = "hooks/install"      # root, via helper
@@ -686,6 +689,16 @@ wizard ──▶ hooks/status (user) → not installed
   (old `uninstall` → new `install`, or an `upgrade` hook if the driver declares one). Kernel
   upgrades are handled by DKMS (or whatever the driver chose).
 - **Immutable distros and Flatpak**: instructions only in v1.
+
+**Updates.** A plugin may ship a newer driver than the one installed, typically after an
+update of the app. The host compares a digest of the driver directory the plugin ships with
+the installed copy (`/var/lib/simrig/drivers/<plugin>/driver`): paths, contents and executable
+bits, so a change to SimRig's hooks counts even when the upstream version stays. A difference
+puts a dot on Plugins in the top bar and an "Update driver" button on the plugin; updating is
+installing again, with the same hooks (they replace a version SimRig installed before, e.g.
+`mod_build` removes the previous DKMS package). The driver's data directory, e.g. the devices
+set up with the generic USB driver, is kept. Plugins shows each driver as its name and the
+version installed (`hid-fanatecff 0.2.3-11-gbc2601b`), with links to its upstream projects.
 
 ### 6.5 Uninstallation
 

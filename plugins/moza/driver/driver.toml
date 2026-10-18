@@ -3,9 +3,12 @@
 # 6.15 (bundled as a git submodule, pinned to a tested version, built with DKMS). The kernel's
 # own hid-universal-pidff, or one installed by other means, is used as it is.
 id = "moza"
+name = "universal-pidff"
 version = "0.2.2-6-gefd9b4a"
 summary = "udev rules for Moza settings without a password, and hid-universal-pidff for kernels older than 6.15"
 license = "GPL-2.0 (universal-pidff), GPL-3.0-or-later (SimRig's hooks)"
+# Upstream projects of the bundled sources, linked from Plugins.
+sources = [{ name = "universal-pidff", url = "https://github.com/JacKeTUs/universal-pidff" }]
 
 install = "hooks/install"
 uninstall = "hooks/uninstall"

@@ -4,9 +4,12 @@
 # wheels up; hid-tmff2 brings an improved one, so the kernel's is blacklisted while SimRig's is
 # installed, as upstream recommends. A hid-tmff2 installed by other means is used as it is.
 id = "thrustmaster"
+name = "hid-tmff2"
 version = "0.83-13-gd890a93"
 summary = "hid-tmff2 kernel driver, built with DKMS, and udev rules for access without a password"
 license = "GPL-2.0-or-later (hid-tmff2, hid-tminit), GPL-3.0-or-later (SimRig's hooks)"
+# Upstream projects of the bundled sources, linked from Plugins.
+sources = [{ name = "hid-tmff2", url = "https://github.com/Kimplul/hid-tmff2" }]
 
 install = "hooks/install"
 uninstall = "hooks/uninstall"

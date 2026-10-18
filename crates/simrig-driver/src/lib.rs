@@ -14,9 +14,9 @@ mod registry;
 #[cfg(feature = "testing")]
 pub mod testing;
 
-pub use contract::{DriverContract, DriverStatus, PrivilegedOp};
+pub use contract::{DriverContract, DriverStatus, PrivilegedOp, Source};
 pub use error::DriverError;
 pub use hooks::{HookContext, HookOutput, run_hook};
-pub use layout::{SYSTEM_STATE_DIR, StateLayout, effective_uid};
+pub use layout::{SYSTEM_STATE_DIR, StateLayout, digest, effective_uid};
 pub use ops::{install, privileged, uninstall};
 pub use registry::{InstallState, InstalledDriver, Registry};

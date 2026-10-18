@@ -122,10 +122,22 @@ export struct FoundDevice {
     preview: Device,
 }
 
+/// A web page, e.g. the upstream project of a driver.
+export struct Link {
+    name: string,
+    url: string,
+}
+
 export struct PluginRow {
     id: string,
     name: string,
+    /// The driver and its version (`hid-fanatecff 0.2.3`), else the plugin's version.
     version: string,
+    /// The plugin ships a newer driver than the one installed.
+    update: bool,
+    update-text: string,
+    /// Upstream projects of the driver's sources.
+    sources: [Link],
     origin: string,
     state: string,
     /// running, idle, failed
@@ -248,6 +260,8 @@ export global Rig {
     in property <[ExcludedRow]> composition;
     in property <[UsbRow]> usb-devices;
     in property <int> drivers-missing;
+    /// Installed drivers with an update: a dot on Plugins.
+    in property <int> drivers-outdated;
     in property <int> theme-index;
     in property <bool> reduced-motion;
     in property <int> first-step;
@@ -292,6 +306,7 @@ export global Api {
     callback add-finish();
     callback install-driver(string);
     callback remove-driver(string);
+    callback update-drivers();
     callback restart-plugin(string);
     callback set-excluded(string, bool);
     callback set-theme(int);

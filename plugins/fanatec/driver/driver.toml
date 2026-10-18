@@ -3,9 +3,12 @@
 # SimRig's udev rules. A hid-fanatec installed by other means (distribution package, by hand,
 # another version) is used as it is and never touched.
 id = "hid-fanatec"
+name = "hid-fanatecff"
 version = "0.2.3-11-gbc2601b"
 summary = "hid-fanatecff kernel driver, built with DKMS, and udev rules for access without a password"
 license = "GPL-2.0 (hid-fanatecff), GPL-3.0-or-later (SimRig's hooks)"
+# Upstream projects of the bundled sources, linked from Plugins.
+sources = [{ name = "hid-fanatecff", url = "https://github.com/gotzl/hid-fanatecff" }]
 
 install = "hooks/install"
 uninstall = "hooks/uninstall"

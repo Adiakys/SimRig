@@ -89,6 +89,8 @@ export component Button {
     /// The action asks for the password: draws a lock before the text.
     in property <bool> privileged: false;
     in property <bool> active: false;
+    /// A dot on the corner: something waits there (e.g. driver updates on Plugins).
+    in property <bool> badge: false;
     callback clicked;
 
     property <bool> compact: small || kind == ButtonKind.quiet || kind == ButtonKind.outline;
@@ -97,7 +99,7 @@ export component Button {
 
     forward-focus: focus;
     accessible-role: AccessibleRole.button;
-    accessible-label: text;
+    accessible-label: badge ? text + " · " + @tr("updates available") : text;
     accessible-enabled: enabled;
     accessible-action-default => { if enabled { clicked(); } }
     height: compact ? 32px : 40px;
@@ -170,6 +172,17 @@ export component Button {
                 vertical-alignment: center;
             }
         }
+    }
+
+    if root.badge: Rectangle {
+        x: parent.width - 9px;
+        y: -1px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: Theme.accent;
+        border-width: 2px;
+        border-color: Theme.surface;
     }
 
     touch := TouchArea {

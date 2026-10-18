@@ -12,10 +12,17 @@ use crate::error::DriverError;
 #[serde(deny_unknown_fields)]
 pub struct DriverContract {
     pub id: String,
+    /// The name users know the driver by, e.g. the upstream project (`hid-fanatecff`).
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The version shipped: upstream's (e.g. `git describe` of the bundled sources).
     pub version: String,
     pub summary: String,
     #[serde(default)]
     pub license: Option<String>,
+    /// Upstream projects of the bundled sources (`https://` pages), linked from the app.
+    #[serde(default)]
+    pub sources: Vec<Source>,
     /// Hooks: executables relative to the driver directory, run without a shell.
     pub install: String,
     pub uninstall: String,
@@ -28,6 +35,13 @@ pub struct DriverContract {
     /// Operations the adapter may request at runtime.
     #[serde(default)]
     pub privileged: Vec<PrivilegedOp>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Source {
+    pub name: String,
+    pub url: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -105,6 +119,9 @@ impl DriverContract {
         let mut hooks = vec![&self.install, &self.uninstall, &self.status];
         hooks.extend(self.upgrade.iter());
         hooks.extend(self.privileged.iter().map(|op| &op.exec));
+        if let Some(bad) = self.sources.iter().find(|s| !s.url.starts_with("https://")) {
+            return Err(format!("source '{}' must be an https:// page", bad.name));
+        }
         if let Some(bad) = hooks.iter().find(|h| !valid_hook_path(h)) {
             return Err(format!("hook path '{bad}' must be a plain relative path"));
         }
@@ -170,6 +187,17 @@ mod tests {
         let c: DriverContract = toml::from_str(&text).map_err(|e| e.to_string())?;
         c.validate()?;
         Ok(c)
+    }
+
+    #[test]
+    fn sources_are_https_pages() {
+        let c = contract(
+            "name = 'hid-x'\nsources = [{ name = 'hid-x', url = 'https://example.org/hid-x' }]",
+        )
+        .unwrap();
+        assert_eq!(c.name.as_deref(), Some("hid-x"));
+        assert_eq!(c.sources[0].url, "https://example.org/hid-x");
+        assert!(contract("sources = [{ name = 'x', url = 'file:///etc/passwd' }]").is_err());
     }
 
     #[test]

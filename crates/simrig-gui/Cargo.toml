@@ -26,7 +26,7 @@ serde_json.workspace = true
 # Updates: the releases on GitHub (HTTPS with rustls, no system TLS library), the download's
 # checksum and version order.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
-sha2 = "0.11"
+sha2.workspace = true
 semver = "1"
 
 [build-dependencies]

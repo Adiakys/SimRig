@@ -24,6 +24,13 @@ pub(crate) const SYSTEM_HELPER: &str = "/usr/libexec/simrig/simrig-helper";
 /// pkexec: the user dismissed the dialog or is not authorized.
 const PKEXEC_DENIED: [i32; 2] = [126, 127];
 
+/// A newer driver than the one installed, shipped with the plugin.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DriverUpdate {
+    pub installed: String,
+    pub available: String,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct DriverManager {
     helper: Option<PathBuf>,
@@ -211,6 +218,29 @@ impl DriverManager {
     ) -> Result<String, HostError> {
         self.runner(plugin, location)?
             .run(&["uninstall".into(), plugin.into()])
+    }
+
+    /// The plugin ships a driver different from the one installed (the hooks count, not only
+    /// the version): installing it again updates it.
+    pub(crate) fn update(
+        &self,
+        manifest: &Manifest,
+        dir: &Path,
+        location: PluginLocation,
+    ) -> Option<DriverUpdate> {
+        let contract_path = dir.join(manifest.driver.as_ref()?);
+        let layout = self.layout(location)?;
+        let registry = Registry::load(&layout).ok()?;
+        let entry = registry
+            .find(&manifest.id)
+            .filter(|e| e.state == simrig_driver::InstallState::Installed)?;
+        let contract = DriverContract::load(&contract_path).ok()?;
+        let shipped = simrig_driver::digest(contract_path.parent()?).ok()?;
+        let installed = simrig_driver::digest(&layout.driver_copy(&manifest.id)).ok()?;
+        (shipped != installed).then(|| DriverUpdate {
+            installed: entry.version.clone(),
+            available: contract.version,
+        })
     }
 
     /// Drivers recorded in the system and development registries.

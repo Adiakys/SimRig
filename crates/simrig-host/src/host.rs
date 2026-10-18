@@ -17,7 +17,7 @@ use simrig_protocol::{
 
 use crate::catalog::{Catalog, Image};
 use crate::conformance;
-use crate::drivers::{DriverManager, find_helper};
+use crate::drivers::{DriverManager, DriverUpdate, find_helper};
 use crate::error::HostError;
 use crate::manifest::{self, Manifest, PluginLocation};
 use crate::paths;
@@ -26,7 +26,7 @@ use crate::process::{PluginProcess, Spawn};
 use crate::rig::RigConfig;
 use crate::system::SystemInfo;
 use crate::usb::{self, UsbDevice};
-use simrig_driver::{DriverStatus, InstalledDriver};
+use simrig_driver::{DriverContract, DriverStatus, InstalledDriver};
 
 /// Events kept for [`Host::poll`] when nobody polls (e.g. the CLI); older ones are dropped.
 const MAX_EVENTS: usize = 10_000;
@@ -1154,15 +1154,35 @@ impl Host {
         self.drivers.status(&p.manifest, &p.dir, p.location)
     }
 
-    /// Installs a plugin's driver; asks for authorization for system plugins. The adapter is
-    /// restarted so it sees the driver.
+    /// The driver a plugin ships. `None` when it has none.
+    pub fn driver_contract(&self, plugin: &str) -> Result<Option<DriverContract>, HostError> {
+        let p = &self.plugins[self.index(plugin)?];
+        DriverManager::contract(&p.manifest, &p.dir)
+    }
+
+    /// The plugin's driver is installed and the plugin ships a different one: installing it
+    /// again updates it.
+    pub fn driver_update(&self, plugin: &str) -> Result<Option<DriverUpdate>, HostError> {
+        let p = &self.plugins[self.index(plugin)?];
+        Ok(self.drivers.update(&p.manifest, &p.dir, p.location))
+    }
+
+    /// Installs a plugin's driver, or updates it; asks for authorization for system plugins.
+    /// The adapter is restarted so it sees the driver.
     pub fn install_driver(&mut self, plugin: &str) -> Result<String, HostError> {
         let i = self.index(plugin)?;
         let p = &self.plugins[i];
-        if self
+        // Not over a driver of the system, unless SimRig installed its own part before (e.g.
+        // access rules for a module installed by other means): then it is an update.
+        let update = self
             .drivers
-            .status(&p.manifest, &p.dir, p.location)?
-            .is_some_and(|s| s.provided_by_system)
+            .update(&p.manifest, &p.dir, p.location)
+            .is_some();
+        if !update
+            && self
+                .drivers
+                .status(&p.manifest, &p.dir, p.location)?
+                .is_some_and(|s| s.provided_by_system)
         {
             return Ok("an equivalent driver is already provided by the system".into());
         }

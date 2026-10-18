@@ -1,9 +1,9 @@
 // SimRig: the main window.
 
 import { Theme, Icons } from "theme.slint";
-import { Rig, Api } from "api.slint";
+import { Rig, Api, Toast } from "api.slint";
 import { Geometry } from "devices.slint";
-import { Button, ButtonKind, Notice } from "widgets.slint";
+import { Button, ButtonKind } from "widgets.slint";
 import { Home } from "home.slint";
 import { ComponentScreen } from "component.slint";
 import { ProcedureScreen } from "procedure.slint";
@@ -76,6 +76,7 @@ component TopBar inherits Rectangle {
                 kind: ButtonKind.quiet;
                 icon: Icons.plug;
                 text: @tr("Plugins");
+                badge: Rig.drivers-outdated > 0;
                 active: root.screen == Screen.plugins;
                 clicked => { root.plugins(); }
             }
@@ -97,6 +98,79 @@ component TopBar inherits Rectangle {
         y: parent.height - 1px;
         height: 1px;
         background: Theme.line;
+    }
+}
+
+/// A confirmation or an error: its icon, the text and a close button on one line, the text
+/// wrapping under its first line.
+component ToastCard inherits Rectangle {
+    in property <Toast> toast;
+    callback dismiss;
+    property <color> fg: toast.level == "success" ? Theme.success : toast.level == "warning" ? Theme.warning
+        : toast.level == "error" ? Theme.error : Theme.ink2;
+    height: row.preferred-height;
+    border-radius: 10px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.dark ? Theme.rule : Theme.line;
+    drop-shadow-blur: Theme.float-blur;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-color: Theme.float-shadow;
+    accessible-role: AccessibleRole.text;
+    accessible-label: toast.text;
+    row := HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 6px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 10px;
+        // Icon, first line of text and close button share a 28px line.
+        VerticalLayout {
+            alignment: start;
+            padding-top: 5px;
+            Image {
+                source: root.toast.level == "success" ? Icons.check : root.toast.level == "warning" ? Icons.warn
+                    : root.toast.level == "error" ? Icons.error : Icons.info;
+                colorize: root.fg;
+                width: 18px;
+                height: 18px;
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            Text {
+                text: root.toast.text;
+                font-family: Theme.sans;
+                font-size: 15px;
+                color: Theme.ink;
+                wrap: word-wrap;
+                vertical-alignment: top;
+            }
+        }
+        VerticalLayout {
+            alignment: start;
+            close := TouchArea {
+                width: 28px;
+                height: 28px;
+                mouse-cursor: pointer;
+                accessible-role: AccessibleRole.button;
+                accessible-label: @tr("Dismiss");
+                accessible-action-default => { root.dismiss(); }
+                clicked => { root.dismiss(); }
+                Rectangle {
+                    border-radius: 6px;
+                    background: close.has-hover ? Theme.raised : transparent;
+                }
+                Image {
+                    source: Icons.x;
+                    colorize: Theme.ink2;
+                    width: 16px;
+                    height: 16px;
+                }
+            }
+        }
     }
 }
 
@@ -153,40 +227,16 @@ export component AppWindow inherits Window {
         close => { Rig.update-open = false; }
     }
 
-    // Toasts: confirmations and errors, bottom right, never modal.
+    // Toasts: confirmations and errors, under the top bar, never modal.
     toasts := VerticalLayout {
-        x: parent.width - self.width - 24px;
-        y: parent.height - self.height - 24px;
-        width: 420px;
+        x: (parent.width - self.width) / 2;
+        y: 44px + 12px;
+        width: 440px;
         height: self.preferred-height;
         spacing: 8px;
-        for t[i] in Rig.toasts: Rectangle {
-            height: n.preferred-height + 28px;
-            border-radius: 10px;
-            background: Theme.surface;
-            border-width: 1px;
-            border-color: Theme.dark ? Theme.rule : Theme.line;
-            drop-shadow-blur: Theme.float-blur;
-            drop-shadow-offset-y: 12px;
-            drop-shadow-color: Theme.float-shadow;
-            n := Notice {
-                x: 16px;
-                width: parent.width - 32px - 24px;
-                text: t.text;
-                level: t.level;
-            }
-            TouchArea {
-                x: parent.width - 36px;
-                width: 28px;
-                mouse-cursor: pointer;
-                clicked => { Api.dismiss-toast(i); }
-                Image {
-                    source: Icons.x;
-                    colorize: Theme.ink2;
-                    width: 16px;
-                    height: 16px;
-                }
-            }
+        for t[i] in Rig.toasts: ToastCard {
+            toast: t;
+            dismiss => { Api.dismiss-toast(i); }
         }
     }
 }

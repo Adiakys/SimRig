@@ -266,6 +266,8 @@ mod callbacks {
         let a = app.clone();
         api.on_remove_driver(move |p| a.borrow_mut().remove_driver(&p));
         let a = app.clone();
+        api.on_update_drivers(move || a.borrow_mut().update_drivers());
+        let a = app.clone();
         api.on_restart_plugin(move |p| {
             a.borrow()
                 .send(backend::Command::RestartPlugin(p.to_string()))
@@ -344,6 +346,11 @@ mod callbacks {
                 }
             }
             "save" => a.save_component(),
+            // toast:<level>:<text>, e.g. toast:error:Driver not installed
+            "toast" => {
+                let (level, text) = arg.split_once(':').unwrap_or(("info", arg));
+                a.toast(text, level);
+            }
             // update:<version>[/<stage>], the update window on a made-up release
             "update" => a.preview_update(arg),
             "driver" => a.install_driver(arg),
