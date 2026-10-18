@@ -76,17 +76,22 @@ impl Drop for Env {
     }
 }
 
-/// `simrig-helper` from the same build; built on demand when only this package is tested.
+/// `simrig-helper` from the same build, with the same profile. Built once per test process
+/// even when present: a helper left by an older build would test old code.
 fn helper(bin_dir: &Path) -> PathBuf {
-    let path = bin_dir.join("simrig-helper");
-    if !path.is_file() {
-        let status = Command::new(env!("CARGO"))
-            .args(["build", "-q", "-p", "simrig-helper"])
-            .status()
-            .unwrap();
-        assert!(status.success(), "cannot build simrig-helper");
-    }
-    path
+    static BUILT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    BUILT.get_or_init(|| {
+        let mut build = Command::new(env!("CARGO"));
+        build.args(["build", "-q", "-p", "simrig-helper"]);
+        if bin_dir.file_name().is_some_and(|n| n == "release") {
+            build.arg("--release");
+        }
+        assert!(
+            build.status().unwrap().success(),
+            "cannot build simrig-helper"
+        );
+    });
+    bin_dir.join("simrig-helper")
 }
 
 /// Waits for the procedure to show a step whose title satisfies `want`.

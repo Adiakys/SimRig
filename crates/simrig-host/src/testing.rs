@@ -138,19 +138,21 @@ fn copy_dir(from: &Path, to: &Path, skip: &[&str]) {
     }
 }
 
-/// The privileged helper, built next to the adapter if needed: with the same profile, so it
-/// lands in the same directory (`target/debug` or `target/release`).
+/// The privileged helper, built next to the adapter with the same profile, so it lands in the
+/// same directory (`target/debug` or `target/release`). Built once per test process even when
+/// present: a helper left by an older build (or restored by a CI cache) would test old code.
 fn helper(bin_dir: &Path) -> PathBuf {
+    static BUILT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let path = bin_dir.join("simrig-helper");
-    if !path.is_file() {
+    BUILT.get_or_init(|| {
         let mut build = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()));
         build.args(["build", "-q", "-p", "simrig-helper"]);
         if bin_dir.file_name().is_some_and(|n| n == "release") {
             build.arg("--release");
         }
         assert!(build.status().unwrap().success());
-        assert!(path.is_file(), "{} was not built", path.display());
-    }
+    });
+    assert!(path.is_file(), "{} was not built", path.display());
     path
 }
 
