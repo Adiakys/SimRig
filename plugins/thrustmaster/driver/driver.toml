@@ -8,6 +8,8 @@
 id = "thrustmaster"
 name = "hid-tmff2, hid-t150"
 version = "tmff2-0.83-13-gd890a93+t150-1.0"
+# Raised when what an installed copy runs changes (udev rules, hooks): 1, the xpad rule.
+revision = 1
 summary = "hid-tmff2 kernel driver (and hid-t150 for the T150 and TMX), built with DKMS, and udev rules for access without a password"
 license = "GPL-2.0-or-later (hid-tmff2, hid-tminit), GPL-2.0 (hid-t150), GPL-3.0-or-later (SimRig's hooks)"
 # Upstream projects of the bundled sources, linked from Plugins.
