@@ -69,6 +69,9 @@ finds your devices and installs what they need.
 Fanatec's) also need DKMS, a compiler and your kernel's headers: SimRig tells you what is
 missing.
 
+**Updates**: SimRig shows a new release in its top bar and installs it with one click (and
+your password). Pre-releases are offered when chosen in Settings.
+
 **Uninstall**: remove the package as usual. The drivers SimRig installed are kept, so your
 devices keep working; remove them first from **Plugins** in the app, or afterwards with
 `sudo /var/lib/simrig/remove-drivers --all` (on Debian and Ubuntu, `apt purge simrig` does it).

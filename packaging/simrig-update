@@ -1,0 +1,64 @@
+#!/bin/sh
+# Installs a SimRig update the app downloaded and checked against the release's SHA256SUMS,
+# with the system's package tool. The app runs it through pkexec (polkit action
+# org.simrig.update), which asks for the password every time.
+#
+#   simrig-update FILE
+#     *.deb             apt-get (resolves dependencies), else dpkg
+#     *.rpm             dnf, zypper, else rpm
+#     *.pkg.tar.zst     pacman
+#     DIR               an extracted release archive: its install.sh
+#
+# Only SimRig itself: a package with another name is refused.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+src="${1:?usage: $0 FILE}"
+case "$src" in
+/*) ;;
+*) echo "simrig-update: the path must be absolute" >&2; exit 2 ;;
+esac
+[ -e "$src" ] || { echo "simrig-update: $src not found" >&2; exit 2; }
+
+# A copy owned by root: the file checked is the file installed. Readable by apt's sandbox user.
+work=$(mktemp -d /var/tmp/simrig-update.XXXXXX)
+trap 'rm -rf "$work"' EXIT
+chmod 0755 "$work"
+cp -R "$src" "$work/"
+f="$work/$(basename "$src")"
+chmod -R a+rX "$f"
+
+not_simrig() {
+    echo "simrig-update: $(basename "$src") is not a SimRig package" >&2
+    exit 2
+}
+
+case "$f" in
+*.deb)
+    [ "$(dpkg-deb -f "$f" Package)" = simrig ] || not_simrig
+    if command -v apt-get >/dev/null; then
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-downgrades "$f"
+    else
+        dpkg -i "$f"
+    fi
+    ;;
+*.rpm)
+    [ "$(rpm -qp --qf '%{NAME}' "$f" 2>/dev/null)" = simrig ] || not_simrig
+    if command -v dnf >/dev/null; then
+        dnf install -y "$f"
+    elif command -v zypper >/dev/null; then
+        zypper --non-interactive install --allow-unsigned-rpm "$f"
+    else
+        rpm -U "$f"
+    fi
+    ;;
+*.pkg.tar.zst)
+    pacman -Qip "$f" | grep -Eq '^Name +: simrig$' || not_simrig
+    pacman -U --noconfirm "$f"
+    ;;
+*)
+    [ -d "$f" ] && [ -f "$f/install.sh" ] && [ -x "$f/root/usr/bin/simrig" ] || not_simrig
+    sh "$f/install.sh" install
+    ;;
+esac

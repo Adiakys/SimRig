@@ -66,6 +66,9 @@ jobs:
         run: |
           sudo apt-get install -y ./dist/packages/simrig_*_amd64.deb
           test -x /usr/libexec/simrig/simrig-helper
+          test -x /usr/libexec/simrig/simrig-update
+          test -f /usr/share/polkit-1/actions/org.simrig.update.policy
+          test "$(cat /usr/lib/simrig/package-format)" = deb
           test -x /usr/lib/simrig/plugins/generic-usb/driver/bin/simrig-generic-usb-service
           test -f /usr/lib/simrig/plugins/fanatec/driver/hid-fanatecff/Kbuild
           test -f /usr/lib/simrig/plugins/moza/driver/universal-pidff/Kbuild

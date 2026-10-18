@@ -8,18 +8,21 @@ import { Home } from "home.slint";
 import { ComponentScreen } from "component.slint";
 import { ProcedureScreen } from "procedure.slint";
 import { AddScreen, PluginsScreen, SettingsScreen, FirstRunScreen } from "flows.slint";
+import { UpdateNotice, UpdateWindow } from "update.slint";
 
 export { Theme, Rig, Api, Geometry }
 
 export enum Screen { home, component, procedure, add, plugins, settings, first-run }
 
-/// Thin top bar: the mark and the name on the left; Settings, Plugins and Add device on the right.
+/// Thin top bar: the mark and the name on the left; the update notice, Settings, Plugins and Add
+/// device on the right.
 component TopBar inherits Rectangle {
     in property <Screen> screen;
     in property <bool> actions: true;
     callback settings;
     callback plugins;
     callback add;
+    callback update;
     height: 44px;
     background: Theme.surface;
     HorizontalLayout {
@@ -47,6 +50,14 @@ component TopBar inherits Rectangle {
             }
         }
         Rectangle { horizontal-stretch: 1; }
+        if Rig.update.available: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            padding-right: 8px;
+            UpdateNotice {
+                clicked => { root.update(); }
+            }
+        }
         if root.actions: VerticalLayout {
             alignment: center;
             horizontal-stretch: 0;
@@ -105,6 +116,10 @@ export component AppWindow inherits Window {
 
     FocusScope {
         key-pressed(e) => {
+            if e.text == Key.Escape && Rig.update-open {
+                Rig.update-open = Rig.update.stage == "downloading" || Rig.update.stage == "installing";
+                return accept;
+            }
             if e.text == Key.Escape && root.screen != Screen.home {
                 Api.go-home();
                 return accept;
@@ -119,6 +134,7 @@ export component AppWindow inherits Window {
                 settings => { root.navigate(Screen.settings); }
                 plugins => { root.navigate(Screen.plugins); }
                 add => { Api.start-add(); }
+                update => { Rig.update-open = true; }
             }
             Rectangle {
                 vertical-stretch: 1;
@@ -131,6 +147,10 @@ export component AppWindow inherits Window {
                 if root.screen == Screen.first-run: FirstRunScreen { }
             }
         }
+    }
+
+    if Rig.update-open && Rig.update.available: UpdateWindow {
+        close => { Rig.update-open = false; }
     }
 
     // Toasts: confirmations and errors, bottom right, never modal.

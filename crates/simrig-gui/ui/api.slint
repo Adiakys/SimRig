@@ -181,6 +181,26 @@ export struct Toast {
     level: string,
 }
 
+/// A newer SimRig release, and how far its installation got.
+export struct UpdateInfo {
+    /// A newer release is out: the top bar says so.
+    available: bool,
+    current: string,
+    latest: string,
+    prerelease: bool,
+    /// The release page, with its notes.
+    page: string,
+    /// idle, downloading, installing, installed, failed
+    stage: string,
+    progress: float,
+    error: string,
+    /// SimRig came from a package of the releases: the update installs from here.
+    can-install: bool,
+    /// The last check, for Settings: checking, up to date, available, the error.
+    status: string,
+    checking: bool,
+}
+
 export global Rig {
     // Home
     in property <[Device]> top;
@@ -236,6 +256,10 @@ export global Rig {
 
     in property <[Toast]> toasts;
     in property <string> app-version;
+    in property <UpdateInfo> update;
+    /// The update window is open (from the top bar or Settings).
+    in-out property <bool> update-open;
+    in property <bool> prereleases;
 }
 
 export global Api {
@@ -281,4 +305,9 @@ export global Api {
     callback dismiss-toast(int);
     callback choose-plugin(string, int);
     callback start-device-procedure(string, string, string);
+    callback check-updates();
+    callback install-update();
+    callback restart-app();
+    callback set-prereleases(bool);
+    callback open-url(string);
 }

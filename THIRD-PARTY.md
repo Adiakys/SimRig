@@ -36,7 +36,8 @@ and offered upstream.
 ## Rust crates
 
 The Rust libraries SimRig is built with (Slint, serde, evdev, resvg…) are listed in
-`Cargo.lock`; each comes under its own license, all compatible with GPL-3.0.
+`Cargo.lock`; each comes under its own license, all compatible with GPL-3.0. The update check
+reaches GitHub with rustls and Mozilla's root certificates (webpki-roots, CDLA-Permissive-2.0).
 
 ## Trademarks
 

@@ -25,6 +25,16 @@ contents:
   - src: ./dist/root/usr/
     dst: /usr/
     type: tree
+  # Which file of a release updates this installation (written by build-packages.sh).
+  - src: ./dist/format/deb
+    dst: /usr/lib/simrig/package-format
+    packager: deb
+  - src: ./dist/format/rpm
+    dst: /usr/lib/simrig/package-format
+    packager: rpm
+  - src: ./dist/format/archlinux
+    dst: /usr/lib/simrig/package-format
+    packager: archlinux
 
 scripts:
   postremove: ./packaging/postremove.sh

@@ -53,6 +53,7 @@
 | `simrig-gui` / `simrig-cli` | user | only while open | configure, calibrate, test, install, apply presets |
 | **Plugin (adapter)** | user | started by the app, stopped with the app | translates a driver's interfaces into components |
 | `simrig-helper` | root, single call | on demand only, via polkit | runs hooks declared by drivers (install, uninstall, privileged operations) |
+| `simrig-update` | root, single call | on demand only, via polkit | installs a new version of the app with the system's package tool (§2.2) |
 
 With the app closed, no simrig process runs. GUI and CLI use the `simrig-host` library directly;
 there is no background agent.
@@ -74,6 +75,27 @@ there is no background agent.
 | Wizard | `system()`: distribution, kernel, Secure Boot, session, systemd, pkexec |
 
 `simrig-cli` exposes the same functions from the terminal.
+
+### 2.2 Updates of the app
+
+While open, the app asks GitHub for the project's releases (at start, then every 12 hours) and
+shows the newest one above the running version in the top bar. Only releases whose packages are
+attached count (the release build attaches `SHA256SUMS` last); pre-releases count when Settings
+says so, by default when the running version is itself a pre-release.
+
+Each package and the archive carry `/usr/lib/simrig/package-format` (`deb`, `rpm`, `archlinux`
+or `tarball`): it says which file of a release updates this installation. Without it
+(development builds, copies made by hand) the update is shown but not installed from the app.
+
+Installing downloads that file into `~/.cache/simrig/update`, checks it against the release's
+`SHA256SUMS` and runs `pkexec /usr/libexec/simrig/simrig-update FILE`. The updater has its own
+polkit action, `org.simrig.update`, which asks for the password every time (the drivers'
+helper keeps it for a while; installing software never does). It copies the file to a
+root-owned directory, refuses packages not named `simrig` and installs with the system's tool:
+`apt-get`/`dpkg`, `dnf`/`zypper`/`rpm`, `pacman`, or the archive's `install.sh`. The new
+version takes over when the app restarts; the window offers to restart it.
+
+The update replaces the app and its plugins; the drivers already installed stay as they are.
 
 ## 3. Domain model
 

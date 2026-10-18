@@ -22,6 +22,12 @@ slint = { version = "1.18", default-features = false, features = ["std", "compat
 png = "0.17"
 # Already used by Slint: draws rotated layers when the renderer cannot rotate (software).
 resvg = { version = "0.48", default-features = false }
+serde_json.workspace = true
+# Updates: the releases on GitHub (HTTPS with rustls, no system TLS library), the download's
+# checksum and version order.
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+sha2 = "0.11"
+semver = "1"
 
 [build-dependencies]
 slint-build = "1.18"

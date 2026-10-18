@@ -45,6 +45,10 @@ pub struct GuiSettings {
     /// The preset applied last, shown in the rig header.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
+    /// Offer pre-releases as updates. Unset: as the running version is (a release candidate
+    /// is followed by the next one).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prereleases: Option<bool>,
 }
 
 impl GuiSettings {

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>SimRig</vendor>
+  <vendor_url>https://github.com/Adiakys/SimRig</vendor_url>
+
+  <!-- simrig-update installs a new version of SimRig with the system's package tool. Unlike
+       the drivers' helper, the password is never kept: it is asked for every update. -->
+  <action id="org.simrig.update">
+    <description>Update SimRig</description>
+    <message>Authentication is required to install the new version of SimRig</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/simrig/simrig-update</annotate>
+  </action>
+</policyconfig>

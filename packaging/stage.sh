@@ -4,9 +4,10 @@
 #
 #   packaging/stage.sh [DEST]      default: dist/root
 #
-# Layout: /usr/bin (app, CLI), /usr/libexec/simrig (helper, run through pkexec),
-# /usr/lib/simrig/plugins (official plugins with their drivers), polkit action, desktop entry,
-# icon, documentation and licenses.
+# Layout: /usr/bin (app, CLI), /usr/libexec/simrig (helper and updater, run through pkexec),
+# /usr/lib/simrig/plugins (official plugins with their drivers), polkit actions, desktop entry,
+# icon, documentation and licenses. The packages and the archive add
+# /usr/lib/simrig/package-format, which tells the app which file of a release updates it.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 bin="$root/target/release"
@@ -26,8 +27,11 @@ rm -rf "$dest"
 install -D -m 0755 "$bin/simrig" "$dest/usr/bin/simrig"
 install -D -m 0755 "$bin/simrig-cli" "$dest/usr/bin/simrig-cli"
 install -D -m 0755 "$bin/simrig-helper" "$dest/usr/libexec/simrig/simrig-helper"
-install -D -m 0644 "$root/packaging/polkit/org.simrig.helper.policy" \
-    "$dest/usr/share/polkit-1/actions/org.simrig.helper.policy"
+install -D -m 0755 "$root/packaging/simrig-update" "$dest/usr/libexec/simrig/simrig-update"
+for policy in org.simrig.helper org.simrig.update; do
+    install -D -m 0644 "$root/packaging/polkit/$policy.policy" \
+        "$dest/usr/share/polkit-1/actions/$policy.policy"
+done
 install -D -m 0644 "$root/packaging/simrig.desktop" "$dest/usr/share/applications/simrig.desktop"
 install -D -m 0644 "$root/crates/simrig-gui/ui/icons/mark.svg" \
     "$dest/usr/share/icons/hicolor/scalable/apps/simrig.svg"

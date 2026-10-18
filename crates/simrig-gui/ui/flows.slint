@@ -650,6 +650,37 @@ export component SettingsScreen inherits Rectangle {
                 }
 
                 SettingsSection {
+                    title: @tr("Updates");
+                    note: @tr("SimRig looks for new releases on GitHub while it is open.");
+                    SettingsLine {
+                        label: @tr("SimRig {}", Rig.app-version);
+                        help: Rig.update.status;
+                        if Rig.update.available: Button {
+                            small: true;
+                            kind: ButtonKind.primary;
+                            icon: Icons.update;
+                            text: @tr("Update to {}", Rig.update.latest);
+                            clicked => { Rig.update-open = true; }
+                        }
+                        Button {
+                            small: true;
+                            text: @tr("Check now");
+                            enabled: !Rig.update.checking;
+                            clicked => { Api.check-updates(); }
+                        }
+                    }
+                    SettingsLine {
+                        label: @tr("Pre-releases");
+                        help: @tr("Release candidates are offered too, before the final version.");
+                        Toggle {
+                            checked: Rig.prereleases;
+                            label: @tr("Pre-releases");
+                            toggled(on) => { Api.set-prereleases(on); }
+                        }
+                    }
+                }
+
+                SettingsSection {
                     title: @tr("About");
                     Small {
                         text: @tr("SimRig {}, free software under the GPL-3.0-or-later license. Bundled drivers and fonts keep their own licenses (THIRD-PARTY.md).", Rig.app-version);

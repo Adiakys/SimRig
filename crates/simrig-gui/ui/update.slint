@@ -1,0 +1,274 @@
+// Updates of SimRig: the top bar notice and the update window.
+
+import { Theme, Icons } from "theme.slint";
+import { Rig, Api } from "api.slint";
+import { Button, ButtonKind, Chip, Heading, Small, Hairline, Notice } from "widgets.slint";
+
+/// In the top bar while a newer release is out: opens the update window.
+export component UpdateNotice {
+    callback clicked;
+    property <string> text: Rig.update.stage == "installed" ? @tr("Restart to update")
+        : Rig.update.stage == "downloading" ? @tr("Downloading · {}%", Math.round(Rig.update.progress * 100))
+        : Rig.update.stage == "installing" ? @tr("Installing the update")
+        : @tr("Update {}", Rig.update.latest);
+    height: 32px;
+    min-width: l.min-width;
+    preferred-width: l.preferred-width;
+    horizontal-stretch: 0;
+    max-width: self.preferred-width;
+    forward-focus: focus;
+    accessible-role: AccessibleRole.button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+
+    focus := FocusScope {
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 20px;
+        border-width: focus.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    Rectangle {
+        y: touch.pressed ? 1px : 0px;
+        border-radius: 16px;
+        background: touch.has-hover ? Theme.line : Theme.raised;
+        animate background { duration: Theme.fast; easing: cubic-bezier(0.25, 1, 0.5, 1); }
+        l := HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 14px;
+            spacing: 8px;
+            alignment: center;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                y: (parent.height - 8px) / 2;
+                border-radius: 4px;
+                background: Theme.accent;
+                border-width: Theme.dark ? 0px : 1px;
+                border-color: Theme.accent-edge;
+            }
+            Text {
+                text: root.text;
+                font-family: Theme.sans;
+                font-size: 15px;
+                font-weight: 500;
+                color: Theme.ink;
+                vertical-alignment: center;
+            }
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            focus.focus();
+            root.clicked();
+        }
+    }
+}
+
+component VersionLine inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> version;
+    in property <bool> prerelease;
+    spacing: 12px;
+    height: 32px;
+    Small {
+        text: root.label;
+        width: 110px;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.version;
+        font-family: Theme.mono;
+        font-size: 15px;
+        font-weight: 500;
+        color: Theme.ink;
+        vertical-alignment: center;
+        horizontal-stretch: 0;
+    }
+    if root.prerelease: VerticalLayout {
+        alignment: center;
+        Chip { text: @tr("Pre-release"); }
+    }
+    Rectangle { horizontal-stretch: 1; }
+}
+
+/// The installed version and the new one, with one main action: install, then restart. The
+/// release notes stay one link away.
+export component UpdateWindow inherits Rectangle {
+    callback close;
+    property <bool> busy: Rig.update.stage == "downloading" || Rig.update.stage == "installing";
+
+    // The rest of the window waits; a click outside closes. Closing never stops a download or
+    // an installation: the window shows it again when reopened.
+    Rectangle {
+        background: Theme.dark ? #0b0a0899 : #201e1852;
+        TouchArea {
+            clicked => { root.close(); }
+        }
+    }
+
+    panel := Rectangle {
+        width: 480px;
+        height: col.preferred-height;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2.4;
+        border-radius: 14px;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.dark ? Theme.rule : Theme.line;
+        drop-shadow-blur: Theme.float-blur;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-color: Theme.float-shadow;
+        accessible-role: AccessibleRole.groupbox;
+        accessible-label: @tr("Update");
+        // Clicks inside stay inside.
+        TouchArea { }
+
+        col := VerticalLayout {
+            padding: 28px;
+            padding-bottom: 20px;
+            spacing: 0px;
+
+            HorizontalLayout {
+                spacing: 12px;
+                Heading {
+                    text: Rig.update.stage == "installed" ? @tr("Update installed") : @tr("Update available");
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+                TouchArea {
+                    width: 32px;
+                    height: 32px;
+                    mouse-cursor: pointer;
+                    accessible-role: AccessibleRole.button;
+                    accessible-label: @tr("Close");
+                    accessible-action-default => { root.close(); }
+                    clicked => { root.close(); }
+                    Rectangle {
+                        border-radius: 6px;
+                        background: parent.has-hover ? Theme.raised : transparent;
+                    }
+                    Image {
+                        source: Icons.x;
+                        colorize: Theme.ink2;
+                        width: 18px;
+                        height: 18px;
+                    }
+                }
+            }
+
+            Rectangle { height: 18px; }
+            VersionLine {
+                label: @tr("Installed");
+                version: Rig.update.current;
+            }
+            VersionLine {
+                label: @tr("Available");
+                version: Rig.update.latest;
+                prerelease: Rig.update.prerelease;
+            }
+            Rectangle { height: 18px; }
+
+            if Rig.update.stage == "downloading": VerticalLayout {
+                spacing: 8px;
+                Rectangle {
+                    height: 6px;
+                    border-radius: 3px;
+                    background: Theme.track;
+                    Rectangle {
+                        x: 0px;
+                        width: parent.width * clamp(Rig.update.progress, 0, 1);
+                        border-radius: 3px;
+                        background: Theme.accent;
+                        animate width { duration: Theme.normal; easing: cubic-bezier(0.25, 1, 0.5, 1); }
+                    }
+                }
+                Small {
+                    text: @tr("Downloading · {}%", Math.round(Rig.update.progress * 100));
+                }
+            }
+            if Rig.update.stage == "installing": Notice {
+                text: @tr("Installing. The system asks for the password.");
+            }
+            if Rig.update.stage == "installed": Notice {
+                text: @tr("Installed. SimRig uses the new version once restarted.");
+                level: "success";
+            }
+            if Rig.update.stage == "failed": Notice {
+                text: Rig.update.error;
+                level: "error";
+            }
+            if !Rig.update.can-install && Rig.update.stage == "idle": Notice {
+                text: @tr("This copy of SimRig was not installed from a release package: update it the way it was installed.");
+            }
+            if !root.busy && (Rig.update.stage != "idle" || !Rig.update.can-install): Rectangle { height: 20px; }
+
+            if !root.busy: HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                Button {
+                    text: @tr("Later");
+                    clicked => { root.close(); }
+                }
+                if Rig.update.stage == "installed": Button {
+                    kind: ButtonKind.primary;
+                    icon: Icons.restart;
+                    text: @tr("Restart SimRig");
+                    clicked => { Api.restart-app(); }
+                }
+                if Rig.update.stage != "installed": Button {
+                    kind: ButtonKind.primary;
+                    privileged: true;
+                    text: Rig.update.stage == "failed" ? @tr("Try again") : @tr("Install");
+                    enabled: Rig.update.can-install;
+                    clicked => { Api.install-update(); }
+                }
+            }
+
+            Rectangle { height: 20px; }
+            Hairline { }
+            Rectangle { height: 12px; }
+            HorizontalLayout {
+                alignment: start;
+                link := TouchArea {
+                    width: lk.preferred-width;
+                    height: 28px;
+                    mouse-cursor: pointer;
+                    accessible-role: AccessibleRole.button;
+                    accessible-label: @tr("Release notes on GitHub");
+                    accessible-action-default => { Api.open-url(Rig.update.page); }
+                    clicked => { Api.open-url(Rig.update.page); }
+                    lk := HorizontalLayout {
+                        spacing: 6px;
+                        Text {
+                            text: @tr("Release notes on GitHub");
+                            font-family: Theme.sans;
+                            font-size: 14px;
+                            color: link.has-hover ? Theme.ink : Theme.ink2;
+                            vertical-alignment: center;
+                        }
+                        Image {
+                            source: Icons.external;
+                            colorize: link.has-hover ? Theme.ink : Theme.ink2;
+                            width: 15px;
+                            height: 15px;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

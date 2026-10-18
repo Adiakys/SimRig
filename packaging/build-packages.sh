@@ -10,9 +10,11 @@ out="$root/dist"
 cd "$root"
 
 packaging/stage.sh "$out/root"
-mkdir -p "$out/packages"
+mkdir -p "$out/packages" "$out/format"
 rm -f "$out/packages/"*
 for format in deb rpm archlinux; do
+    # Installed as /usr/lib/simrig/package-format (nfpm.yaml): how the app updates itself.
+    echo "$format" > "$out/format/$format"
     SIMRIG_VERSION="$version" nfpm package -f packaging/nfpm.yaml -p "$format" -t "$out/packages/"
 done
 
@@ -20,6 +22,7 @@ tarball="simrig-$version-x86_64-linux"
 rm -rf "$out/$tarball"
 mkdir -p "$out/$tarball"
 cp -a "$out/root" "$out/$tarball/root"
+echo tarball > "$out/$tarball/root/usr/lib/simrig/package-format"
 install -m 0755 packaging/tarball-install.sh "$out/$tarball/install.sh"
 install -m 0755 packaging/postremove.sh "$out/$tarball/postremove.sh"
 tar -C "$out" -czf "$out/packages/$tarball.tar.gz" "$tarball"

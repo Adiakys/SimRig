@@ -39,6 +39,7 @@ pub struct App {
     /// Rotated layers drawn on the CPU, when the renderer cannot rotate.
     raster: Option<crate::raster::Raster>,
     snapshot_count: usize,
+    pub updates: crate::update::Updates,
 }
 
 pub struct Models {
@@ -84,6 +85,15 @@ pub fn deliver(update: Update) {
     let _ = slint::invoke_from_event_loop(move || {
         if let Some(app) = APP.with(|a| a.borrow().clone()) {
             App::handle(&app, update);
+        }
+    });
+}
+
+/// Runs `f` on the app, on the UI thread: for work finished on other threads.
+pub fn with_app(f: impl FnOnce(&mut App) + Send + 'static) {
+    let _ = slint::invoke_from_event_loop(move || {
+        if let Some(app) = APP.with(|a| a.borrow().clone()) {
+            f(&mut app.borrow_mut());
         }
     });
 }
@@ -144,7 +154,18 @@ impl App {
             flows: Default::default(),
             raster: raster.then(Default::default),
             snapshot_count: 0,
+            updates: Default::default(),
         }
+        .published()
+    }
+
+    /// Shows what does not wait for the plugins.
+    fn published(self) -> Self {
+        self.window()
+            .global::<Rig>()
+            .set_prereleases(self.prereleases());
+        self.publish_updates();
+        self
     }
 
     pub fn window(&self) -> AppWindow {

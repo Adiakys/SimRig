@@ -11,6 +11,7 @@ mod procedure;
 mod raster;
 mod settings;
 mod shot;
+mod update;
 
 #[allow(unsafe_code, clippy::all)]
 mod ui {
@@ -118,6 +119,8 @@ fn run(cli: Cli) -> Result<()> {
         None => None,
     };
 
+    // Where to start again after an update: once replaced, the running binary has no path.
+    let exe = std::env::current_exe().ok();
     let window = AppWindow::new().context("cannot create the window")?;
     // Matches simrig.desktop, so docks and task bars show the app's icon and group its window
     // (Wayland app id, X11 window class). Nothing to match in screenshots.
@@ -165,6 +168,7 @@ fn run(cli: Cli) -> Result<()> {
             .unwrap_or_else(|| Err(anyhow::anyhow!("the screen was not captured")))?;
         window.hide()?;
     } else {
+        app.borrow_mut().start_update_checks();
         window.run()?;
     }
 
@@ -173,6 +177,7 @@ fn run(cli: Cli) -> Result<()> {
     if let Some(app) = app::uninstall() {
         drop(app);
     }
+    update::restart(exe.as_deref());
     Ok(())
 }
 
@@ -293,6 +298,14 @@ mod callbacks {
         api.on_first_install_drivers(move || a.borrow_mut().first_install_drivers());
         let a = app.clone();
         api.on_first_run_done(move || a.borrow_mut().first_run_done());
+        let a = app.clone();
+        api.on_check_updates(move || a.borrow_mut().check_updates());
+        let a = app.clone();
+        api.on_install_update(move || a.borrow_mut().install_update());
+        let a = app.clone();
+        api.on_set_prereleases(move |on| a.borrow_mut().set_prereleases(on));
+        api.on_restart_app(update::request_restart);
+        api.on_open_url(|url| update::open_url(&url));
     }
 
     /// Opens a screen by name, for screenshots: `home`, `component:<address or suffix>`…
@@ -331,6 +344,8 @@ mod callbacks {
                 }
             }
             "save" => a.save_component(),
+            // update:<version>[/<stage>], the update window on a made-up release
+            "update" => a.preview_update(arg),
             "driver" => a.install_driver(arg),
             "generic" => a.add_generic(arg),
             "choose" => a.add_choose(arg),
