@@ -344,6 +344,20 @@ fn a_tuning_menu_not_received_yet_says_what_to_do() {
         })
     });
     assert!(host.problems().is_empty(), "{:?}", host.problems());
+
+    // The base reports a paddle mode out of the menu (a rim without analog paddles, or the
+    // entry not sent yet): not available, never an invalid value.
+    fs::write(env.hid("ftec_tuning/0003:0EB7:0020.0001/ACP"), "0\n").unwrap();
+    let wheel = host.find("wheel").unwrap().address.clone();
+    until(&mut host, "paddle mode unavailable", |h| {
+        h.describe(&wheel).is_ok_and(|c| {
+            matches!(
+                c.item("analog_paddle_mode").map(|i| &i.support),
+                Some(simrig_model::Support::Unsupported(_))
+            )
+        })
+    });
+    assert!(host.problems().is_empty(), "{:?}", host.problems());
 }
 
 /// A driver just bound creates its attributes, and udev gives the user its event node, a moment

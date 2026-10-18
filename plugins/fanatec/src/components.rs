@@ -314,9 +314,15 @@ impl SteeringWheel for Wheel {
                 if let Some(u) = d.tuning_unread() {
                     return Support::Unsupported(u);
                 }
-                Support::Supported(
-                    ParamSpec::choice(&v.to_string(), &tuning::PADDLE_MODES).persistent(),
-                )
+                // 0: a rim without analog paddles, or the base has not sent this entry of
+                // its menu yet (it comes with the rest a moment later).
+                let current = v.to_string();
+                if !tuning::PADDLE_MODES.iter().any(|(id, _)| *id == current) {
+                    return Support::not_in_hardware(
+                        "The steering wheel reports no analog paddle mode.",
+                    );
+                }
+                Support::Supported(ParamSpec::choice(&current, &tuning::PADDLE_MODES).persistent())
             }
             SteeringWheelParam::Vibration => {
                 tuning_spec(&self.device, standard_entry(Place::Wheel("vibration")))
