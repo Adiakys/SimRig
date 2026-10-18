@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use simrig_host::testing::{PluginEnv, reason, until};
-use simrig_model::{ParamType, Value};
+use simrig_model::{ParamType, Persistence, Value};
 
 fn env(name: &str) -> PluginEnv {
     PluginEnv::new(
@@ -138,6 +138,107 @@ fn a_g29_on_the_kernels_driver() {
         Value::Float(900.0)
     );
     assert!(reason(&mut host, &base, "ffb_strength").contains("new-lg4ff"));
+}
+
+#[test]
+fn the_kernels_driver_takes_strength_and_centering_through_the_input_interface() {
+    let env = env("g29-ff");
+    let hid = g29(&env, false);
+    env.input(&hid, "abs 0 32768 0 65535\nff gain autocenter\n");
+    let mut host = env.start();
+    until(&mut host, "base", |h| h.find("base").is_ok());
+    let base = host.find("base").unwrap().address.clone();
+
+    // Supported, marked: the value cannot be read back.
+    let spec = host.param(&base, "ffb_strength").unwrap();
+    assert_eq!(spec.value, Value::Float(100.0));
+    assert_eq!(spec.persistence, Persistence::Volatile);
+    assert!(spec.caveat.is_some());
+    host.set(&base, "ffb_strength", Value::Float(50.0)).unwrap();
+    host.set(&base, "custom.autocenter", Value::Float(25.0))
+        .unwrap();
+    let ff = fs::read_to_string(hid.join("simrig-fake-ff")).unwrap();
+    assert!(ff.contains("gain 32768"), "{ff}");
+    assert!(ff.contains("autocenter 16384"), "{ff}");
+    assert_eq!(
+        host.param(&base, "ffb_strength").unwrap().value,
+        Value::Float(50.0)
+    );
+    let centering = host
+        .find(&base)
+        .unwrap()
+        .description
+        .custom_param("autocenter")
+        .cloned()
+        .unwrap();
+    assert!(centering.availability.is_supported() && centering.caveat.is_some());
+    // Nothing to keep for the next plug-in.
+    host.install_driver("logitech").unwrap();
+    assert!(host.save(&base, "ffb_strength").is_err());
+}
+
+#[test]
+fn modes_and_combined_pedals() {
+    let env = env("g29-modes");
+    let hid = g29(&env, true);
+    attrs(
+        &hid,
+        &[
+            (
+                "alternate_modes",
+                "native: G29 Driving Force Racing Wheel *\nDF-EX: Driving Force / Formula EX\n\
+                 DFP: Driving Force Pro\nG29: G29 Racing Wheel *",
+            ),
+            ("combine_pedals", "2"),
+        ],
+    );
+    let mut host = env.start();
+    until(&mut host, "base", |h| h.find("base").is_ok());
+    let base = host.find("base").unwrap().address.clone();
+    let d = host.find(&base).unwrap().description.clone();
+
+    let mode = d.custom_param("mode").unwrap();
+    assert_eq!(mode.value, Value::Choice("G29".into()));
+    let ParamType::Choice { options } = &mode.ty else {
+        panic!("{:?}", mode.ty)
+    };
+    assert_eq!(options.len(), 3);
+    host.set(&base, "custom.mode", Value::Choice("DFP".into()))
+        .unwrap();
+    assert_eq!(read(&hid, "alternate_modes"), "DFP");
+
+    let combine = d.custom_param("combine_pedals").unwrap();
+    assert_eq!(combine.value, Value::Choice("2".into()));
+    host.set(&base, "custom.combine_pedals", Value::Choice("1".into()))
+        .unwrap();
+    assert_eq!(read(&hid, "combine_pedals"), "1");
+}
+
+#[test]
+fn a_wingman_formula_force_on_iforce() {
+    let env = env("wff");
+    // iforce is a USB driver: bound to the interface, no HID device.
+    let hid = env.plug(
+        "1-7",
+        0x046d,
+        0xc291,
+        "WingMan Formula Force",
+        "1-7:1.0",
+        Some("iforce"),
+    );
+    env.input(&hid, "abs 0 512 0 1023\nkey 288 0\nff gain autocenter\n");
+    let mut host = env.start();
+    until(&mut host, "base", |h| h.find("base").is_ok());
+    let base = host.find("base").unwrap().address.clone();
+    assert!(reason(&mut host, &base, "rotation").contains("180°"));
+    let spec = host.param(&base, "ffb_strength").unwrap();
+    assert!(spec.caveat.is_some());
+    host.set(&base, "ffb_strength", Value::Float(80.0)).unwrap();
+    assert!(
+        fs::read_to_string(hid.join("simrig-fake-ff"))
+            .unwrap()
+            .contains("gain 52428")
+    );
 }
 
 #[test]

@@ -76,7 +76,10 @@ jobs:
           test -f /usr/lib/simrig/plugins/logitech/driver/logitech-trueforce/mainline/dkms.conf
           test ! -e /usr/lib/simrig/plugins/logitech/driver/logitech-trueforce/tools
           test -f /usr/lib/simrig/plugins/thrustmaster/driver/hid-tmff2/deps/hid-tminit/hid-tminit.c
+          test -f /usr/lib/simrig/plugins/thrustmaster/driver/hid-t150/dkms_make.mak
+          test -f /usr/lib/simrig/plugins/thrustmaster/driver/dkms/hid-t150.conf
           test -f /usr/lib/simrig/plugins/pxn/driver/universal-pidff/Kbuild
+          test -f /usr/lib/simrig/plugins/pidff/driver/universal-pidff/Kbuild
           simrig-cli --version
           simrig-cli plugins
           sudo apt-get remove -y simrig

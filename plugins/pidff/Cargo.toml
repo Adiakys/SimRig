@@ -1,0 +1,23 @@
+[package]
+name = "simrig-plugin-pidff"
+description = "simrig plugin for wheel bases on the standard USB force feedback protocol (hid-universal-pidff): Cammus, Asetek, VRS, FFBeast, Turtle Beach, OpenFFBoard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "simrig-plugin-pidff"
+path = "src/bin/adapter.rs"
+
+[dependencies]
+simrig-plugin-kit.workspace = true
+simrig-plugin-sdk.workspace = true
+
+[dev-dependencies]
+simrig-driver = { workspace = true, features = ["testing"] }
+simrig-host = { workspace = true, features = ["testing"] }
+simrig-model.workspace = true
+
+[lints]
+workspace = true

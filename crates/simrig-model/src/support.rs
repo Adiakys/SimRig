@@ -124,6 +124,75 @@ impl Reason {
     }
 }
 
+/// A supported item that may not work fully, with the reason: the app marks it so the user
+/// knows. Plugins report it the way they report unsupported items: a standard reason the core
+/// explains, plus an optional detail.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Caveat {
+    pub reason: CaveatReason,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+impl Caveat {
+    pub fn new(reason: CaveatReason) -> Self {
+        Self {
+            reason,
+            detail: None,
+        }
+    }
+
+    /// The device does not report the value back: what is shown is the last value set.
+    pub fn write_only() -> Self {
+        Self::new(CaveatReason::WriteOnly)
+    }
+
+    /// The driver accepts the item, but whether the device acts on it is not known.
+    pub fn unverified() -> Self {
+        Self::new(CaveatReason::Unverified)
+    }
+
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    /// Full explanation: the core text for the reason, followed by the plugin's detail.
+    pub fn explain(&self) -> String {
+        match &self.detail {
+            Some(detail) => format!("{} {}", self.reason.explain(), detail),
+            None => self.reason.explain(),
+        }
+    }
+}
+
+/// The standard reasons for a caveat. The core owns their (translated) texts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaveatReason {
+    /// The value cannot be read back from the device.
+    WriteOnly,
+    /// Support is not confirmed for this device.
+    Unverified,
+}
+
+impl CaveatReason {
+    pub fn explain(self) -> String {
+        match self {
+            CaveatReason::WriteOnly => {
+                "Not fully supported: the device does not report this value, so the last value \
+                 set is shown."
+                    .into()
+            }
+            CaveatReason::Unverified => {
+                "Not fully supported: the driver accepts it, but it is not confirmed on this \
+                 device."
+                    .into()
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,6 +201,15 @@ mod tests {
     fn explain_includes_detail() {
         let u = Unsupported::new(Reason::NotInHardware).with_detail("No load cell.");
         assert_eq!(u.explain(), "Not available on this hardware. No load cell.");
+    }
+
+    #[test]
+    fn caveat_explains_with_detail() {
+        let c = Caveat::write_only().with_detail("Set through the kernel.");
+        assert!(c.explain().starts_with("Not fully supported"));
+        assert!(c.explain().ends_with("Set through the kernel."));
+        let json = serde_json::to_value(&c).unwrap();
+        assert_eq!(json["reason"], "write_only");
     }
 
     #[test]

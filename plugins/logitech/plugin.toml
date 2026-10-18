@@ -4,11 +4,13 @@ version = "0.1.0"
 api = 1
 exec = "simrig-plugin-logitech"
 driver = "driver/driver.toml"
-description = "Logitech wheels: G29, G27, G25, Driving Force, G920, G923 on the kernel's drivers (with new-lg4ff for more effects), G PRO and RS50 on the TrueForce driver."
+description = "Logitech wheels: G29, G27, G25, Driving Force, G920, G923 on the kernel's drivers (with new-lg4ff for more effects), G PRO and RS50 on the TrueForce driver, the oldest WingMan wheels."
 
 # The wheels of src/models.rs; a test keeps the two in step.
 [match]
 usb = [
+    { vid = 0x046d, pid = 0xc20e }, # WingMan Formula GP
+    { vid = 0x046d, pid = 0xc291 }, # WingMan Formula Force
     { vid = 0x046d, pid = 0xc293 }, # WingMan Formula Force GP
     { vid = 0x046d, pid = 0xc294 }, # Driving Force
     { vid = 0x046d, pid = 0xc295 }, # MOMO Racing

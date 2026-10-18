@@ -1,17 +1,45 @@
 #!/bin/sh
-# Saves a setting as an option of the hid-tmff2 module: applied to every wheel it starts, the
-# next time one is plugged in.
+# Saves a setting for the next time a wheel is plugged in: as an option of the hid-tmff2
+# module, applied to every wheel it starts; for the T150 and TMX (hid-t150, which has no
+# options), as a udev rule that writes the attribute when the driver binds to that model.
 set -eu
 . "$SIMRIG_DRIVER_DIR/hooks/common.sh"
 mkdir -p "$DATA"
-{
-    grep -v "^$SIMRIG_ARG_ATTR=" "$DATA/settings" 2>/dev/null || true
-    echo "$SIMRIG_ARG_ATTR=$SIMRIG_ARG_VALUE"
-} > "$DATA/settings.new"
-mv "$DATA/settings.new" "$DATA/settings"
-if [ "$(id -u)" = 0 ]; then
-    write_conf
-else
-    echo "development install: kept in $DATA"
-fi
-echo "$SIMRIG_ARG_ATTR $SIMRIG_ARG_VALUE saved"
+pid="$SIMRIG_ARG_PID"
+attr="$SIMRIG_ARG_ATTR"
+value="$SIMRIG_ARG_VALUE"
+
+case " $T150_WHEELS " in
+*" $pid "*)
+    upper=$(echo "$pid" | tr '[:lower:]' '[:upper:]')
+    match="KERNEL==\"0003:044F:$upper.*\", ATTR{$attr}="
+    line="ACTION==\"bind\", SUBSYSTEM==\"hid\", $match\"$value\""
+    if [ "$(id -u)" = 0 ]; then
+        file="$(udev_rules_dir)/$SETTINGS"
+        mkdir -p "$(udev_rules_dir)"
+    else
+        # Development: kept in the driver's data.
+        file="$DATA/t150-settings"
+    fi
+    {
+        echo "# Written by SimRig: T150 and TMX settings applied when the wheel is plugged in."
+        grep -vF "$match" "$file" 2>/dev/null | grep -v '^#' || true
+        echo "$line"
+    } > "$file.new"
+    mv "$file.new" "$file"
+    [ "$(id -u)" = 0 ] && udevadm control --reload
+    ;;
+*)
+    {
+        grep -v "^$attr=" "$DATA/settings" 2>/dev/null || true
+        echo "$attr=$value"
+    } > "$DATA/settings.new"
+    mv "$DATA/settings.new" "$DATA/settings"
+    if [ "$(id -u)" = 0 ]; then
+        write_conf
+    else
+        echo "development install: kept in $DATA"
+    fi
+    ;;
+esac
+echo "$attr $value saved"

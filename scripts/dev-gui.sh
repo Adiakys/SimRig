@@ -48,6 +48,7 @@ run)
         --plugin-dir "$root/plugins/logitech" \
         --plugin-dir "$root/plugins/thrustmaster" \
         --plugin-dir "$root/plugins/pxn" \
+        --plugin-dir "$root/plugins/pidff" \
         --no-default-dirs \
         --config-dir "$dev/config" \
         --state-dir "$dev/state" \

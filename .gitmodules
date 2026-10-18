@@ -16,3 +16,9 @@
 [submodule "plugins/pxn/driver/universal-pidff"]
 	path = plugins/pxn/driver/universal-pidff
 	url = https://github.com/JacKeTUs/universal-pidff
+[submodule "plugins/thrustmaster/driver/hid-t150"]
+	path = plugins/thrustmaster/driver/hid-t150
+	url = https://github.com/scarburato/t150_driver
+[submodule "plugins/pidff/driver/universal-pidff"]
+	path = plugins/pidff/driver/universal-pidff
+	url = https://github.com/JacKeTUs/universal-pidff

@@ -1,6 +1,7 @@
 #!/bin/sh
-# Builds and installs hid-tmff2 with DKMS, then SimRig's udev rules. Upgrades a version SimRig
-# installed before; leaves a hid-tmff2 installed by other means alone.
+# Builds and installs hid-tmff2 with DKMS, and hid-t150 if a T150 or TMX is plugged in, then
+# SimRig's udev rules. Upgrades what SimRig installed before; leaves modules installed by other
+# means alone.
 set -eu
 . "$SIMRIG_DRIVER_DIR/hooks/common.sh"
 mkdir -p "$DATA"
@@ -13,30 +14,34 @@ fi
 
 udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
 
-# A hid-tmff2 installed by other means is used as it is: only SimRig's rules are added.
+rc=0
 if other=$(mod_foreign "$PACKAGE" "$MODULE"); then
+    # A hid-tmff2 installed by other means is used as it is.
     echo "$other" > "$DATA/integration"
-    udev_apply hid hidraw
     echo "hid-tmff2 $other is installed, not by SimRig: it is used as it is, with SimRig's access rules"
-    exit 0
+else
+    mod_prerequisites
+    mod_build "$PACKAGE" "$VERSION" "$SOURCE" dkms/dkms.conf $INIT_MODULES "$MODULE" || rc=$?
+    # hid-tminit's modules start the wheels from now on.
+    write_conf
+    modprobe -r hid_thrustmaster 2>/dev/null || true
+    case $rc in
+    0)
+        # Wheels start again, as if replugged: hid-tminit starts them up and hid-tmff2 takes
+        # them.
+        usb_replug 044f
+        echo "hid-tmff2 $VERSION installed"
+        ;;
+    3) echo "hid-tmff2 $VERSION installed" ;;
+    *) exit 1 ;;
+    esac
 fi
 
-mod_prerequisites
-rc=0
-mod_build "$PACKAGE" "$VERSION" "$SOURCE" dkms/dkms.conf $INIT_MODULES "$MODULE" || rc=$?
-# hid-tminit's modules start the wheels from now on.
-write_conf
-modprobe -r hid_thrustmaster 2>/dev/null || true
-case $rc in
-0)
-    # Wheels start again, as if replugged: hid-tminit starts them up and hid-tmff2 takes them.
-    usb_replug 044f
-    udev_apply hid hidraw
-    echo "hid-tmff2 $VERSION installed"
-    ;;
-3)
-    udev_apply hidraw
-    echo "hid-tmff2 $VERSION installed: $(mod_key_message)"
-    ;;
-*) exit 1 ;;
-esac
+t150=0
+t150_ensure || t150=$?
+[ "$t150" = 1 ] && exit 1
+
+udev_apply hid hidraw
+if [ "$rc" = 3 ] || [ "$t150" = 3 ]; then
+    echo "Thrustmaster driver installed: $(mod_key_message)"
+fi

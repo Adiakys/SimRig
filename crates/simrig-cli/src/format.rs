@@ -90,10 +90,11 @@ pub fn component(c: &HostComponent, inputs: &BTreeMap<String, Value>) -> String 
                     None => "-".into(),
                 },
                 Support::Supported(ItemSpec::Param(spec)) => format!(
-                    "{}   [{}] {}",
+                    "{}   [{}] {}{}",
                     value_with_unit(&spec.value, unit(c, &item.id)),
                     range(&spec.ty),
-                    persistence(spec.persistence)
+                    persistence(spec.persistence),
+                    caveat(spec.caveat.as_ref())
                 ),
                 Support::Supported(ItemSpec::Output { ty }) => format!("[{}]", range(ty)),
                 Support::Supported(ItemSpec::Action(a)) => match &a.confirm {
@@ -129,10 +130,11 @@ pub fn component(c: &HostComponent, inputs: &BTreeMap<String, Value>) -> String 
                         .map(|u| format!(" {u}"))
                         .unwrap_or_default();
                     format!(
-                        "{}{unit}   [{}] {}",
+                        "{}{unit}   [{}] {}{}",
                         p.value,
                         range(&p.ty),
-                        persistence(p.persistence)
+                        persistence(p.persistence),
+                        caveat(p.caveat.as_ref())
                     )
                 }
             };
@@ -140,4 +142,11 @@ pub fn component(c: &HostComponent, inputs: &BTreeMap<String, Value>) -> String 
         }
     }
     out
+}
+
+/// A caveat, after the value: `  ⚠ Not fully supported: …`.
+fn caveat(caveat: Option<&simrig_model::Caveat>) -> String {
+    caveat
+        .map(|c| format!("  ⚠ {}", c.explain()))
+        .unwrap_or_default()
 }

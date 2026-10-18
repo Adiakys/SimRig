@@ -30,7 +30,7 @@ pub use procedure::{
     ActionRole, Element, Level, Preview, ProcedureDescriptor, ProcedureState, ProcedureTarget,
     Step, StepAction,
 };
-pub use support::{Reason, Support, Unsupported};
+pub use support::{Caveat, CaveatReason, Reason, Support, Unsupported};
 pub use value::{Axis, CurvePoint, Gear, Value, ValueKind};
 
 /// Angle in degrees.

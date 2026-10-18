@@ -90,10 +90,10 @@ pub enum Change {
 /// Everything a plugin author usually needs.
 pub mod prelude {
     pub use crate::model::{
-        ActionOutcome, ActionRole, ActionSpec, Axis, ChoiceOption, ComponentKind, CurvePoint,
-        CustomParam, Degrees, DeviceInfo, Element, Gear, HandbrakeAction, HandbrakeParam,
-        Kilograms, Level, ParamSpec, ParamType, PedalAction, PedalParam, PedalRole, Percent,
-        Persistence, Preview, ProcedureDescriptor, Reason, ShifterAction, ShifterParam,
+        ActionOutcome, ActionRole, ActionSpec, Axis, Caveat, ChoiceOption, ComponentKind,
+        CurvePoint, CustomParam, Degrees, DeviceInfo, Element, Gear, HandbrakeAction,
+        HandbrakeParam, Kilograms, Level, ParamSpec, ParamType, PedalAction, PedalParam, PedalRole,
+        Percent, Persistence, Preview, ProcedureDescriptor, Reason, ShifterAction, ShifterParam,
         SteeringWheelAction, SteeringWheelOutput, SteeringWheelParam, Step, StepAction, Support,
         Unsupported, Value, WheelBaseAction, WheelBaseParam,
     };

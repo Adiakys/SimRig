@@ -5,6 +5,17 @@ set -eu
 
 active=false
 mod_loaded "$MODULE" && active=true
+t150=$(mod_state "$T150_PACKAGE" "$T150_MODULE" "$T150_VERSION")
+case $t150 in
+pending*)
+    status_json true false "$VERSION" true false true "To trust the key that signs the driver: $(mod_key_message)."
+    exit 0
+    ;;
+esac
+# A T150 or TMX plugged in that hid-t150 does not drive yet: the driver must be installed again.
+needs=""
+t150_missing && needs="hid-t150 (force feedback and settings on the T150 and TMX)"
+
 set -- $(mod_state "$PACKAGE" "$MODULE" "$VERSION")
 case $1 in
 pending)
@@ -14,21 +25,32 @@ outdated)
     status_json true "$active" "$2" false false true "Version $VERSION of the driver is available."
     ;;
 ours)
-    status_json true "$active" "$2" false false true ""
+    if [ -n "$needs" ]; then
+        status_json false false "$2" false false true "The wheel plugged in needs $needs. Asks for the password once."
+    else
+        case $t150 in
+        outdated*) message="Version $T150_VERSION of hid-t150 is available." ;;
+        *) message="" ;;
+        esac
+        status_json true "$active" "$2" false false true "$message"
+    fi
     ;;
 *)
     if [ -f "$DATA/dev-installed" ]; then
         status_json true false "$VERSION" false false true "Development install: hid-tmff2 is not built."
+    elif [ -f "$DATA/integration" ] && [ -n "$needs" ]; then
+        other=${2:-$(cat "$DATA/integration")}
+        status_json false false "$other" false false true "The wheel plugged in needs $needs. Asks for the password once."
     elif [ -f "$DATA/integration" ]; then
         other=${2:-$(cat "$DATA/integration")}
         status_json true "$active" "$other" false false true \
             "Uses hid-tmff2 $other installed by you or your distribution (SimRig is tested with $VERSION)."
     elif [ "$1" = foreign ]; then
         status_json false false "$2" false false true \
-            "hid-tmff2 $2 is installed (by you or your distribution): SimRig keeps it and adds its access rules. Asks for the password once."
+            "hid-tmff2 $2 is installed (by you or your distribution): SimRig keeps it and adds its access rules${needs:+, and builds $needs}. Asks for the password once."
     else
         status_json false false "" false false true \
-            "Builds the open source hid-tmff2 driver for your kernel: force feedback and settings. Asks for the password once."
+            "Builds the open source hid-tmff2 driver for your kernel${needs:+, and $needs}: force feedback and settings. Asks for the password once."
     fi
     ;;
 esac

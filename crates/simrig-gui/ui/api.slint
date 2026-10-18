@@ -26,6 +26,8 @@ export struct SettingRow {
     help: string,
     enabled: bool,
     reason: string,
+    /// Why a supported item may not work fully: a yellow mark with this text as its tooltip.
+    caveat: string,
     // Numbers
     value: float,
     minimum: float,

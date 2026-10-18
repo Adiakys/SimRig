@@ -1,18 +1,20 @@
 #!/bin/sh
-# Removes what SimRig installed: its DKMS version of hid-tmff2, its modprobe configuration and
-# its udev rules, and gives the wheels back to the kernel's hid-thrustmaster. Never a hid-tmff2
-# installed by other means. Works on partial installs.
+# Removes what SimRig installed: its DKMS versions of hid-tmff2 and hid-t150, its modprobe
+# configuration and its udev rules, and gives the wheels back to the kernel's hid-thrustmaster.
+# Never modules installed by other means. Works on partial installs.
 set -eu
 . "$SIMRIG_DRIVER_DIR/hooks/common.sh"
 
 if [ "$(id -u)" = 0 ]; then
     mod_remove "$PACKAGE" "$MODULE" $INIT_MODULES
+    mod_remove "$T150_PACKAGE" "$T150_MODULE"
     rm -f "${CONF:?}"
     modprobe hid_thrustmaster 2>/dev/null || true
     udev_remove "$RULES"
+    udev_remove "$SETTINGS"
     udev_apply hid hidraw
 fi
-for file in "$PACKAGE.installed" integration mok-pending dev-installed settings; do
+for file in "$PACKAGE.installed" "$T150_PACKAGE.installed" integration mok-pending dev-installed settings t150-settings; do
     rm -f "${DATA:?}/$file"
 done
 echo "SimRig's Thrustmaster driver removed"

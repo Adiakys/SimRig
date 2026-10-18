@@ -4,9 +4,9 @@ version = "0.1.0"
 api = 1
 exec = "simrig-plugin-thrustmaster"
 driver = "driver/driver.toml"
-description = "Thrustmaster wheels: T300 RS, T248, T128, TX, TS-PC, TS-XW, T-GT II, on the open source hid-tmff2 driver."
+description = "Thrustmaster wheels: T300 RS, T248, T128, TX, TS-PC, TS-XW, T-GT II on the open source hid-tmff2 driver, T150 and TMX on hid-t150, T500 RS and T80 (inputs only)."
 
-# The wheels of src/models.rs; a test keeps them in step with hid-tmff2 and hid-tminit.
+# The wheels of src/models.rs; a test keeps them in step with hid-tmff2, hid-t150 and hid-tminit.
 [match]
 usb = [
     { vid = 0x044f, pid = 0xb66e }, # T300 RS
@@ -16,6 +16,11 @@ usb = [
     { vid = 0x044f, pid = 0xb669 }, # TX Racing Wheel
     { vid = 0x044f, pid = 0xb689 }, # TS-PC Racer
     { vid = 0x044f, pid = 0xb692 }, # TS-XW Racer
+    { vid = 0x044f, pid = 0xb677 }, # T150
+    { vid = 0x044f, pid = 0xb67f }, # TMX
+    { vid = 0x044f, pid = 0xb65e }, # T500 RS
+    { vid = 0x044f, pid = 0xb668 }, # T80 Racing Wheel
+    { vid = 0x044f, pid = 0xb66a }, # T80 Racing Wheel (H)
     { vid = 0x044f, pid = 0xb65d }, # a wheel starting up
     { vid = 0x044f, pid = 0xb664 }, # a wheel starting up
     { vid = 0x044f, pid = 0xb69c }, # a wheel starting up

@@ -1,0 +1,22 @@
+id = "pidff"
+name = "Standard force feedback"
+version = "0.1.0"
+api = 1
+exec = "simrig-plugin-pidff"
+driver = "driver/driver.toml"
+description = "Wheel bases on the standard USB force feedback protocol: Cammus C5 and C12, Asetek, VRS DirectForce Pro, FFBeast, Turtle Beach VelocityOne Race, OpenFFBoard. Their settings stay in their own software."
+
+# The bases of src/models.rs; a test keeps them in step with hid-universal-pidff.
+[match]
+usb = [
+    { vid = 0x3416, pid = 0x0301 }, # Cammus C5
+    { vid = 0x3416, pid = 0x0302 }, # Cammus C12
+    { vid = 0x2433, pid = 0xf300 }, # Asetek Invicta
+    { vid = 0x2433, pid = 0xf301 }, # Asetek Forte
+    { vid = 0x2433, pid = 0xf303 }, # Asetek La Prima
+    { vid = 0x2433, pid = 0xf306 }, # Asetek Tony Kanaan
+    { vid = 0x0483, pid = 0xa355 }, # VRS DirectForce Pro
+    { vid = 0x045b, pid = 0x59d7 }, # FFBeast Wheel
+    { vid = 0x10f5, pid = 0x7077 }, # Turtle Beach VelocityOne Race
+    { vid = 0x1209, pid = 0xffb0 }, # OpenFFBoard
+]

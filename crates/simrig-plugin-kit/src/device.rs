@@ -1,11 +1,12 @@
 //! One device handled by a kernel driver: the HID device the driver is bound to, its inputs,
 //! and the pedal mapping kept in the user's configuration.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use simrig_plugin_sdk::prelude::*;
 
-use crate::input::Inputs;
+use crate::input::{FfControl, Inputs};
 use crate::pedals::{self, Layout, PedalMap};
 use crate::sysfs;
 
@@ -37,6 +38,9 @@ pub struct HidDevice {
     pub layout: Option<PedalMap>,
     /// The steering axis of a wheel base (not a pedal); `None` for a pedal set.
     pub steering: Option<u16>,
+    /// Force feedback controls set through the input interface, in percent, as last set: they
+    /// cannot be read back.
+    ff_levels: BTreeMap<FfControl, f64>,
 }
 
 impl HidDevice {
@@ -60,6 +64,7 @@ impl HidDevice {
             pedal_map,
             layout: None,
             steering,
+            ff_levels: BTreeMap::new(),
         };
         device.refresh();
         device
@@ -186,6 +191,40 @@ impl HidDevice {
             return Support::not_in_driver();
         }
         Support::Supported(buttons.into_iter().map(|(_, pressed)| pressed).collect())
+    }
+
+    /// A force feedback control of the input interface as a percentage, when the driver takes
+    /// it: the last value set, else what drivers start with (full strength, no centering
+    /// spring). Marked as not fully supported, since the device cannot report it.
+    pub fn ff_spec(&self, control: FfControl) -> Option<ParamSpec> {
+        if self.hid.is_none() || !self.inputs.takes(control) {
+            return None;
+        }
+        let start = match control {
+            FfControl::Gain => 100.0,
+            FfControl::Autocenter => 0.0,
+        };
+        let level = self.ff_levels.get(&control).copied().unwrap_or(start);
+        Some(ParamSpec::float(level, 0.0, 100.0, 1.0).with_caveat(
+            Caveat::write_only().with_detail(
+                "It is set through the kernel's force feedback interface, as games do, and \
+                 games can change it too.",
+            ),
+        ))
+    }
+
+    /// Sets a force feedback control of the input interface, `value` in percent.
+    pub fn set_ff(&mut self, control: FfControl, value: &Value) -> Result<()> {
+        let percent = value
+            .as_f64()
+            .ok_or_else(|| Error::InvalidValue("expected a number".into()))?
+            .clamp(0.0, 100.0);
+        let level = (percent / 100.0 * f64::from(u16::MAX)).round() as u16;
+        self.inputs
+            .set_control(control, level)
+            .map_err(|e| Error::failed(e.to_string()))?;
+        self.ff_levels.insert(control, percent);
+        Ok(())
     }
 
     pub fn save_map(&mut self, map: PedalMap) -> std::io::Result<()> {

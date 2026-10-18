@@ -208,7 +208,13 @@ impl WheelBase for SimBase {
             WheelBaseParam::NaturalInertia => {
                 return Support::not_in_hardware("The simulated base has no inertia filter.");
             }
-            WheelBaseParam::SpringStrength => percent(self.spring_strength),
+            // Marked like a value a real device cannot report back, to show how that looks.
+            WheelBaseParam::SpringStrength => {
+                percent(self.spring_strength).with_caveat(Caveat::write_only().with_detail(
+                    "Simulated: real drivers without an attribute for it set it through the \
+                     kernel's force feedback interface.",
+                ))
+            }
             WheelBaseParam::DamperStrength => percent(self.damper_strength),
         })
     }

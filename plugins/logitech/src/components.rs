@@ -9,7 +9,7 @@ use simrig_plugin_sdk::prelude::*;
 
 use crate::device::{LogitechDevice, Shared};
 use crate::models::Family;
-use crate::settings;
+use crate::{modes, settings};
 
 fn spec(device: &Shared, setting: &Setting) -> Support<ParamSpec> {
     let d = device.borrow();
@@ -17,7 +17,7 @@ fn spec(device: &Shared, setting: &Setting) -> Support<ParamSpec> {
 }
 
 fn write(device: &Shared, setting: &Setting, value: &Value) -> Result<()> {
-    setting.write(&device.borrow().hid, value)
+    setting.write(&mut device.borrow_mut().hid, value)
 }
 
 pub struct Base {
@@ -57,10 +57,14 @@ impl Component for Base {
         settings::of(d.model.family)
             .enumerate()
             .filter_map(|(order, s)| s.custom_param(&d.hid, max_range, order as i32))
+            .chain(modes::param(&d.hid))
             .collect()
     }
 
     fn set_custom(&mut self, id: &str, value: &Value) -> Result<()> {
+        if id == modes::ID {
+            return modes::set(&self.device.borrow().hid, value);
+        }
         let setting = settings::find_custom(self.family(), id)
             .ok_or_else(|| Error::NotFound(format!("no setting '{id}'")))?;
         write(&self.device, setting, value)
@@ -70,6 +74,11 @@ impl Component for Base {
         let setting = self
             .setting(item)
             .ok_or_else(|| Error::NotFound(format!("no setting '{item}'")))?;
+        if !setting.saved_by_attr(&self.device.borrow().hid) {
+            return Err(Error::failed(
+                "The driver has no setting to keep: it lasts until the wheel is unplugged.",
+            ));
+        }
         let raw = setting.raw(value)?;
         let pid = format!("{:04x}", self.device.borrow().model.pid);
         // A udev rule sets it again whenever the driver binds to the wheel.
@@ -131,6 +140,10 @@ impl WheelBase for Base {
     }
 
     fn param(&mut self, param: WheelBaseParam) -> Support<ParamSpec> {
+        if param == WheelBaseParam::Rotation && self.family() == Family::Classic {
+            let max = self.device.borrow().model.max_range;
+            return Support::not_in_hardware(format!("The rotation is fixed at {max}°."));
+        }
         match settings::standard(self.family(), param) {
             Some(setting) => spec(&self.device, setting),
             None => Support::not_in_driver(),

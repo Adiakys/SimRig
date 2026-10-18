@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 
 /// HID devices of `vendor` (hex, e.g. `0EB7`) bound to one of `drivers`, below a USB device.
 /// A device often has several; the first one with any of the `rich` entries (attributes or
-/// the `input` directory) is the one to talk to.
+/// the `input` directory) is the one to talk to. A USB interface bound to one of `drivers`
+/// counts too: some old wheels have a USB driver of their own, not a HID one.
 pub fn find_hid(usb: &Path, vendor: &str, drivers: &[&str], rich: &[&str]) -> Option<PathBuf> {
     let prefix = format!("0003:{}:", vendor.to_ascii_uppercase());
     let mut found = Vec::new();
@@ -32,15 +33,19 @@ fn collect(dir: &Path, depth: usize, prefix: &str, drivers: &[&str], found: &mut
         }
         let name = entry.file_name().to_string_lossy().to_ascii_uppercase();
         let path = entry.path();
+        let bound = || {
+            fs::read_link(path.join("driver"))
+                .ok()
+                .and_then(|d| d.file_name().map(|n| n.to_owned()))
+                .is_some_and(|n| drivers.iter().any(|d| n == *d))
+        };
         if name.starts_with(prefix) {
-            let driver = fs::read_link(path.join("driver")).ok();
-            let bound = driver
-                .as_ref()
-                .and_then(|d| d.file_name())
-                .is_some_and(|n| drivers.iter().any(|d| n == *d));
-            if bound {
+            if bound() {
                 found.push(path);
             }
+        } else if name.contains(':') && !name.starts_with("0003:") && bound() {
+            // A USB interface (`1-2:1.0`) a USB driver of the wheel's own is bound to.
+            found.push(path);
         } else {
             collect(&path, depth + 1, prefix, drivers, found);
         }

@@ -429,18 +429,24 @@ impl App {
         let help = format::item_help(d.kind, key).to_string();
         let unit = format::unit(def.and_then(|d| d.unit));
         match support {
-            Support::Supported(ItemSpec::Param(spec)) => self.param_row(
-                address,
-                ParamInfo {
-                    item: id.to_string(),
-                    label,
-                    help,
-                    ty: &spec.ty,
-                    value: &spec.value,
-                    unit,
-                    persistence: spec.persistence,
-                },
-            ),
+            Support::Supported(ItemSpec::Param(spec)) => {
+                let mut row = self.param_row(
+                    address,
+                    ParamInfo {
+                        item: id.to_string(),
+                        label,
+                        help,
+                        ty: &spec.ty,
+                        value: &spec.value,
+                        unit,
+                        persistence: spec.persistence,
+                    },
+                );
+                if let Some(c) = &spec.caveat {
+                    row.caveat = c.explain().into();
+                }
+                row
+            }
             Support::Supported(ItemSpec::Output { .. }) => SettingRow {
                 kind: RowKind::Info,
                 item: id.into(),
@@ -489,6 +495,9 @@ impl App {
                 persistence: p.persistence,
             },
         );
+        if let Some(c) = &p.caveat {
+            row.caveat = c.explain().into();
+        }
         if let Support::Unsupported(u) = &p.availability {
             row.enabled = false;
             row.reason = u.explain().into();

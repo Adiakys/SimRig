@@ -2,7 +2,9 @@
 //! and the force feedback test.
 //!
 //! Tests use a fake device: a HID directory outside `/sys` with a `simrig-fake-input` file of
-//! lines `abs <code> <value> <min> <max>`, `key <code> <0|1>` and `ff` (force feedback).
+//! lines `abs <code> <value> <min> <max>`, `key <code> <0|1>` and `ff [gain] [autocenter]`
+//! (force feedback, and the controls the driver takes). Levels set on a fake device are written
+//! to `simrig-fake-ff`, as `gain <level>` and `autocenter <level>` lines.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -10,10 +12,39 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use evdev::{
-    Device, FFEffect, FFEffectData, FFEffectKind, FFEnvelope, FFReplay, FFTrigger, FFWaveform,
+    Device, FFEffect, FFEffectCode, FFEffectData, FFEffectKind, FFEnvelope, FFReplay, FFTrigger,
+    FFWaveform,
 };
 
 pub const FAKE_INPUT: &str = "simrig-fake-input";
+pub const FAKE_FF: &str = "simrig-fake-ff";
+
+/// The device-wide force feedback controls of the kernel's input interface, which most force
+/// feedback drivers take: games set them, and so can SimRig where a driver has no attribute for
+/// them. They cannot be read back.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FfControl {
+    /// The strength of every effect (`FF_GAIN`).
+    Gain,
+    /// The spring that pulls the wheel to the center (`FF_AUTOCENTER`).
+    Autocenter,
+}
+
+impl FfControl {
+    fn code(self) -> FFEffectCode {
+        match self {
+            FfControl::Gain => FFEffectCode::FF_GAIN,
+            FfControl::Autocenter => FFEffectCode::FF_AUTOCENTER,
+        }
+    }
+
+    fn key(self) -> &'static str {
+        match self {
+            FfControl::Gain => "gain",
+            FfControl::Autocenter => "autocenter",
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AxisState {
@@ -139,8 +170,44 @@ impl Inputs {
             Inputs::Device { device, .. } => device
                 .supported_ff()
                 .is_some_and(|ff| ff.iter().next().is_some()),
-            Inputs::Fake(path) => fake(path).iter().any(|l| words(l) == ["ff"]),
+            Inputs::Fake(path) => fake(path).iter().any(|l| words(l).first() == Some(&"ff")),
             Inputs::None(_) => false,
+        }
+    }
+
+    /// The driver takes this control.
+    pub fn takes(&self, control: FfControl) -> bool {
+        match self {
+            Inputs::Device { device, .. } => device
+                .supported_ff()
+                .is_some_and(|ff| ff.contains(control.code())),
+            Inputs::Fake(path) => fake(path).iter().any(|l| {
+                let w = words(l);
+                w.first() == Some(&"ff") && w.contains(&control.key())
+            }),
+            Inputs::None(_) => false,
+        }
+    }
+
+    /// Sets a control, `level` in 0..=65535.
+    pub fn set_control(&mut self, control: FfControl, level: u16) -> io::Result<()> {
+        match self {
+            Inputs::Device { device, .. } => match control {
+                FfControl::Gain => device.set_ff_gain(level),
+                FfControl::Autocenter => device.set_ff_autocenter(level),
+            },
+            Inputs::Fake(path) => {
+                let file = path.with_file_name(FAKE_FF);
+                let mut lines: Vec<String> = fs::read_to_string(&file)
+                    .unwrap_or_default()
+                    .lines()
+                    .filter(|l| l.split_whitespace().next() != Some(control.key()))
+                    .map(str::to_string)
+                    .collect();
+                lines.push(format!("{} {level}", control.key()));
+                fs::write(file, lines.join("\n") + "\n")
+            }
+            Inputs::None(why) => Err(io::Error::other(why.clone())),
         }
     }
 

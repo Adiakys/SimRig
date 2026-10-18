@@ -5,29 +5,64 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
+use simrig_plugin_kit::input::FfControl;
 use simrig_plugin_kit::settings::{Place, Setting};
 use simrig_plugin_sdk::prelude::WheelBaseParam;
 
-use crate::models::{Kind, Model};
+use crate::models::{Driver, Kind, Model};
 
-pub const BINDING: Binding = Binding {
-    vendor: "044F",
-    drivers: &["tmff2"],
-    rich: &["range", "input"],
-    unbound: "The hid-tmff2 driver is not installed, or not bound to the wheel.",
+const fn binding(drivers: &'static [&'static str], unbound: &'static str) -> Binding {
+    Binding {
+        vendor: "044F",
+        drivers,
+        rich: &["range", "input"],
+        unbound,
+    }
+}
+
+const TMFF2: Binding = binding(
+    &["tmff2"],
+    "The hid-tmff2 driver is not installed, or not bound to the wheel.",
+);
+const T150: Binding = binding(
+    &["hid-t150"],
+    "The hid-t150 driver is not installed, or not bound to the wheel: install the Thrustmaster \
+     driver with the wheel plugged in.",
+);
+const GENERIC: Binding = binding(
+    &["hid-generic"],
+    "No HID driver handles the wheel: plug it in again.",
+);
+
+const EFFECTS: Place = Place::Custom {
+    group: "Force feedback",
+    advanced: false,
 };
 
-/// hid-tmff2's settings (the same attributes on every wheel).
-pub const SETTINGS: &[Setting] = &[
-    Setting {
-        // The 16-bit gain, shown as a percentage.
-        scale: 655.35,
-        ..Setting::percent(
-            "gain",
-            "Force feedback strength",
-            Place::Standard(WheelBaseParam::FfbStrength),
-        )
-    },
+/// The 16-bit gain, shown as a percentage; the input interface's when there is no attribute.
+const GAIN: Setting = Setting {
+    scale: 655.35,
+    ff: Some(FfControl::Gain),
+    ..Setting::percent(
+        "gain",
+        "Force feedback strength",
+        Place::Standard(WheelBaseParam::FfbStrength),
+    )
+};
+
+/// The 16-bit centering spring; the input interface's when there is no attribute.
+const AUTOCENTER: Setting = Setting {
+    scale: 655.35,
+    ff: Some(FfControl::Autocenter),
+    help: "Pulls the wheel back to the center; games usually set it themselves.",
+    missing: "Not taken by the installed driver.",
+    ..Setting::percent("autocenter", "Centering spring", EFFECTS)
+};
+
+/// hid-tmff2's settings (the same attributes on every wheel); the centering spring through the
+/// input interface.
+pub const TMFF2_SETTINGS: &[Setting] = &[
+    GAIN,
     Setting::percent(
         "spring_level",
         "Spring effect strength",
@@ -38,14 +73,21 @@ pub const SETTINGS: &[Setting] = &[
         "Damper effect strength",
         Place::Standard(WheelBaseParam::DamperStrength),
     ),
-    Setting::percent(
-        "friction_level",
-        "Friction effect strength",
-        Place::Custom {
-            group: "Force feedback",
-            advanced: false,
-        },
-    ),
+    Setting::percent("friction_level", "Friction effect strength", EFFECTS),
+    AUTOCENTER,
+];
+
+/// hid-t150's (besides the rotation).
+pub const T150_SETTINGS: &[Setting] = &[GAIN, AUTOCENTER];
+
+/// Every attribute a driver may expose, for the adapter to notice when they show up.
+pub const ATTRS: &[&str] = &[
+    "range",
+    "gain",
+    "autocenter",
+    "spring_level",
+    "damper_level",
+    "friction_level",
 ];
 
 pub struct TmDevice {
@@ -69,7 +111,11 @@ impl TmDevice {
         let mut hid = HidDevice::new(
             id,
             usb,
-            BINDING,
+            match model.driver {
+                Driver::Tmff2 => TMFF2,
+                Driver::T150 => T150,
+                Driver::Generic { .. } => GENERIC,
+            },
             config,
             &format!("{:04x}", model.pid),
             Some(0),
@@ -87,22 +133,40 @@ impl TmDevice {
         }
     }
 
-    /// The rotation, between this wheel's limits.
-    pub fn rotation(&self) -> Setting {
+    /// The rotation, between this wheel's limits, when its driver sets it.
+    pub fn rotation(&self) -> Option<Setting> {
         let min = match self.model.kind {
             Kind::Wheel { min_range, .. } => f64::from(min_range),
             Kind::StartingUp => 40.0,
         };
-        Setting::rotation("range", min)
+        (!matches!(self.model.driver, Driver::Generic { .. }))
+            .then(|| Setting::rotation("range", min))
+    }
+
+    /// The settings of this wheel's driver, the rotation apart.
+    pub fn settings(&self) -> Vec<Setting> {
+        match self.model.driver {
+            Driver::Tmff2 => TMFF2_SETTINGS.to_vec(),
+            Driver::T150 => T150_SETTINGS.to_vec(),
+            // Through the input interface only, if a driver ever takes them.
+            Driver::Generic { why } => [GAIN, AUTOCENTER]
+                .map(|s| Setting { missing: why, ..s })
+                .to_vec(),
+        }
     }
 
     pub fn setting(&self, param: WheelBaseParam) -> Option<Setting> {
         if param == WheelBaseParam::Rotation {
-            return Some(self.rotation());
+            return self.rotation();
         }
-        SETTINGS
-            .iter()
+        self.settings()
+            .into_iter()
             .find(|s| s.place == Place::Standard(param))
-            .copied()
+    }
+
+    pub fn custom(&self, id: &str) -> Option<Setting> {
+        self.settings()
+            .into_iter()
+            .find(|s| s.custom_id() == id && matches!(s.place, Place::Custom { .. }))
     }
 }

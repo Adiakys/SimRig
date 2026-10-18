@@ -5,6 +5,9 @@ ACTION!="add|change|bind", GOTO="simrig_thrustmaster_end"
 # hid-tmff2's settings, writable by local users: rotation, gain, effect levels, modes.
 SUBSYSTEM=="hid", DRIVER=="tmff2", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w range gain spring_level damper_level friction_level alternate_modes || true'"
 
+# hid-t150's settings: rotation, gain, centering.
+SUBSYSTEM=="hid", DRIVER=="hid-t150", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w range gain autocenter enable_autocenter || true'"
+
 # Raw HID, which some games need through Proton: the user at the seat only.
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="044f", TAG+="uaccess"
 

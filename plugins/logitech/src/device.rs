@@ -10,7 +10,8 @@ use crate::models::Model;
 
 pub const BINDING: Binding = Binding {
     vendor: "046D",
-    drivers: &["logitech", "logitech-hidpp-device", "logitech-dd"],
+    // iforce: a USB driver, bound to the WingMan Formula Force's interface.
+    drivers: &["logitech", "logitech-hidpp-device", "logitech-dd", "iforce"],
     // The interface with the settings and the inputs, when there are several.
     rich: &["range", "wheel_range", "input"],
     unbound: "No Logitech driver handles the wheel: install the driver, then plug it in again.",

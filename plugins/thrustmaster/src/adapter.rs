@@ -48,13 +48,7 @@ impl ThrustmasterAdapter {
             driver: d.hid.driver(),
             pedals: d.hid.pedal_map.roles(),
             inputs: d.hid.inputs_ready(),
-            exposed: d.hid.exposed(&[
-                "range",
-                "gain",
-                "spring_level",
-                "damper_level",
-                "friction_level",
-            ]),
+            exposed: d.hid.exposed(crate::device::ATTRS),
         }
     }
 

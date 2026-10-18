@@ -1,0 +1,9 @@
+# Installed by SimRig: wheel bases on the standard force feedback protocol, for the logged-in
+# user, without a password: inputs and force feedback (usually given to the user already, as
+# joysticks). The force feedback strength and centering spring are set there too.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="3416", ATTRS{idProduct}=="0301|0302", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="2433", ATTRS{idProduct}=="f300|f301|f303|f306", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="a355", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="045b", ATTRS{idProduct}=="59d7", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="10f5", ATTRS{idProduct}=="7077", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="ffb0", TAG+="uaccess"

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::param::{ParamType, Persistence};
-use crate::support::Support;
+use crate::support::{Caveat, Support};
 use crate::value::Value;
 
 /// A plugin-defined parameter beyond the standard interface. It is fully self-described so
@@ -37,6 +37,9 @@ pub struct CustomParam {
     /// Mandatory when the parameter controls force.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub force_limit: Option<f64>,
+    /// Set when the parameter may not work fully: the app marks it, with the explanation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caveat: Option<Caveat>,
 }
 
 impl CustomParam {
@@ -56,6 +59,7 @@ impl CustomParam {
             enabled_if: None,
             availability: Support::Supported(()),
             force_limit: None,
+            caveat: None,
         }
     }
 
@@ -104,6 +108,11 @@ impl CustomParam {
             item: item.into(),
             equals: value,
         });
+        self
+    }
+
+    pub fn caveat(mut self, caveat: Option<Caveat>) -> Self {
+        self.caveat = caveat;
         self
     }
 

@@ -18,7 +18,7 @@ dkms_installed() {
 
 # dkms_install NAME VERSION SOURCE_DIR [DKMS_CONF]
 # Copies the sources to /usr/src/NAME-VERSION (without VCS files), with DKMS_CONF (a path in
-# the sources, default dkms.conf) as its dkms.conf. Sets the package's name and version there
+# the sources, default dkms.conf, or an absolute path) as its dkms.conf. Sets the package's name and version there
 # (upstream ones are fixed, or a `#VERSION#` placeholder, also replaced in the sources), then
 # adds, builds and installs the module for the running kernel and for every other kernel that
 # has headers. Idempotent. On a build failure, prints the build log.
@@ -28,7 +28,12 @@ dkms_install() {
     rm -rf "$dest"
     mkdir -p "$dest"
     (cd "$source" && tar cf - --exclude=.git --exclude=.github .) | (cd "$dest" && tar xf -)
-    [ "$conf" = dkms.conf ] || cp "$dest/$conf" "$dest/dkms.conf"
+    case $conf in
+    dkms.conf) ;;
+    # SimRig's own, for sources without a usable one.
+    /*) cp "$conf" "$dest/dkms.conf" ;;
+    *) cp "$dest/$conf" "$dest/dkms.conf" ;;
+    esac
     find "$dest" -type f \( -name dkms.conf -o -name '*.c' -o -name '*.h' \) \
         -exec sed -i "s/#VERSION#/$version/g" {} +
     sed -i -e "s/^PACKAGE_NAME=.*/PACKAGE_NAME=\"$name\"/" \

@@ -116,6 +116,32 @@ fn a_v12_has_inputs_and_forces_but_no_settings() {
     assert!(reason(&mut host, &base, "test_effect").contains("hid-universal-pidff"));
 }
 
+#[test]
+fn without_settings_the_strength_goes_through_the_input_interface() {
+    let env = env("v12-gain");
+    let hid = env.plug(
+        "1-12",
+        0x11ff,
+        0x1212,
+        "PXN V12",
+        "1-12:1.0/0003:11FF:1212.0003",
+        Some("hid-universal-pidff"),
+    );
+    env.input(&hid, "abs 0 32767 0 65535\nff gain\n");
+    let mut host = env.start();
+    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    let base = host.find("base").unwrap().address.clone();
+    let spec = host.param(&base, "ffb_strength").unwrap();
+    assert!(spec.caveat.is_some());
+    host.set(&base, "ffb_strength", Value::Float(25.0)).unwrap();
+    assert_eq!(
+        fs::read_to_string(hid.join("simrig-fake-ff")).unwrap(),
+        "gain 16384\n"
+    );
+    // The rest still needs the VD series' protocol.
+    assert!(reason(&mut host, &base, "rotation").contains("VD series"));
+}
+
 /// The manifest claims exactly the plugin's models.
 #[test]
 fn manifest_matches_the_models() {

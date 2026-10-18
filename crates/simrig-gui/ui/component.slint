@@ -76,6 +76,44 @@ component CurveEditor {
     }
 }
 
+/// A setting that may not work fully: a yellow mark, the explanation as its tooltip.
+component CaveatMark inherits Rectangle {
+    in property <string> text;
+    width: 18px;
+    height: 18px;
+    y: 2px;
+    accessible-role: AccessibleRole.image;
+    accessible-label: @tr("Not fully supported");
+    accessible-description: root.text;
+    Image {
+        source: Icons.warn;
+        colorize: Theme.warning;
+        width: 16px;
+        height: 16px;
+        x: 1px;
+        y: 1px;
+    }
+    Tooltip {
+        Rectangle {
+            border-radius: 6px;
+            background: Theme.raised;
+            border-width: 1px;
+            border-color: Theme.warning;
+            width: 300px;
+            height: tip.preferred-height + 16px;
+            tip := Text {
+                x: 10px;
+                width: parent.width - 20px;
+                text: root.text;
+                font-family: Theme.sans;
+                font-size: 13px;
+                color: Theme.ink;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
 /// One setting: label, help and reason on the left; the control on the right.
 component SettingLine {
     in property <SettingRow> setting;
@@ -151,12 +189,19 @@ component SettingLine {
                     width: 236px;
                     spacing: 4px;
                     alignment: start;
-                    Text {
-                        text: root.setting.label;
-                        font-family: Theme.sans;
-                        font-size: 16px;
-                        color: root.setting.enabled ? Theme.ink : Theme.ink3;
-                        wrap: word-wrap;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        Text {
+                            text: root.setting.label;
+                            font-family: Theme.sans;
+                            font-size: 16px;
+                            color: root.setting.enabled ? Theme.ink : Theme.ink3;
+                            wrap: word-wrap;
+                        }
+                        if root.setting.caveat != "" && root.setting.enabled: CaveatMark {
+                            text: root.setting.caveat;
+                        }
                     }
                     if root.setting.reason != "": Small {
                         text: root.setting.reason;

@@ -51,7 +51,7 @@ impl LogitechAdapter {
             exposed: d.hid.exposed(
                 &crate::settings::of(d.model.family)
                     .map(|s| s.attr)
-                    .chain(["wheel_firmware", "wheel_calibrate_here"])
+                    .chain(["wheel_firmware", "wheel_calibrate_here", crate::modes::ATTR])
                     .collect::<Vec<_>>(),
             ),
         }

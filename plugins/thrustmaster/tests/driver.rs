@@ -21,6 +21,13 @@ fn version() -> String {
         .to_string()
 }
 
+fn t150_version() -> String {
+    fs::read_to_string(Path::new(DRIVER).join("hid-t150.version"))
+        .unwrap()
+        .trim()
+        .to_string()
+}
+
 #[test]
 fn clean_install_and_uninstall() {
     let sb = sandbox("clean", true);
@@ -95,7 +102,10 @@ fn settings_are_module_options() {
     let sb = sandbox("save", true);
     sb.install();
     let save = |attr: &str, value: &str| {
-        let (ok, _, err) = sb.hook_with("save-setting", &[("attr", attr), ("value", value)]);
+        let (ok, _, err) = sb.hook_with(
+            "save-setting",
+            &[("pid", "b66e"), ("attr", attr), ("value", value)],
+        );
         assert!(ok, "{err}");
     };
     save("range", "900");
@@ -107,6 +117,59 @@ fn settings_are_module_options() {
         conf.lines()
             .any(|l| l == "options hid_tmff_new gain=40000 range=540"),
         "{conf}"
+    );
+}
+
+#[test]
+fn a_t150_gets_hid_t150() {
+    let sb = sandbox("t150", true);
+    // Without a T150 or TMX, hid-t150 is not built.
+    sb.install();
+    assert!(!sb.dkms().contains("hid-t150"), "{}", sb.dkms());
+
+    sb.plug(0x044f, 0xb677, Some("hid-generic"));
+    let status = sb.status();
+    assert!(!status.installed, "{status:?}");
+    assert!(
+        status.message.as_deref().unwrap_or("").contains("hid-t150"),
+        "{status:?}"
+    );
+    sb.hid_driver("hid-t150");
+    sb.install();
+    let v = t150_version();
+    assert!(
+        sb.dkms()
+            .contains(&format!("hid-t150 {v} {KERNEL} installed")),
+        "{}",
+        sb.dkms()
+    );
+    // SimRig's dkms.conf: upstream's needs its install script to copy the Makefile.
+    let conf = sb.read(&format!("usr/src/hid-t150-{v}/dkms.conf"));
+    assert!(conf.contains("dkms_make.mak"), "{conf}");
+    assert!(conf.contains(&format!("PACKAGE_VERSION=\"{v}\"")), "{conf}");
+    assert!(sb.file("sys/module/hid_t150").is_dir());
+    assert_eq!(sb.read("sys/bus/usb/devices/1-b677/authorized"), "1\n");
+    assert!(sb.status().installed);
+
+    // Its settings are udev rules: hid-t150 has no module options.
+    let (ok, _, err) = sb.hook_with(
+        "save-setting",
+        &[("pid", "b677"), ("attr", "range"), ("value", "540")],
+    );
+    assert!(ok, "{err}");
+    let rules = sb.read("etc/udev/rules.d/72-simrig-thrustmaster-settings.rules");
+    assert!(
+        rules.contains(r#"KERNEL=="0003:044F:B677.*", ATTR{range}="540""#),
+        "{rules}"
+    );
+    assert!(!sb.read(CONF).contains("range"));
+
+    let (ok, _, err) = sb.hook("uninstall");
+    assert!(ok, "{err}");
+    assert!(!sb.dkms().contains("hid-t150"), "{}", sb.dkms());
+    assert!(
+        !sb.file("etc/udev/rules.d/72-simrig-thrustmaster-settings.rules")
+            .exists()
     );
 }
 
@@ -135,7 +198,7 @@ fn without_root_nothing_is_built() {
 /// the ones starting up are hid-tminit's.
 #[test]
 fn wheels_agree_with_the_driver() {
-    use simrig_plugin_thrustmaster::models::{Kind, MODELS};
+    use simrig_plugin_thrustmaster::models::{Driver, Kind, MODELS};
     let header = fs::read_to_string(Path::new(DRIVER).join("hid-tmff2/src/hid-tmff2.h")).unwrap();
     let source = fs::read_to_string(Path::new(DRIVER).join("hid-tmff2/src/hid-tmff2.c")).unwrap();
     let table = source.split("tmff2_devices[] = {").nth(1).unwrap();
@@ -166,11 +229,37 @@ fn wheels_agree_with_the_driver() {
 
     let mut wheels: Vec<u16> = MODELS
         .iter()
-        .filter(|m| matches!(m.kind, Kind::Wheel { .. }))
+        .filter(|m| matches!(m.kind, Kind::Wheel { .. }) && m.driver == Driver::Tmff2)
         .map(|m| m.pid)
         .collect();
     wheels.sort();
     assert_eq!(wheels, driven);
+
+    // hid-t150's: the ones it is built for, and drives (hid-t150.h).
+    let line = common
+        .lines()
+        .find(|l| l.starts_with("T150_WHEELS="))
+        .unwrap();
+    let mut built: Vec<u16> = line
+        .split('"')
+        .nth(1)
+        .unwrap()
+        .split_whitespace()
+        .map(|p| u16::from_str_radix(p, 16).unwrap())
+        .collect();
+    built.sort();
+    let mut t150: Vec<u16> = MODELS
+        .iter()
+        .filter(|m| m.driver == Driver::T150)
+        .map(|m| m.pid)
+        .collect();
+    t150.sort();
+    assert_eq!(built, t150);
+    let header =
+        fs::read_to_string(Path::new(DRIVER).join("hid-t150/hid-t150/hid-t150.h")).unwrap();
+    for pid in t150 {
+        assert!(header.contains(&format!("0x{pid:04x}")), "{pid:04x}");
+    }
 
     let init = fs::read_to_string(Path::new(DRIVER).join("hid-tmff2/deps/hid-tminit/hid-tminit.c"))
         .unwrap()
@@ -182,8 +271,11 @@ fn wheels_agree_with_the_driver() {
 }
 
 #[test]
-fn contract_version_is_the_bundled_one() {
+fn contract_version_is_the_bundled_ones() {
     let contract =
         simrig_driver::DriverContract::load(&Path::new(DRIVER).join("driver.toml")).unwrap();
-    assert_eq!(contract.version, version());
+    assert_eq!(
+        contract.version,
+        format!("tmff2-{}+t150-{}", version(), t150_version())
+    );
 }

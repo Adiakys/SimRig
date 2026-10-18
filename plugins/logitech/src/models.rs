@@ -12,6 +12,10 @@ pub enum Family {
     /// The TrueForce driver (`hid-logitech-dd`), which the driver builds for these direct drive
     /// bases. HID driver `logitech-dd`.
     DirectDrive,
+    /// The oldest wheels: a fixed rotation, on the kernel's hid-logitech (no force feedback) or
+    /// iforce (a USB driver; force feedback, its strength and centering spring through the input
+    /// interface).
+    Classic,
 }
 
 use simrig_plugin_kit::pedals::Layout;
@@ -74,6 +78,22 @@ const fn wheel(
 use Family::*;
 
 pub const MODELS: &[Model] = &[
+    wheel(
+        0xc20e,
+        "WingMan Formula GP",
+        "logitech/wingman-formula-gp",
+        Classic,
+        180,
+        None,
+    ),
+    wheel(
+        0xc291,
+        "WingMan Formula Force",
+        "logitech/wingman-formula-force",
+        Classic,
+        180,
+        None,
+    ),
     wheel(
         0xc293,
         "WingMan Formula Force GP",
@@ -233,5 +253,6 @@ pub fn hid_driver(family: Family) -> &'static str {
         Lg4ff => "logitech",
         Hidpp => "logitech-hidpp-device",
         DirectDrive => "logitech-dd",
+        Classic => "logitech",
     }
 }

@@ -227,8 +227,17 @@ pub enum Reason {
     Unavailable,                          // temporary: device busy, reconnecting…
 }
 
-/// A parameter as declared by the plugin: type and range, current value, persistence.
-pub struct ParamSpec { pub ty: ParamType, pub value: Value, pub persistence: Persistence, pub force_limit: Option<f64> }
+/// A parameter as declared by the plugin: type and range, current value, persistence, and a
+/// caveat when it may not work fully (§3.5).
+pub struct ParamSpec { pub ty: ParamType, pub value: Value, pub persistence: Persistence, pub force_limit: Option<f64>, pub caveat: Option<Caveat> }
+
+/// A supported item that may not work fully, reported like an unsupported one's reason.
+pub struct Caveat { pub reason: CaveatReason, pub detail: Option<String> }
+
+pub enum CaveatReason {
+    WriteOnly,   // "the device does not report this value, so the last value set is shown."
+    Unverified,  // "the driver accepts it, but it is not confirmed on this device."
+}
 
 pub trait Component {
     fn id(&self) -> String;
@@ -305,6 +314,12 @@ what their hardware can and cannot do.
   enables itself.
 - **Wizard**: calibration and test steps for unsupported items are shown as skipped, with the reason.
 - **Custom parameters** follow the same rules (`availability`, `enabled_if`).
+- **Partly supported, marked**: a parameter that works but not fully carries a `Caveat`, which
+  plugins report the same way as an unsupported item's reason (a standard `CaveatReason` the core
+  explains, plus an optional detail), on standard and custom parameters alike, read anew with
+  every description. The UI keeps the control enabled and puts a yellow warning sign next to its
+  label, with the explanation as its tooltip. Example: a force feedback strength the driver
+  takes through the kernel's input interface but the device cannot report back (`WriteOnly`).
 
 ## 4. Catalog and images
 
@@ -611,8 +626,18 @@ takes upstream packages as they are: their fixed name and version are rewritten 
 and their `dkms.conf` may live in a subdirectory.
 
 On the adapter side, `crates/simrig-plugin-kit` holds what plugins of kernel-driven wheels and
-pedals share: the HID device a driver is bound to and its sysfs attributes, the event node
-(axes, buttons, force feedback test), and pedals: a standard pedals component over evdev axes.
+pedals share: the HID device a driver is bound to and its sysfs attributes (or the USB interface
+a wheel's own USB driver is bound to, like the WingMan Formula Force's `iforce`), the event node
+(axes, buttons, force feedback test), settings that are sysfs attributes (numbers, switches,
+choices), and pedals: a standard pedals component over evdev axes.
+
+**Force feedback strength and centering without an attribute.** Most force feedback drivers take
+two device-wide controls through the kernel's input interface, as games set them: `FF_GAIN` and
+`FF_AUTOCENTER`. Where a driver has no sysfs attribute for them, a kit setting can stand in with
+the control (`Setting::ff`), as Oversteer does, but only when the driver declares it takes that
+control (its force feedback capabilities, read live). The value cannot be read back, so it is
+marked with a `WriteOnly` caveat, shows the last value set (else what drivers start with: full
+strength, no centering spring), and lasts until the device is unplugged (nothing to save).
 
 **Pedals are recognised, not configured.** Like Oversteer, each plugin knows where the pedals of
 its wheels are: a table of axes and directions per model (`Layout`), from Oversteer's and
@@ -935,8 +960,9 @@ Logitech wheels are spread over three kernel drivers, which decide what SimRig c
 
 | Family | Wheels | Driver | Settings |
 |---|---|---|---|
-| lg4ff | G29, G27, G25, Driving Force GT/Pro/EX, MOMO, Speed Force Wireless, G923 for PlayStation | the kernel's `hid-logitech`, replaced by the bundled [new-lg4ff](https://github.com/berarma/new-lg4ff) when one of these wheels is plugged in | rotation (kernel); force feedback gain, spring, damper and friction effect levels, autocenter, force feedback on the LEDs (new-lg4ff) |
-| hidpp | G920, G923 for Xbox | the kernel's `hid-logitech-hidpp` | rotation |
+| lg4ff | G29, G27, G25, Driving Force GT/Pro/EX, MOMO, Speed Force Wireless, G923 for PlayStation | the kernel's `hid-logitech`, replaced by the bundled [new-lg4ff](https://github.com/berarma/new-lg4ff) when one of these wheels is plugged in | rotation, the model presented to older games (`alternate_modes`) (kernel); force feedback gain, spring, damper and friction effect levels, autocenter, force feedback on the LEDs, combined pedals (new-lg4ff); on the kernel's driver, gain and autocenter through the input interface |
+| hidpp | G920, G923 for Xbox | the kernel's `hid-logitech-hidpp` | rotation; strength and centering through the input interface |
+| classic | WingMan Formula GP, WingMan Formula Force | the kernel's `hid-logitech`, and `iforce` (a USB driver) for the Formula Force | fixed rotation; strength and centering through the input interface |
 | direct drive | G PRO (Xbox/PC, PlayStation), RS50 | the bundled [TrueForce driver](https://github.com/mescon/logitech-trueforce-linux-driver) (`hid-logitech-dd`), built when one of them is plugged in | rotation, strength, damping, TrueForce, force feedback filter, firmware, centering |
 
 **The driver** always installs SimRig's udev rules (the attributes above writable by local
@@ -950,13 +976,18 @@ when the driver binds to that model (`72-simrig-logitech-settings.rules`).
 
 **The adapter** gives each wheel a wheel base, its rim (buttons) and the pedals plugged into it
 (Oversteer's tables per model; the RS50's, which no table covers, are mapped while it is added). What a family's driver lacks stays visible with the reason (new-lg4ff's
-settings on the kernel's driver say it is needed). Tested end to end on a fake G29 (with and
-without new-lg4ff) and a fake G PRO.
+settings on the kernel's driver say it is needed). Switching the model presented to games
+makes the wheel reconnect with that model's id, which SimRig then shows until it is plugged in
+again. Tested end to end on a fake G29 (with and without new-lg4ff, with the input interface's
+controls), a fake G PRO and a fake WingMan Formula Force on iforce.
 
 ### 11.3 Thrustmaster
 
 The kernel's `hid-thrustmaster` only starts Thrustmaster wheels up (they appear with a generic
-id, then switch to their own); force feedback needs [hid-tmff2](https://github.com/Kimplul/hid-tmff2).
+id, then switch to their own); force feedback needs [hid-tmff2](https://github.com/Kimplul/hid-tmff2),
+or [hid-t150](https://github.com/scarburato/t150_driver) for the T150 and TMX. The T500 RS has no
+force feedback driver on Linux and the T80 no motor: both give their inputs through
+`hid-generic`.
 
 **The driver** builds hid-tmff2 with DKMS: its `dkms.conf` lives in `dkms/` and its version is
 fixed upstream, both handled by the `dkms` recipe, and it bundles
@@ -965,12 +996,18 @@ wheels in place of the kernel's module; that one is blacklisted while SimRig's h
 installed, as upstream recommends (`/etc/modprobe.d/simrig-thrustmaster.conf`), and restored on
 removal. A hid-tmff2 installed by other means is kept, and the user's modprobe configuration
 with it. Settings are saved as options of the module (`save-setting`): hid-tmff2 applies them
-to every wheel it starts.
+to every wheel it starts. hid-t150 is built too, like the Logitech driver's modules, only when a
+T150 or TMX is plugged in (or SimRig built it before); its sources lack a usable `dkms.conf`, so
+SimRig ships its own (`dkms/hid-t150.conf`, the `dkms` recipe takes an absolute path). It has no
+module options: its settings are saved as udev rules per model
+(`72-simrig-thrustmaster-settings.rules`).
 
 **The adapter** gives each wheel a wheel base (rotation within the wheel's limits, gain, spring,
-damper and friction levels, force feedback test), its rim (buttons) and the pedals
-plugged into it. A wheel still starting up (hid-tminit's ids) is claimed without components, so
-adding it installs the driver. Tested end to end on a fake T300 RS.
+damper and friction levels, the centering spring, through the input interface on hid-tmff2,
+force feedback test), its rim (buttons) and the pedals plugged into it. Each model says which
+driver drives it, which decides the HID driver looked for and the settings. A wheel still
+starting up (hid-tminit's ids) is claimed without components, so adding it installs the driver.
+Tested end to end on a fake T300 RS, T150, T500 RS and T80.
 
 ### 11.4 PXN
 
@@ -992,7 +1029,20 @@ protection and reversed forces are custom ones. Whether the base keeps them when
 not verified, so they are not offered as saved. The V10 and V12 families have no known settings
 protocol: their settings are shown as unavailable, with the reason. Force feedback is offered
 when the event node takes effects. Tested end to end on a fake VD6 whose control interface
-answers like the real one, and a fake V12.
+answers like the real one, and a fake V12. Without the settings protocol, the force feedback
+strength goes through the input interface, marked.
+
+### 11.5 Standard force feedback bases
+
+Other bases speak the USB standard for force feedback (HID PID) and are in hid-universal-pidff's
+table: Cammus C5 and C12, Asetek Invicta, Forte, La Prima and Tony Kanaan, VRS DirectForce Pro,
+FFBeast, Turtle Beach VelocityOne Race; the OpenFFBoard works with the kernel's generic driver.
+None has a known settings protocol, and the rotation lives in each brand's software: the
+`pidff` plugin gives their inputs, the force feedback test, and the strength and centering
+spring through the input interface (marked), and shows the steering angle over each model's
+usual rotation. Its driver is PXN's and Moza's: SimRig's udev rules, and the bundled
+universal-pidff on kernels older than 6.15, shared with theirs. Tested end to end on a fake
+Cammus C5 and Asetek Forte.
 
 ## 12. Decisions
 
@@ -1016,6 +1066,7 @@ answers like the real one, and a fake V12.
 | D16 | Guided procedures (calibration, mapping, setup) are defined by plugins; the core only renders generic steps | new procedures without touching the core, like custom parameters |
 | D17 | The core ships generic layered drawings per component type; plugins give appearance hints (rim shape) or their own pictures | every device looks right without a single brand asset; brand-agnostic by construction |
 | D18 | The generic USB plugin's driver is a userspace service started by udev with each set-up device (hidraw in, or the USB interrupt endpoint for devices the kernel's HID driver rejects; uinput out), not HID-BPF or a kernel module | works on any kernel with free-form mappings; nothing runs while no set-up device is connected; HID-BPF stays an option for later |
+| D19 | Parameters that work only in part carry a caveat, reported by plugins like an unsupported reason and shown with a yellow sign and a tooltip | the user can use them, knowing their limits (e.g. values the device cannot report back) |
 
 ## 13. Risks
 

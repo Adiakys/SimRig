@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::support::Caveat;
 use crate::value::{CurvePoint, Value, ValueKind};
 
 /// Whether a value survives with the app closed. How it is persisted is up to the driver.
@@ -21,6 +22,9 @@ pub struct ParamSpec {
     /// For force-related parameters: the highest value the app may ever apply.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub force_limit: Option<f64>,
+    /// Set when the parameter may not work fully: the app marks it, with the explanation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caveat: Option<Caveat>,
 }
 
 impl ParamSpec {
@@ -30,6 +34,7 @@ impl ParamSpec {
             value,
             persistence: Persistence::Volatile,
             force_limit: None,
+            caveat: None,
         }
     }
 
@@ -64,6 +69,11 @@ impl ParamSpec {
 
     pub fn with_force_limit(mut self, limit: f64) -> Self {
         self.force_limit = Some(limit);
+        self
+    }
+
+    pub fn with_caveat(mut self, caveat: Caveat) -> Self {
+        self.caveat = Some(caveat);
         self
     }
 }

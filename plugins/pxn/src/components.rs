@@ -1,6 +1,7 @@
 //! PXN bases as standard components: inputs and force feedback through the kernel, settings
 //! of the VD series over their control interface.
 
+use simrig_plugin_kit::input::FfControl;
 use simrig_plugin_kit::pedals::{self, PedalNotes, PedalSet};
 use simrig_plugin_sdk::model::{Appearance, RimShape};
 use simrig_plugin_sdk::prelude::*;
@@ -46,6 +47,18 @@ fn write(device: &Shared, setting: &Setting, value: &Value) -> Result<()> {
 
 pub struct Base {
     pub device: Shared,
+}
+
+impl Base {
+    /// The force feedback strength through the input interface, when the base's settings
+    /// cannot be reached and the driver takes it.
+    fn ff_gain(&self, param: WheelBaseParam) -> Option<ParamSpec> {
+        let d = self.device.borrow();
+        if param != WheelBaseParam::FfbStrength || d.no_settings().is_none() {
+            return None;
+        }
+        d.hid.ff_spec(FfControl::Gain)
+    }
 }
 
 impl Component for Base {
@@ -144,6 +157,9 @@ impl WheelBase for Base {
     }
 
     fn param(&mut self, param: WheelBaseParam) -> Support<ParamSpec> {
+        if let Some(spec) = self.ff_gain(param) {
+            return Support::Supported(spec);
+        }
         match settings::standard_setting(param) {
             Some(setting) => spec(&self.device, setting),
             None => Support::not_in_driver(),
@@ -151,6 +167,9 @@ impl WheelBase for Base {
     }
 
     fn set_param(&mut self, param: WheelBaseParam, value: &Value) -> Result<()> {
+        if self.ff_gain(param).is_some() {
+            return self.device.borrow_mut().hid.set_ff(FfControl::Gain, value);
+        }
         let setting = settings::standard_setting(param).ok_or_else(Error::unsupported)?;
         write(&self.device, setting, value)
     }

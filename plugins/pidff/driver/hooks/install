@@ -1,0 +1,47 @@
+#!/bin/sh
+# Installs SimRig's udev rules and, when the kernel has no hid-universal-pidff (before 6.15),
+# builds the bundled one with DKMS. Upgrades a version SimRig installed before; leaves the
+# kernel's module, or one installed by other means, alone.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA"
+
+if [ "$(id -u)" != 0 ]; then
+    echo "$VERSION" > "$DATA/dev-installed"
+    echo "development install: nothing is installed (needs root)"
+    exit 0
+fi
+
+udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
+touch "$DATA/rules"
+
+set -- $(mod_state "$PACKAGE" "$MODULE" "$VERSION")
+case $1 in
+kernel)
+    udev_apply input
+    echo "the kernel's hid-universal-pidff is used, with SimRig's access rules"
+    exit 0
+    ;;
+foreign)
+    udev_apply input
+    echo "$2" > "$DATA/integration"
+    echo "hid-universal-pidff $2 is installed, not by SimRig: it is used as it is, with SimRig's access rules"
+    exit 0
+    ;;
+esac
+
+mod_prerequisites
+rc=0
+mod_build "$PACKAGE" "$VERSION" "$SOURCE" dkms.conf "$MODULE" || rc=$?
+case $rc in
+0)
+    replug_bases
+    udev_apply input
+    echo "hid-universal-pidff $VERSION installed"
+    ;;
+3)
+    udev_apply input
+    echo "hid-universal-pidff $VERSION installed: $(mod_key_message)"
+    ;;
+*) exit 1 ;;
+esac

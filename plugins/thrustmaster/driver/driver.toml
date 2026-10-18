@@ -3,13 +3,18 @@
 # upgrades by DKMS, plus SimRig's udev rules. The kernel's own hid-thrustmaster only starts the
 # wheels up; hid-tmff2 brings an improved one, so the kernel's is blacklisted while SimRig's is
 # installed, as upstream recommends. A hid-tmff2 installed by other means is used as it is.
+# For the T150 and TMX, which hid-tmff2 does not drive, hid-t150 (bundled the same way) is built
+# too, only when one is plugged in.
 id = "thrustmaster"
-name = "hid-tmff2"
-version = "0.83-13-gd890a93"
-summary = "hid-tmff2 kernel driver, built with DKMS, and udev rules for access without a password"
-license = "GPL-2.0-or-later (hid-tmff2, hid-tminit), GPL-3.0-or-later (SimRig's hooks)"
+name = "hid-tmff2, hid-t150"
+version = "tmff2-0.83-13-gd890a93+t150-1.0"
+summary = "hid-tmff2 kernel driver (and hid-t150 for the T150 and TMX), built with DKMS, and udev rules for access without a password"
+license = "GPL-2.0-or-later (hid-tmff2, hid-tminit), GPL-2.0 (hid-t150), GPL-3.0-or-later (SimRig's hooks)"
 # Upstream projects of the bundled sources, linked from Plugins.
-sources = [{ name = "hid-tmff2", url = "https://github.com/Kimplul/hid-tmff2" }]
+sources = [
+    { name = "hid-tmff2", url = "https://github.com/Kimplul/hid-tmff2" },
+    { name = "hid-t150", url = "https://github.com/scarburato/t150_driver" },
+]
 
 install = "hooks/install"
 uninstall = "hooks/uninstall"
@@ -17,8 +22,9 @@ status = "hooks/status"
 
 requires = ["dkms", "kernel-headers", "build-tools"]
 
-# Saves a setting as an option of the hid-tmff2 module, applied when it starts a wheel.
+# Saves a setting of a wheel model: an option of the hid-tmff2 module, applied when it starts a
+# wheel, or for hid-t150 a udev rule applied when it binds to the wheel.
 [[privileged]]
 name = "save-setting"
 exec = "hooks/save-setting"
-args = { attr = "range|gain|spring_level|damper_level|friction_level", value = "[0-9]{1,5}" }
+args = { pid = "[0-9a-f]{4}", attr = "range|gain|autocenter|spring_level|damper_level|friction_level", value = "[0-9]{1,5}" }
