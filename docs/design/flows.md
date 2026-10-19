@@ -1,9 +1,7 @@
 # SimRig: user flows (M1)
 
-How people move through the app. Screens refer to the static mockups in
-[`mockups/png`](mockups/png) (each in a `-light` and a `-dark` version); copy in the mockups is
-Italian, the UI ships in English and Italian. Visual rules are in [`DESIGN.md`](../../DESIGN.md),
-product principles in [`PRODUCT.md`](../../PRODUCT.md).
+How people move through the app; the UI ships in English and Italian. Visual rules are in
+[`DESIGN.md`](../../DESIGN.md), product principles in [`PRODUCT.md`](../../PRODUCT.md).
 
 Every flow follows three rules from PRODUCT.md:
 

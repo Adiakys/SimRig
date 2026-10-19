@@ -270,6 +270,21 @@ Plugins written in other languages implement the same interfaces through the pro
 each standard item has a fixed id (`rotation`, `brake.position`) and "unsupported" is an
 explicit answer carrying its reason.
 
+### 3.3.1 Controls
+
+A component may also list the physical **controls** its inputs come from (`controls` in its
+description): a rim's buttons, hat switches, encoders and analog paddles. Each has its kind, its
+number as games read it, the kernel's code (`BTN_THUMB`), the plugin's name for it when it knows
+the rim ("Shift up"), and where its live value is: a standard input (`buttons`, `hats`,
+`encoders`, `analog_paddles`) and a position in it. The core knows nothing about any rim; the
+app lists the controls and lights them from the live values.
+
+Games under Proton get their controllers through SDL, which numbers buttons from the codes
+`BTN_JOYSTICK` and up, then the ones below, and axes in code order without the hat switches'.
+The kit (`HidDevice::controls`) numbers them the same way, and gives `buttons` in that order, so
+"Button 7" in SimRig is button 7 in a game. Plugins add what only they know: names, which axes
+are analog paddles.
+
 ### 3.4 Custom parameters
 
 Everything a plugin offers beyond the standard interface is a **custom parameter**, declared at
@@ -358,8 +373,7 @@ live inputs, also in Slint, which cannot animate inside a single SVG:
 | Handbrake | side view, body + lever | the lever turns on its pivot |
 
 `assets/devices/devices.toml` is the contract between the drawings and the renderer: view boxes,
-layers, pivots, hinge points, gate geometry and the rules to draw a gate. `docs/design/devices.js`
-implements the same rules for the mockups.
+layers, pivots, hinge points, gate geometry and the rules to draw a gate.
 
 **Plugins give hints, the core picks the drawing.** A component's description carries an
 `appearance`; today it has the rim shape (`round`, `gt`, `formula`), so a plugin gets the right

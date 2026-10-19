@@ -1,2 +1,4 @@
 /target
 /dist
+# Design mockups never go in the repository.
+mockups/

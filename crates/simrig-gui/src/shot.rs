@@ -1,5 +1,5 @@
 //! `--screenshot`: the real app drawn by the software renderer into a PNG instead of a window.
-//! Used to check screens without a display (and to keep the mockups honest).
+//! Used to check screens without a display.
 
 use std::collections::VecDeque;
 use std::path::Path;

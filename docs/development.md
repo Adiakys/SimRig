@@ -107,7 +107,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `plugins/pidff` | Standard force feedback plugin: Cammus, Asetek, VRS, FFBeast, Turtle Beach, OpenFFBoard bases (inputs, force feedback, strength and centering through the input interface); bundles [universal-pidff](https://github.com/JacKeTUs/universal-pidff) for kernels older than 6.15 |
 | `plugins/simagic` | Simagic plugin: Alpha and EVO bases; bundles [simagic-ff](https://github.com/JacKeTUs/simagic-ff) as a submodule, built with DKMS for the bases that need it |
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
-| `design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
+| `docs/design` | Design: flows; the style guide and product context are `DESIGN.md` and `PRODUCT.md` at the root |
 | `scripts` | Development helpers |
 | `packaging/polkit` | polkit action of the helper |
 
