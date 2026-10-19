@@ -1,0 +1,12 @@
+# Installed by the SimRig Simagic driver: access to Simagic bases without a password. Bound to
+# "bind" too, so the rules apply again whenever the driver binds to a base.
+ACTION!="add|change|bind", GOTO="simrig_simagic_end"
+
+# simagic-ff's settings, writable by local users.
+SUBSYSTEM=="hid", DRIVER=="simagic-ff", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w max_angle ff_strength wheel_rotation_speed mechanical_centering mechanical_damper center_damper mechanical_friction game_centering game_inertia game_damper game_friction angle_lock feedback_detail angle_lock_strength mechanical_inertia filter_level slew_rate_control ring_light_enabled || true'"
+
+# Raw HID of the bases, for Simagic's own software under Wine: the user at the seat only.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3670", ATTRS{idProduct}=="0500|0501|0502", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="0522", TAG+="uaccess"
+
+LABEL="simrig_simagic_end"

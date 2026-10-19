@@ -49,6 +49,7 @@ run)
         --plugin-dir "$root/plugins/thrustmaster" \
         --plugin-dir "$root/plugins/pxn" \
         --plugin-dir "$root/plugins/pidff" \
+        --plugin-dir "$root/plugins/simagic" \
         --no-default-dirs \
         --config-dir "$dev/config" \
         --state-dir "$dev/state" \

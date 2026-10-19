@@ -80,6 +80,7 @@ jobs:
           test -f /usr/lib/simrig/plugins/thrustmaster/driver/dkms/hid-t150.conf
           test -f /usr/lib/simrig/plugins/pxn/driver/universal-pidff/Kbuild
           test -f /usr/lib/simrig/plugins/pidff/driver/universal-pidff/Kbuild
+          test -f /usr/lib/simrig/plugins/simagic/driver/simagic-ff/dkms.conf
           simrig-cli --version
           simrig-cli plugins
           sudo apt-get remove -y simrig

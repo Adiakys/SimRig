@@ -1,0 +1,16 @@
+id = "simagic"
+name = "Simagic"
+version = "0.1.0"
+api = 1
+exec = "simrig-plugin-simagic"
+driver = "driver/driver.toml"
+description = "Simagic wheel bases: Alpha Mini, Alpha, Alpha U and the EVO series, on the open source simagic-ff driver; older firmware on the kernel's own."
+
+# The bases of src/models.rs; a test keeps them in step with simagic-ff.
+[match]
+usb = [
+    { vid = 0x0483, pid = 0x0522 }, # Alpha Mini, Alpha, Alpha U (and the M10)
+    { vid = 0x3670, pid = 0x0500 }, # EVO Sport
+    { vid = 0x3670, pid = 0x0501 }, # EVO
+    { vid = 0x3670, pid = 0x0502 }, # EVO Pro
+]

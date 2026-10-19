@@ -105,6 +105,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `plugins/thrustmaster` | Thrustmaster plugin: T300 RS, T248, TX, TS-PC, TS-XW, T150, TMX, T500 RS and T80 (inputs only); bundles [hid-tmff2](https://github.com/Kimplul/hid-tmff2) (with hid-tminit nested) and [hid-t150](https://github.com/scarburato/t150_driver) as submodules, built with DKMS |
 | `plugins/pxn` | PXN plugin: V10, V12, VD6; VD settings over the vendor control interface ([Pitwall](https://github.com/unionyxx/pitwall)'s protocol); bundles [universal-pidff](https://github.com/JacKeTUs/universal-pidff) for kernels older than 6.15 |
 | `plugins/pidff` | Standard force feedback plugin: Cammus, Asetek, VRS, FFBeast, Turtle Beach, OpenFFBoard bases (inputs, force feedback, strength and centering through the input interface); bundles [universal-pidff](https://github.com/JacKeTUs/universal-pidff) for kernels older than 6.15 |
+| `plugins/simagic` | Simagic plugin: Alpha and EVO bases; bundles [simagic-ff](https://github.com/JacKeTUs/simagic-ff) as a submodule, built with DKMS for the bases that need it |
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
 | `design` | Design: flows, mockups, the style guide (`DESIGN.md`, `PRODUCT.md` at the root) |
 | `scripts` | Development helpers |

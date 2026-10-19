@@ -1,0 +1,25 @@
+# The Simagic driver: simagic-ff (bundled as a git submodule, pinned to a version tested with the
+# adapter), built for the running kernel and kept rebuilt on kernel upgrades by DKMS, plus SimRig's
+# udev rules. Built only for bases that need it: a firmware from before v159 speaks standard HID
+# force feedback, which the kernel drives itself. A simagic-ff installed by other means is used
+# as it is.
+id = "simagic"
+name = "simagic-ff"
+version = "2.0.0-14-g6fa8c4b"
+summary = "simagic-ff kernel driver, built with DKMS, and udev rules for the bases' settings without a password"
+license = "GPL-2.0 (simagic-ff), GPL-3.0-or-later (SimRig's hooks)"
+# Upstream projects of the bundled sources, linked from Plugins.
+sources = [{ name = "simagic-ff", url = "https://github.com/JacKeTUs/simagic-ff" }]
+
+install = "hooks/install"
+uninstall = "hooks/uninstall"
+status = "hooks/status"
+
+requires = ["dkms", "kernel-headers", "build-tools"]
+
+# Saves a setting of a base model for the next plug-in: a udev rule that writes the attribute
+# when simagic-ff binds to it. Never the rotation (see the adapter).
+[[privileged]]
+name = "save-setting"
+exec = "hooks/save-setting"
+args = { model = "(0483:0522|3670:050[0-2])", attr = "ff_strength|mechanical_damper|mechanical_friction|mechanical_inertia|game_centering|game_damper|game_friction|game_inertia|feedback_detail|filter_level|slew_rate_control|mechanical_centering|center_damper|wheel_rotation_speed|angle_lock|angle_lock_strength|ring_light_enabled", value = "[0-9]{1,4}" }

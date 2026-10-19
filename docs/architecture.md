@@ -1069,6 +1069,30 @@ usual rotation. Its driver is PXN's and Moza's: SimRig's udev rules, and the bun
 universal-pidff on kernels older than 6.15, shared with theirs. Tested end to end on a fake
 Cammus C5 and Asetek Forte.
 
+### 11.6 Simagic
+
+Simagic bases with a firmware from v159 on (nearly all sold since 2024) speak a variant of HID
+PID without its descriptor, which the kernel refuses: force feedback needs
+[simagic-ff](https://github.com/JacKeTUs/simagic-ff), which also exposes the base settings as
+sysfs attributes. Older firmware declares standard PID and works with the kernel's own driver,
+under the same id as the newer Alpha bases (`0483:0522`); the EVO series has its own ids.
+
+**The driver** installs SimRig's udev rules (simagic-ff's attributes writable by local users, raw
+HID of the bases for Simagic's software under Wine) and builds simagic-ff only when a base needs
+it: an EVO, or an Alpha whose HID report descriptor has no PID usage page, which the hooks and
+the adapter both read item by item. A simagic-ff installed by other means is kept. Settings are
+saved as udev rules per model, applied when simagic-ff binds; never the rotation.
+
+**The adapter** gives each base a wheel base (rotation, force feedback strength, natural damper,
+friction and inertia, game effect strengths up to 200%, filter, detail, end stop, centering,
+ring light, firmware), its rim (buttons) and the pedals plugged into its bus port, mapped while
+it is added. The firmware loses force feedback, until replugged, when the rotation changes with
+the wheel outside the new one: SimRig refuses that change until the wheel is turned inside it,
+as Simagic's software does, and does not save the rotation for the next plug-in, when the wheel
+could be anywhere. An older firmware's settings are shown as unavailable, with the reason. Pedal
+sets, shifters and handbrakes on their own USB are not handled yet: their ids are not known.
+Tested end to end on a fake EVO Pro and fake Alphas with either firmware.
+
 ## 12. Decisions
 
 | # | Decision | Rationale |

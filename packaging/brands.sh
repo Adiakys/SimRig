@@ -1,7 +1,7 @@
 # The brand plugins SimRig ships, with the driver sources each bundles: git submodules in
 # plugins/<plugin>/driver/<source>. Sourced by the staging and install scripts.
 
-BRANDS="fanatec moza logitech thrustmaster pxn pidff"
+BRANDS="fanatec moza logitech thrustmaster pxn pidff simagic"
 
 brand_sources() {
     case $1 in
@@ -9,6 +9,7 @@ brand_sources() {
     moza | pxn | pidff) echo universal-pidff ;;
     logitech) echo new-lg4ff logitech-trueforce ;;
     thrustmaster) echo hid-tmff2 hid-t150 ;;
+    simagic) echo simagic-ff ;;
     esac
 }
 

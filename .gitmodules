@@ -22,3 +22,6 @@
 [submodule "plugins/pidff/driver/universal-pidff"]
 	path = plugins/pidff/driver/universal-pidff
 	url = https://github.com/JacKeTUs/universal-pidff
+[submodule "plugins/simagic/driver/simagic-ff"]
+	path = plugins/simagic/driver/simagic-ff
+	url = https://github.com/JacKeTUs/simagic-ff

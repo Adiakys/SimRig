@@ -1,0 +1,47 @@
+#!/bin/sh
+# Runs as the user: the state of the Simagic driver, as JSON.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+
+if [ -f "$DATA/dev-installed" ]; then
+    status_json true false "$(cat "$DATA/dev-installed")" false false true "Development install: simagic-ff is not built."
+    exit 0
+fi
+
+active=false
+mod_loaded "$MODULE" && active=true
+set -- $(mod_state "$PACKAGE" "$MODULE" "$VERSION")
+case $1 in
+pending)
+    status_json true false "$2" true false true "To trust the key that signs the driver: $(mod_key_message)."
+    ;;
+outdated)
+    status_json true "$active" "$2" false false true "Version $VERSION of the driver is available."
+    ;;
+ours)
+    status_json true "$active" "$2" false false true ""
+    ;;
+foreign | kernel)
+    if rules_installed; then
+        status_json true "$active" "${2:-}" false false true \
+            "Uses simagic-ff ${2:-} installed by you or your distribution (SimRig is tested with $VERSION)."
+    else
+        status_json false false "${2:-}" false false true \
+            "simagic-ff ${2:-} is installed (by you or your distribution): SimRig keeps it and adds its access rules. Asks for the password once."
+    fi
+    ;;
+*)
+    if rules_installed && needs_module; then
+        status_json false false "" false false true \
+            "The base plugged in needs simagic-ff, the open source driver for its force feedback and settings. Asks for the password once."
+    elif rules_installed; then
+        status_json true false "" false false true "No base plugged in needs simagic-ff: older firmware works with the kernel's own driver."
+    elif needs_module; then
+        status_json false false "" false false true \
+            "Builds the open source simagic-ff driver for your kernel: force feedback and settings. Asks for the password once."
+    else
+        status_json false false "" false false true \
+            "Adds access to the bases' settings; builds simagic-ff when a base needs it. Asks for the password once."
+    fi
+    ;;
+esac

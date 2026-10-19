@@ -1,0 +1,53 @@
+#!/bin/sh
+# Installs SimRig's udev rules and, for a base that needs it, builds simagic-ff with DKMS.
+# Upgrades a version SimRig installed before; leaves one installed by other means alone.
+set -eu
+. "$SIMRIG_DRIVER_DIR/hooks/common.sh"
+mkdir -p "$DATA"
+
+if [ "$(id -u)" != 0 ]; then
+    echo "$VERSION" > "$DATA/dev-installed"
+    echo "development install: simagic-ff is not built (needs root)"
+    exit 0
+fi
+
+udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
+touch "$DATA/rules"
+
+set -- $(mod_state "$PACKAGE" "$MODULE" "$VERSION")
+case $1 in
+foreign | kernel)
+    echo "${2:-}" > "$DATA/integration"
+    udev_apply hid hidraw
+    echo "simagic-ff ${2:-} is installed, not by SimRig: it is used as it is, with SimRig's access rules"
+    exit 0
+    ;;
+"ours")
+    [ "${2:-}" = "$VERSION" ] && { udev_apply hid hidraw; echo "simagic-ff $VERSION is installed"; exit 0; }
+    ;;
+esac
+
+if ! needed; then
+    # Bases with an older firmware work with the kernel's own driver.
+    udev_apply hid hidraw
+    echo "Simagic driver installed: no base plugged in needs simagic-ff"
+    exit 0
+fi
+
+mod_prerequisites
+rc=0
+mod_build "$PACKAGE" "$VERSION" "$SOURCE" dkms.conf "$MODULE" || rc=$?
+case $rc in
+0)
+    # The bases start again, as if replugged: simagic-ff takes them.
+    usb_replug 3670 $EVO_BASES
+    usb_replug 0483 0522
+    udev_apply hid hidraw
+    echo "simagic-ff $VERSION installed"
+    ;;
+3)
+    udev_apply hid hidraw
+    echo "simagic-ff $VERSION installed: $(mod_key_message)"
+    ;;
+*) exit 1 ;;
+esac
