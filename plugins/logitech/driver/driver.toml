@@ -8,7 +8,7 @@ id = "logitech"
 name = "new-lg4ff + logitech-trueforce"
 version = "lg4ff-0.5.0+tf-0.42.5-2-g972274b"
 summary = "udev rules for Logitech wheel settings without a password; new-lg4ff and the TrueForce driver for the wheels that need them"
-license = "GPL-2.0 (new-lg4ff, logitech-trueforce-linux-driver), GPL-3.0-or-later (SimRig's hooks)"
+license = "GPL-2.0 (new-lg4ff), GPL-2.0-only (logitech-trueforce-linux-driver's module), GPL-3.0-or-later (SimRig's hooks)"
 # Upstream projects of the bundled sources, linked from Plugins.
 sources = [
     { name = "new-lg4ff", url = "https://github.com/berarma/new-lg4ff" },

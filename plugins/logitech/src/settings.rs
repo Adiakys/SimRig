@@ -160,7 +160,9 @@ pub const SETTINGS: &[(Family, Setting)] = &[
     (
         DirectDrive,
         Setting {
-            help: "Engine and road texture in the rim, on top of the force feedback.",
+            help: "Engine and road texture in the rim, on top of the force feedback. In games \
+                   through Proton it also needs the TrueForce driver's companion apps \
+                   (logi-launch), which SimRig does not install.",
             ..Setting::percent("wheel_trueforce", "TrueForce", EFFECTS)
         },
     ),

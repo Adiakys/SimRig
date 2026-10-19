@@ -11,8 +11,8 @@ SUBSYSTEM=="hid", DRIVER=="logitech-hidpp-device", ATTRS{idVendor}=="046d", RUN+
 # G PRO and RS50 (the TrueForce driver): the settings SimRig shows, and centering.
 SUBSYSTEM=="hid", DRIVER=="logitech-dd", RUN+="/bin/sh -c 'cd %S%p && chmod -f a+w wheel_range wheel_strength wheel_damping wheel_trueforce wheel_ffb_filter wheel_calibrate_here || true'"
 
-# Raw HID of the direct drive wheels, for TrueForce in games through Proton: the user at the
-# seat only.
+# Raw HID of the direct drive wheels, which the TrueForce driver's companion apps use to carry
+# TrueForce into games through Proton: the user at the seat only.
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c268|c272|c276", TAG+="uaccess"
 
 LABEL="simrig_logitech_end"

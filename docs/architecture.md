@@ -981,7 +981,8 @@ Logitech wheels are spread over three kernel drivers, which decide what SimRig c
 | direct drive | G PRO (Xbox/PC, PlayStation), RS50 | the bundled [TrueForce driver](https://github.com/mescon/logitech-trueforce-linux-driver) (`hid-logitech-dd`), built when one of them is plugged in | rotation, strength, damping, TrueForce, force feedback filter, firmware, centering |
 
 **The driver** always installs SimRig's udev rules (the attributes above writable by local
-users, raw HID of the direct drive wheels for TrueForce through Proton), and builds each module
+users, raw HID of the direct drive wheels for the TrueForce driver's companion apps, which carry
+TrueForce into games through Proton and which SimRig does not install), and builds each module
 only for the wheels plugged in that need it: `status` reports the driver as not installed while
 such a wheel is plugged in and its module is missing, so adding the wheel installs it. A module
 installed by other means is kept. The TrueForce driver also claims the G923; SimRig does not
