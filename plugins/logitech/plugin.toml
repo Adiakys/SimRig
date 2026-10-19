@@ -24,8 +24,9 @@ usb = [
     { vid = 0x046d, pid = 0xc266 }, # G923 Racing Wheel (PlayStation)
     { vid = 0x046d, pid = 0xc267 }, # G923 Racing Wheel (PlayStation)
     { vid = 0x046d, pid = 0xc262 }, # G920 Driving Force
-    { vid = 0x046d, pid = 0xc26d }, # G923 Racing Wheel (Xbox)
+    { vid = 0x046d, pid = 0xc26d }, # G923 Racing Wheel (Xbox), in its console mode
     { vid = 0x046d, pid = 0xc26e }, # G923 Racing Wheel (Xbox)
+    { vid = 0x046d, pid = 0xc275 }, # RS50 (Xbox), in its console mode
     { vid = 0x046d, pid = 0xc268 }, # G PRO Racing Wheel (PlayStation)
     { vid = 0x046d, pid = 0xc272 }, # G PRO Racing Wheel
     { vid = 0x046d, pid = 0xc276 }, # RS50 Direct Drive Wheel Base

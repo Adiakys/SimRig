@@ -12,9 +12,12 @@ if [ "$(id -u)" = 0 ]; then
     modprobe "$LG4FF_MODULE" 2>/dev/null || true
     udev_remove "$RULES"
     udev_remove "$SETTINGS"
+    udev_remove "$XBOX_RULES"
     udev_apply hid hidraw
 fi
 for file in "$LG4FF_PACKAGE.installed" "$TF_PACKAGE.installed" mok-pending dev-installed rules settings; do
     rm -f "${DATA:?}/$file"
 done
+rm -f "${XBOX_SWITCH:?}"
+rmdir "$DATA/bin" 2>/dev/null || true
 echo "SimRig's Logitech driver removed"

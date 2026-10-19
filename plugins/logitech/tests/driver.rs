@@ -2,6 +2,7 @@
 //! are the bundled new-lg4ff and TrueForce driver.
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use simrig_driver::testing::{KERNEL, Sandbox};
@@ -36,6 +37,72 @@ fn a_g920_needs_only_the_rules() {
     assert!(sb.read(RULES).contains("logitech-hidpp-device"));
     let status = sb.status();
     assert!(status.installed && status.version.is_none(), "{status:?}");
+}
+
+/// The Xbox editions start in a console mode: the driver switches them to their PC mode, with
+/// usb_modeswitch, at once and at every plug-in.
+#[test]
+fn xbox_editions_are_switched_to_their_pc_mode() {
+    let sb = sandbox("xbox", true);
+    sb.plug(0x046d, 0xc26d, None);
+    // In console mode xpad holds its interface.
+    let iface = "sys/bus/usb/devices/1-c26d/1-c26d:1.0";
+    fs::create_dir_all(sb.file(iface)).unwrap();
+    fs::create_dir_all(sb.file("sys/bus/usb/drivers/xpad")).unwrap();
+    std::os::unix::fs::symlink(
+        sb.file("sys/bus/usb/drivers/xpad"),
+        sb.file(&format!("{iface}/driver")),
+    )
+    .unwrap();
+
+    // Without usb_modeswitch the driver says what is missing.
+    sb.install();
+    let status = sb.status();
+    assert!(
+        status
+            .message
+            .as_deref()
+            .unwrap_or("")
+            .contains("usb-modeswitch"),
+        "{status:?}"
+    );
+
+    let stub = sb.file("bin/usb_modeswitch");
+    fs::write(
+        &stub,
+        "#!/bin/sh\necho \"usb_modeswitch $*\" >> \"$SIMRIG_TEST_ROOT/log\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&stub, fs::Permissions::from_mode(0o755)).unwrap();
+    sb.install();
+    assert!(
+        sb.log()
+            .contains("usb_modeswitch -v 046d -p c26d -M 0f00010142 -C 0x03 -m 01 -r 81"),
+        "{}",
+        sb.log()
+    );
+    assert_eq!(sb.read("sys/bus/usb/drivers/xpad/unbind"), "1-c26d:1.0\n");
+    // At every plug-in, off the udev worker.
+    let rule = sb.read("etc/udev/rules.d/73-simrig-logitech-xbox.rules");
+    assert!(rule.contains(r#"ATTR{idProduct}=="c26d|c275""#), "{rule}");
+    assert!(rule.contains("systemd-run --no-block"), "{rule}");
+    assert!(
+        rule.contains(
+            &sb.data
+                .join("bin/simrig-logitech-xbox-to-pc")
+                .display()
+                .to_string()
+        )
+    );
+    assert!(sb.data.join("bin/simrig-logitech-xbox-to-pc").is_file());
+
+    let (ok, _, err) = sb.hook("uninstall");
+    assert!(ok, "{err}");
+    assert!(
+        !sb.file("etc/udev/rules.d/73-simrig-logitech-xbox.rules")
+            .exists()
+    );
+    assert!(!sb.data.join("bin/simrig-logitech-xbox-to-pc").exists());
 }
 
 #[test]
@@ -167,7 +234,7 @@ fn wheels_agree_with_the_models_and_the_modules() {
     let family = |f: Family| -> Vec<u16> {
         MODELS
             .iter()
-            .filter(|m| m.family == f)
+            .filter(|m| m.family == f && !m.console)
             .map(|m| m.pid)
             .collect()
     };
@@ -176,6 +243,11 @@ fn wheels_agree_with_the_models_and_the_modules() {
     let mut models = family(Family::Lg4ff);
     models.sort();
     assert_eq!(lg4ff, models);
+    let mut xbox = list("XBOX_WHEELS");
+    xbox.sort();
+    let mut console: Vec<u16> = MODELS.iter().filter(|m| m.console).map(|m| m.pid).collect();
+    console.sort();
+    assert_eq!(xbox, console);
     let mut tf = list("TF_WHEELS");
     tf.sort();
     let mut models = family(Family::DirectDrive);

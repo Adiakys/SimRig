@@ -13,7 +13,14 @@ if [ "$(id -u)" != 0 ]; then
 fi
 
 udev_install "$RULES" < "$SIMRIG_DRIVER_DIR/udev/$RULES"
+mkdir -p "$DATA/bin"
+install -m 0755 "$SIMRIG_DRIVER_DIR/hooks/xbox-to-pc" "$XBOX_SWITCH"
+xbox_rules | udev_install "$XBOX_RULES"
 touch "$DATA/rules"
+# An Xbox edition plugged in now is switched at once (not from udev: no lock held here).
+if usb_present 046d $XBOX_WHEELS; then
+    "$XBOX_SWITCH" || true
+fi
 
 lg4ff=0
 ensure "$LG4FF_PACKAGE" "$LG4FF_MODULE" "$LG4FF_VERSION" "$LG4FF_SOURCE" logitech no $LG4FF_WHEELS || lg4ff=$?

@@ -20,9 +20,24 @@ TF_VERSION=$(cat "$SIMRIG_DRIVER_DIR/logitech-trueforce.version")
 TF_SOURCE="$SIMRIG_DRIVER_DIR/logitech-trueforce/mainline"
 TF_WHEELS="c268 c272 c276"
 
+# The Xbox editions of the G923 and RS50 start in a console mode no driver can use: a udev rule
+# switches them to their PC mode at every plug-in (hooks/xbox-to-pc, kept in the data directory).
+XBOX_WHEELS="c26d c275"
+XBOX_RULES=73-simrig-logitech-xbox.rules
+XBOX_SWITCH="$DATA/bin/simrig-logitech-xbox-to-pc"
+
 for recipe in prereq status dkms secureboot udev module; do
     . "$SIMRIG_DRIVER_DIR/recipes/$recipe.sh"
 done
+
+# The rule that switches the Xbox editions to their PC mode, run off the udev worker.
+xbox_rules() {
+    echo "# Installed by the SimRig Logitech driver: the Xbox editions of the G923 and RS50 start in"
+    echo "# a console mode no driver can use; this switches them to their PC mode at every plug-in,"
+    echo "# through systemd-run so the udev worker is not held during the USB transfer. Without"
+    echo "# systemd-run or usb_modeswitch it does nothing."
+    echo "ACTION==\"add\", SUBSYSTEM==\"usb\", ENV{DEVTYPE}==\"usb_device\", ATTR{idVendor}==\"046d\", ATTR{idProduct}==\"$(echo "$XBOX_WHEELS" | tr ' ' '|')\", RUN+=\"/bin/sh -c 'command -v systemd-run >/dev/null && command -v usb_modeswitch >/dev/null && systemd-run --no-block --collect --description=\\\"SimRig: Logitech wheel to PC mode\\\" $XBOX_SWITCH >/dev/null 2>&1 || true'\""
+}
 
 rules_installed() {
     [ -f "$DATA/rules" ]

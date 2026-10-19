@@ -985,7 +985,13 @@ users, raw HID of the direct drive wheels for the TrueForce driver's companion a
 TrueForce into games through Proton and which SimRig does not install), and builds each module
 only for the wheels plugged in that need it: `status` reports the driver as not installed while
 such a wheel is plugged in and its module is missing, so adding the wheel installs it. A module
-installed by other means is kept. The TrueForce driver also claims the G923; SimRig does not
+installed by other means is kept. The Xbox editions of the G923 (`c26d`) and RS50 (`c275`) start
+in a console mode with no HID interface: a udev rule of the driver switches them to their PC mode
+(`c26e`, `c276`) at every plug-in, with the vendor's mode-switch message sent by `usb_modeswitch`
+through `systemd-run`, never from the udev worker itself, whose device lock held during the USB
+transfer has stalled the USB stack of some machines; the adapter claims them in console mode
+without components, and `status` asks for `usb-modeswitch` while one waits. The TrueForce driver
+also claims the G923; SimRig does not
 build it for a G923, which keeps the kernel's driver (or new-lg4ff). Settings are saved for the
 next plug-in by the `save-setting` privileged operation, as udev rules that write the attribute
 when the driver binds to that model (`72-simrig-logitech-settings.rules`).

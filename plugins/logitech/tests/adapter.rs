@@ -242,6 +242,28 @@ fn a_wingman_formula_force_on_iforce() {
 }
 
 #[test]
+fn an_xbox_edition_in_console_mode_has_no_components_yet() {
+    let env = env("xbox-console");
+    env.plug(
+        "1-9",
+        0x046d,
+        0xc26d,
+        "Logitech G923 for Xbox",
+        "1-9:1.0",
+        Some("xpad"),
+    );
+    let mut host = env.start();
+    until(&mut host, "the device", |h| {
+        h.usb_devices()
+            .iter()
+            .any(|(_, owner)| owner.as_deref() == Some("logitech"))
+    });
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    host.poll();
+    assert!(host.components().is_empty());
+}
+
+#[test]
 fn a_g_pro_on_the_truforce_driver() {
     let env = env("gpro");
     let hid = env.plug(

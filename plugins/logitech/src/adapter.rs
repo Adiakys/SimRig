@@ -58,6 +58,10 @@ impl LogitechAdapter {
     }
 
     fn components(device: &Shared) -> Vec<AnyComponent> {
+        // An Xbox edition in its console mode comes back in its PC mode, with its own id.
+        if device.borrow().model.console {
+            return Vec::new();
+        }
         let mut list = vec![
             AnyComponent::WheelBase(Box::new(Base {
                 device: device.clone(),
@@ -116,6 +120,8 @@ impl Adapter for LogitechAdapter {
     fn device_procedures(&mut self, device_id: &str) -> Vec<ProcedureDescriptor> {
         self.devices
             .get(device_id)
+            // Nothing to set up on a wheel in its console mode: it comes back as another.
+            .filter(|(device, _)| !device.borrow().model.console)
             .map(|(device, _)| vec![pedals::descriptor(device)])
             .unwrap_or_default()
     }

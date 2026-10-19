@@ -53,6 +53,9 @@ pub struct Model {
     pub max_range: u32,
     /// Where its pedals are, when known.
     pub pedals: Option<Layout>,
+    /// An Xbox edition in its console mode: no driver can use it until the driver's udev rule
+    /// switches it to its PC mode, where it comes back with another id.
+    pub console: bool,
 }
 
 pub const VENDOR: u16 = 0x046d;
@@ -72,6 +75,7 @@ const fn wheel(
         family,
         max_range,
         pedals,
+        console: false,
     }
 }
 
@@ -200,14 +204,18 @@ pub const MODELS: &[Model] = &[
         900,
         Some(Y_Z_RZ),
     ),
-    wheel(
-        0xc26d,
-        "G923 Racing Wheel (Xbox)",
-        "logitech/g923-xbox",
-        Hidpp,
-        900,
-        Some(Y_Z_RZ),
-    ),
+    // Becomes c26e.
+    Model {
+        console: true,
+        ..wheel(
+            0xc26d,
+            "G923 Racing Wheel (Xbox)",
+            "logitech/g923-xbox",
+            Hidpp,
+            900,
+            Some(Y_Z_RZ),
+        )
+    },
     wheel(
         0xc26e,
         "G923 Racing Wheel (Xbox)",
@@ -232,6 +240,18 @@ pub const MODELS: &[Model] = &[
         1080,
         Some(RX_RY_RZ),
     ),
+    // The Xbox edition, in its console mode: becomes c276.
+    Model {
+        console: true,
+        ..wheel(
+            0xc275,
+            "RS50 Direct Drive Wheel Base (Xbox)",
+            "logitech/rs50",
+            DirectDrive,
+            2700,
+            None,
+        )
+    },
     // Not in Oversteer's tables: its pedals are mapped when it is added.
     wheel(
         0xc276,

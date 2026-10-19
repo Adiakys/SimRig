@@ -1,0 +1,33 @@
+#!/bin/sh
+# Switches the Xbox editions of the G923 (046d:c26d) and the RS50 (046d:c275) to their PC mode
+# (c26e, c276). They start in a console mode with no HID interface, so no driver can use them,
+# and forget the switch when unplugged: SimRig's udev rule runs this, through systemd-run, at
+# every plug-in. The message is the vendor's own mode switch, the one the G920 has long used
+# (c261 to c262), applied to these wheels by usb_modeswitch users, Batocera and the TrueForce
+# driver project.
+#
+# Never from a udev RUN+= directly: the USB transfer would hold the udev worker's device lock,
+# which has stalled the USB stack of some machines.
+set -eu
+SYS="${SIMRIG_TEST_ROOT:-}/sys/bus/usb"
+VID=046d
+CONSOLE="c26d c275"
+MESSAGE=0f00010142
+
+command -v usb_modeswitch >/dev/null 2>&1 || {
+    echo "usb_modeswitch is not installed: the wheel stays in its console mode" >&2
+    exit 1
+}
+for dev in "$SYS"/devices/*; do
+    [ "$(cat "$dev/idVendor" 2>/dev/null)" = "$VID" ] || continue
+    pid=$(cat "$dev/idProduct" 2>/dev/null) || continue
+    case " $CONSOLE " in *" $pid "*) ;; *) continue ;; esac
+    # The console-mode driver (xpad, xbox-gip) must let go of the interfaces first.
+    for iface in "$dev"/*:*; do
+        [ -L "$iface/driver" ] || continue
+        driver=$(basename "$(readlink "$iface/driver")")
+        echo "$(basename "$iface")" > "$SYS/drivers/$driver/unbind" 2>/dev/null || true
+    done
+    echo "switching $VID:$pid to PC mode"
+    usb_modeswitch -v "$VID" -p "$pid" -M "$MESSAGE" -C 0x03 -m 01 -r 81
+done

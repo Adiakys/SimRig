@@ -33,6 +33,13 @@ if missing "$TF_PACKAGE" "$TF_MODULE" "$TF_VERSION" yes $TF_WHEELS; then
     needs="${needs:+$needs and }the TrueForce driver (force feedback on the G PRO and RS50)"
 fi
 
+# An Xbox edition still in its console mode: its switch needs usb_modeswitch.
+if rules_installed && usb_present 046d $XBOX_WHEELS && ! command -v usb_modeswitch >/dev/null 2>&1; then
+    status_json true true "$version" false false true \
+        "The Xbox edition plugged in starts in a console mode: install usb-modeswitch (your distribution's package), then plug it in again."
+    exit 0
+fi
+
 if ! rules_installed; then
     status_json false false "" false false true \
         "Adds access to the wheels' settings${needs:+ and builds $needs}. Asks for the password once."

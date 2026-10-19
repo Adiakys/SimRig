@@ -25,6 +25,7 @@ and offered upstream.
 | What | Where | From | License |
 |---|---|---|---|
 | The Moza serial protocol: frame format, checksum, command table and value scales | `plugins/moza/src/protocol.rs`, `plugins/moza/src/settings.rs` | [Boxflat](https://github.com/Lawstorant/boxflat) by Tomasz Pakuła (`moza-protocol.md`, `data/serial.yml`, the base panel) | GPL-3.0, like SimRig |
+| The mode switch of the G923 and RS50 Xbox editions: the message and the `usb_modeswitch` options, run off the udev worker | `plugins/logitech/driver/hooks/xbox-to-pc`, `plugins/logitech/driver/hooks/common.sh` | The G920's long-standing switch, as applied to these wheels by [Batocera](https://github.com/batocera-linux/batocera.linux) and the [TrueForce driver](https://github.com/mescon/logitech-trueforce-linux-driver) (`tools/xbox-modeswitch.sh`, `udev/73-logitech-xbox-modeswitch.rules`) | rewritten for SimRig, GPL-3.0-or-later |
 | The PXN VD control protocol: reports, commands and the base settings block | `plugins/pxn/src/protocol.rs`, `plugins/pxn/src/settings.rs` | [Pitwall](https://github.com/unionyxx/pitwall) by unionyxx (`pitwall/protocol.py`, the base page) | GPL-3.0-or-later, like SimRig |
 
 ## Fonts
