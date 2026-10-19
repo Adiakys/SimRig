@@ -27,6 +27,31 @@ pub fn unit(unit: Option<Unit>) -> String {
 }
 
 /// A live input as text, with the unit to draw next to it.
+/// Hat switches' directions, in words.
+pub fn hats(directions: &[i64]) -> String {
+    const WAYS: [&str; 8] = [
+        "up",
+        "up-right",
+        "right",
+        "down-right",
+        "down",
+        "down-left",
+        "left",
+        "up-left",
+    ];
+    directions
+        .iter()
+        .map(|d| {
+            usize::try_from(*d)
+                .ok()
+                .and_then(|d| WAYS.get(d))
+                .copied()
+                .unwrap_or("at rest")
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 pub fn input(value: &Value, unit_of: Option<Unit>) -> (String, String) {
     match value {
         Value::Float(v) => {

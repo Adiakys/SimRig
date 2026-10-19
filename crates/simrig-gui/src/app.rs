@@ -40,6 +40,7 @@ pub struct App {
     raster: Option<crate::raster::Raster>,
     snapshot_count: usize,
     pub updates: crate::update::Updates,
+    pub inputs: crate::inputs::InputsState,
 }
 
 pub struct Models {
@@ -155,6 +156,7 @@ impl App {
             raster: raster.then(Default::default),
             snapshot_count: 0,
             updates: Default::default(),
+            inputs: Default::default(),
         }
         .published()
     }
@@ -219,6 +221,7 @@ impl App {
                     this.live.entry(address.clone()).or_default().extend(values);
                     moved.push(address);
                 }
+                this.track_presses(&moved);
                 this.update_cards(|d| moved.iter().any(|m| same_device(m, d)));
                 this.refresh_live();
             }
@@ -427,6 +430,11 @@ impl App {
                     }
                 }
                 if d.kind == ComponentKind::SteeringWheel {
+                    if let Some((what, label)) = self.recent_press(&c.address) {
+                        device.pressed_show = true;
+                        device.pressed = what.into();
+                        device.pressed_label = label.into();
+                    }
                     let pivot = self.geometry.steering_wheel.pivot;
                     if let Some(raster) = &mut self.raster {
                         device.frame =

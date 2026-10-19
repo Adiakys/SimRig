@@ -7,6 +7,7 @@ mod component;
 mod devices;
 mod flows;
 mod format;
+mod inputs;
 mod procedure;
 mod raster;
 mod settings;
@@ -169,6 +170,7 @@ fn run(cli: Cli) -> Result<()> {
         window.hide()?;
     } else {
         app.borrow_mut().start_update_checks();
+        app.borrow_mut().start_inputs_ticker();
         window.run()?;
     }
 
@@ -217,6 +219,8 @@ mod callbacks {
         });
         let a = app.clone();
         api.on_toggle_advanced(move |_| a.borrow_mut().toggle_advanced());
+        let a = app.clone();
+        api.on_show_inputs(move |on| a.borrow_mut().show_inputs(on));
         let a = app.clone();
         api.on_run_action(move |item| a.borrow_mut().run_component_action(&item));
         let a = app.clone();
@@ -317,6 +321,11 @@ mod callbacks {
         if screen == "component" && arg.contains("+advanced") {
             a.open_component(arg.trim_end_matches("+advanced"));
             a.toggle_advanced();
+            return;
+        }
+        if screen == "component" && arg.contains("+inputs") {
+            a.open_component(arg.trim_end_matches("+inputs"));
+            a.show_inputs(true);
             return;
         }
         match screen {

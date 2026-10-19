@@ -154,6 +154,7 @@ mod tests {
             custom: vec![],
             procedures: vec![],
             appearance: Default::default(),
+            controls: vec![],
         }
     }
 

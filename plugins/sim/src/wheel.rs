@@ -82,13 +82,53 @@ impl Component for SimWheel {
     fn save(&mut self, item: &str, value: &Value, host: &mut HostLink<'_>) -> Result<()> {
         self.shared.save(&self.id(), item, value, host)
     }
+
+    /// Like a real rim's: buttons named where a plugin would know them, encoders that step
+    /// with a pair of buttons, a hat switch, and on the formula rim two analog paddles.
+    fn controls(&mut self) -> Vec<Control> {
+        const NAMES: [&str; 6] = ["Shift down", "Shift up", "Radio", "Flash", "Pit", "Neutral"];
+        let count = self.buttons_count();
+        let mut controls: Vec<Control> = (0..count)
+            .map(|i| {
+                let c = Control::new(ControlKind::Button, i as u32 + 1, "buttons", i)
+                    .code(format!("BTN_TRIGGER_HAPPY{}", i + 1));
+                match NAMES.get(i) {
+                    Some(name) => c.label(*name),
+                    None => c,
+                }
+            })
+            .collect();
+        controls.push(Control::new(ControlKind::Hat, 1, "hats", 0).code("ABS_HAT0X/ABS_HAT0Y"));
+        for i in 0..2 {
+            let mut encoder = Control::new(ControlKind::Encoder, i + 1, "encoders", i as usize)
+                .label(format!("Encoder {}", i + 1));
+            encoder.buttons = vec![count as u32 - 3 + 2 * i, count as u32 - 2 + 2 * i];
+            controls.push(encoder);
+        }
+        if !self.gt {
+            for (i, name) in ["Left clutch paddle", "Right clutch paddle"]
+                .iter()
+                .enumerate()
+            {
+                controls.push(
+                    Control::new(ControlKind::Axis, i as u32 + 4, "analog_paddles", i)
+                        .code(if i == 0 { "ABS_RX" } else { "ABS_RY" })
+                        .label(*name)
+                        .bits(12),
+                );
+            }
+        }
+        controls
+    }
 }
 
 impl SteeringWheel for SimWheel {
     fn buttons(&mut self) -> Support<Vec<bool>> {
+        // One button at a time, briefly, every second and a half.
         let count = self.buttons_count();
-        let pressed = (self.shared.get().t() * 8.0) as usize % count;
-        Support::Supported((0..count).map(|i| i == pressed).collect())
+        let beat = self.shared.get().t() / 1.5;
+        let pressed = (beat.fract() < 0.15).then_some(beat as usize * 7 % count);
+        Support::Supported((0..count).map(|i| Some(i) == pressed).collect())
     }
 
     fn encoders(&mut self) -> Support<Vec<i64>> {
@@ -107,6 +147,16 @@ impl SteeringWheel for SimWheel {
         }
         let s = self.shared.get();
         Support::Supported(vec![s.unit_wave(0.0), s.unit_wave(0.5)])
+    }
+
+    fn hats(&mut self) -> Support<Vec<i64>> {
+        // A push every few seconds, round the eight directions.
+        let beat = self.shared.get().t() / 3.0;
+        Support::Supported(vec![if beat.fract() < 0.1 {
+            beat as i64 % 8
+        } else {
+            -1
+        }])
     }
 
     fn rim_id(&mut self) -> Support<String> {

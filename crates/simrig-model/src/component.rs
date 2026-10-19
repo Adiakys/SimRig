@@ -270,6 +270,7 @@ std_items! {
         Encoders => "encoders", "Encoders", Ints, None;
         ShiftPaddles => "shift_paddles", "Shift paddles", Buttons, None;
         AnalogPaddles => "analog_paddles", "Analog paddles", Floats, None;
+        Hats => "hats", "Hat switches", Ints, None;
         RimId => "rim_id", "Rim", Text, None;
     }
 }

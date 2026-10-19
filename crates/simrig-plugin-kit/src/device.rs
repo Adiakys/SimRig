@@ -6,9 +6,10 @@ use std::path::PathBuf;
 
 use simrig_plugin_sdk::prelude::*;
 
-use crate::input::{FfControl, Inputs};
+use crate::input::{self, FfControl, Inputs};
 use crate::pedals::{self, Layout, PedalMap};
 use crate::sysfs;
+use simrig_plugin_sdk::model::{Control, ControlKind};
 
 /// Which HID devices below the USB device belong to the driver.
 #[derive(Clone, Copy, Debug)]
@@ -225,6 +226,83 @@ impl HidDevice {
             .map_err(|e| Error::failed(e.to_string()))?;
         self.ff_levels.insert(control, percent);
         Ok(())
+    }
+
+    /// The hat switches' directions, as a steering wheel's.
+    pub fn hats(&self) -> Support<Vec<i64>> {
+        let hats = self.inputs.hats();
+        if hats.is_empty() {
+            return Support::not_in_driver();
+        }
+        Support::Supported(hats.into_iter().map(|(_, d)| d).collect())
+    }
+
+    /// Analog paddles on these axes, each 0..1 over its travel.
+    pub fn analog_paddles(&self, codes: &[u16]) -> Support<Vec<f64>> {
+        let axes = self.inputs.axes();
+        let values: Option<Vec<f64>> = codes
+            .iter()
+            .map(|c| axes.get(c).map(|a| a.unit()))
+            .collect();
+        match values {
+            Some(v) if !v.is_empty() => Support::Supported(v),
+            _ => Support::not_in_driver(),
+        }
+    }
+
+    /// The device's buttons and hat switches, and the analog paddles on `paddles` (axis code,
+    /// name), numbered as games number them; `labels` names buttons by their code.
+    pub fn controls(&self, paddles: &[(u16, &str)], labels: &[(u16, &str)]) -> Vec<Control> {
+        let mut controls: Vec<Control> = self
+            .inputs
+            .buttons()
+            .into_iter()
+            .enumerate()
+            .map(|(i, (code, _))| {
+                let c = Control::new(ControlKind::Button, i as u32 + 1, "buttons", i)
+                    .code(input::key_name(code));
+                match labels.iter().find(|(l, _)| *l == code) {
+                    Some((_, label)) => c.label(*label),
+                    None => c,
+                }
+            })
+            .collect();
+        controls.extend(
+            self.inputs
+                .hats()
+                .into_iter()
+                .enumerate()
+                .map(|(i, (x, _))| {
+                    Control::new(ControlKind::Hat, i as u32 + 1, "hats", i).code(format!(
+                        "{}/{}",
+                        input::axis_name(x),
+                        input::axis_name(x + 1)
+                    ))
+                }),
+        );
+        // Games number axes in code order, hats apart.
+        let axes = self.inputs.axes();
+        let numbered: Vec<u16> = axes
+            .keys()
+            .copied()
+            .filter(|c| !input::is_hat(*c))
+            .collect();
+        for (i, (code, name)) in paddles.iter().enumerate() {
+            let (Some(number), Some(axis)) =
+                (numbered.iter().position(|c| c == code), axes.get(code))
+            else {
+                continue;
+            };
+            let span = (i64::from(axis.max) - i64::from(axis.min)).max(1) as u64 + 1;
+            let bits = (64 - (span - 1).leading_zeros()) as u8;
+            controls.push(
+                Control::new(ControlKind::Axis, number as u32 + 1, "analog_paddles", i)
+                    .code(input::axis_name(*code))
+                    .label(*name)
+                    .bits(bits),
+            );
+        }
+        controls
     }
 
     pub fn save_map(&mut self, map: PedalMap) -> std::io::Result<()> {

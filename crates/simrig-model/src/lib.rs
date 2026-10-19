@@ -21,8 +21,8 @@ pub use component::{
 };
 pub use custom::{Condition, CustomParam};
 pub use describe::{
-    ActionOutcome, ActionSpec, Appearance, ComponentDescription, ItemDescription, ItemSpec,
-    RimShape,
+    ActionOutcome, ActionSpec, Appearance, ComponentDescription, Control, ControlKind,
+    ItemDescription, ItemSpec, RimShape,
 };
 pub use device::{Bus, DeviceInfo};
 pub use param::{ChoiceOption, ParamSpec, ParamType, Persistence, ValueError};

@@ -1,0 +1,243 @@
+// The Inputs view of a steering wheel: what the rim sends, as games number it, live.
+
+import { Theme } from "theme.slint";
+import { InputsView, InputButton, InputHat, InputEncoder, InputAxis } from "api.slint";
+import { Eyebrow, Heading, Small, LiveValue, Hairline, Notice } from "widgets.slint";
+
+component Mono inherits Text {
+    font-family: Theme.mono;
+    font-size: 15px;
+    font-weight: 500;
+    color: Theme.ink;
+    vertical-alignment: center;
+}
+
+component Count inherits VerticalLayout {
+    in property <string> label;
+    in property <int> value;
+    spacing: 6px;
+    Eyebrow { text: root.label; }
+    LiveValue { value: root.value; size: "m"; }
+}
+
+component SectionTitle inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> note;
+    padding-top: 22px;
+    padding-bottom: 6px;
+    spacing: 10px;
+    alignment: start;
+    Heading { text: root.title; vertical-alignment: bottom; }
+    Small { text: root.note; vertical-alignment: bottom; color: Theme.ink3; }
+}
+
+/// One button: its number as games read it, its name, lit while pressed. Pressed is also told
+/// by the dot, not by colour alone.
+component ButtonTile inherits Rectangle {
+    in property <InputButton> button;
+    border-radius: 6px;
+    background: button.pressed ? Theme.accent : Theme.raised;
+    border-width: 1px;
+    border-color: button.pressed ? Theme.accent-edge : button.held != "" ? Theme.warning : button.last ? Theme.ink2 : transparent;
+    animate background { duration: 120ms; easing: cubic-bezier(0.25, 1, 0.5, 1); }
+    accessible-role: AccessibleRole.text;
+    accessible-label: @tr("Button {}", button.number) + (button.label != "" ? ", " + button.label : "") + (button.pressed ? ", " + @tr("pressed") : "");
+    VerticalLayout {
+        alignment: center;
+        spacing: 3px;
+        Text {
+            text: root.button.number;
+            font-family: Theme.mono;
+            font-size: 15px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            color: root.button.pressed ? Theme.on-accent : Theme.ink;
+        }
+        if root.button.label != "": Text {
+            text: root.button.label;
+            font-family: Theme.sans;
+            font-size: 11px;
+            font-weight: 500;
+            horizontal-alignment: center;
+            overflow: elide;
+            color: root.button.pressed ? Theme.on-accent : Theme.ink3;
+        }
+    }
+    if root.button.pressed: Rectangle {
+        x: parent.width - 12px;
+        y: 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: Theme.on-accent;
+    }
+}
+
+/// The buttons in rows, as many to a row as fit.
+component ButtonGrid inherits Rectangle {
+    in property <[InputButton]> buttons;
+    property <length> gap: 6px;
+    property <length> tile-height: 54px;
+    property <int> columns: max(4, floor((self.width + gap) / (64px + gap)));
+    property <length> tile-width: (self.width - (columns - 1) * gap) / columns;
+    // A held button's time sits under it.
+    property <length> row-height: tile-height + gap + 14px;
+    height: ceil(buttons.length / columns) * row-height;
+    for b[i] in root.buttons: VerticalLayout {
+        x: mod(i, root.columns) * (root.tile-width + root.gap);
+        y: floor(i / root.columns) * root.row-height;
+        width: root.tile-width;
+        spacing: 2px;
+        ButtonTile {
+            height: root.tile-height;
+            button: b;
+        }
+        Text {
+            height: 12px;
+            text: b.held;
+            font-family: Theme.mono;
+            font-size: 11px;
+            color: Theme.warning;
+        }
+    }
+}
+
+/// A hat switch: four arms, lit towards where it is pushed (diagonals light two).
+component Hat inherits Rectangle {
+    in property <int> direction;
+    property <length> arm: 26px;
+    property <length> mid: (self.width - arm) / 2;
+    width: 96px;
+    height: 96px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: direction < 0 ? @tr("Hat at rest") : @tr("Hat pushed");
+    Rectangle { x: mid; y: 2px; width: arm; height: arm; border-radius: 5px; background: (direction == 7 || direction == 0 || direction == 1) ? Theme.accent : Theme.raised; }
+    Rectangle { x: parent.width - arm - 2px; y: mid; width: arm; height: arm; border-radius: 5px; background: (direction >= 1 && direction <= 3) ? Theme.accent : Theme.raised; }
+    Rectangle { x: mid; y: parent.height - arm - 2px; width: arm; height: arm; border-radius: 5px; background: (direction >= 3 && direction <= 5) ? Theme.accent : Theme.raised; }
+    Rectangle { x: 2px; y: mid; width: arm; height: arm; border-radius: 5px; background: (direction >= 5 && direction <= 7) ? Theme.accent : Theme.raised; }
+    Rectangle { x: mid; y: mid; width: arm; height: arm; border-radius: arm / 2; background: Theme.track; }
+}
+
+component EncoderRow inherits VerticalLayout {
+    in property <InputEncoder> encoder;
+    Hairline { }
+    HorizontalLayout {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 16px;
+        Text { text: root.encoder.label; font-family: Theme.sans; font-size: 16px; font-weight: 500; color: Theme.ink; width: 120px; vertical-alignment: center; }
+        Mono { text: (root.encoder.steps > 0 ? "+" : "") + root.encoder.steps; width: 56px; horizontal-alignment: right; }
+        Small { text: root.encoder.buttons == "" ? @tr("steps") : @tr("steps · {}", root.encoder.buttons); vertical-alignment: center; }
+    }
+}
+
+component AxisRow inherits VerticalLayout {
+    in property <InputAxis> axis;
+    Hairline { }
+    HorizontalLayout {
+        padding-top: 11px;
+        padding-bottom: 11px;
+        spacing: 16px;
+        Mono { text: @tr("Axis {}", root.axis.number); font-size: 14px; color: Theme.ink2; width: 72px; }
+        VerticalLayout {
+            width: 220px;
+            spacing: 2px;
+            Text { text: root.axis.label; font-family: Theme.sans; font-size: 16px; font-weight: 500; color: Theme.ink; }
+            Text { text: root.axis.code; font-family: Theme.mono; font-size: 12px; color: Theme.ink3; }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 8px;
+                border-radius: 4px;
+                background: Theme.track;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * clamp(root.axis.value, 0, 1);
+                    height: parent.height;
+                    border-radius: 4px;
+                    background: Theme.ink;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            width: 92px;
+            LiveValue { value: round(root.axis.value * 100); unit: "%"; size: "m"; align: right; }
+        }
+    }
+}
+
+export component InputsPanel inherits VerticalLayout {
+    in property <InputsView> view;
+    spacing: 0;
+
+    // What the rim has, at a glance.
+    HorizontalLayout {
+        padding-top: 18px;
+        padding-bottom: 16px;
+        spacing: 36px;
+        alignment: start;
+        if root.view.buttons.length > 0: Count { label: @tr("BUTTONS"); value: root.view.buttons.length; }
+        if root.view.encoders.length > 0: Count { label: @tr("ENCODERS"); value: root.view.encoders.length; }
+        if root.view.hats.length > 0: Count { label: @tr("HAT"); value: root.view.hats.length; }
+        if root.view.axes.length > 0: Count { label: @tr("ANALOG PADDLES"); value: root.view.axes.length; }
+    }
+    Small { text: @tr("What the rim sends. Steering and pedals are on their own screens."); color: Theme.ink3; }
+    Rectangle { height: 14px; }
+
+    // The control used last: press one to find it.
+    Rectangle {
+        height: 54px;
+        border-radius: 10px;
+        background: Theme.raised;
+        HorizontalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 16px;
+            Eyebrow { text: @tr("LAST INPUT"); vertical-alignment: center; }
+            if root.view.last-what == "": Small { text: @tr("Press a button or turn an encoder to find it here."); vertical-alignment: center; }
+            if root.view.last-what != "": Text {
+                text: root.view.last-what;
+                font-family: Theme.mono;
+                font-size: 20px;
+                font-weight: 600;
+                color: Theme.ink;
+                vertical-alignment: center;
+            }
+            if root.view.last-label != "": Text { text: root.view.last-label; font-family: Theme.sans; font-size: 16px; font-weight: 500; color: Theme.ink; vertical-alignment: center; }
+            Text { text: root.view.last-code; font-family: Theme.mono; font-size: 13px; color: Theme.ink3; vertical-alignment: center; horizontal-stretch: 1; }
+        }
+    }
+
+    if root.view.buttons.length > 0: VerticalLayout {
+        SectionTitle { title: @tr("Buttons"); note: @tr("numbered as games read them, named where the plugin knows the rim"); }
+        ButtonGrid { buttons: root.view.buttons; }
+        if root.view.stuck != "": Notice { text: root.view.stuck; level: "warning"; }
+    }
+
+    if root.view.hats.length > 0 || root.view.encoders.length > 0: VerticalLayout {
+        SectionTitle { title: root.view.encoders.length > 0 ? @tr("Hat and encoders") : @tr("Hat switch"); }
+        HorizontalLayout {
+            spacing: 40px;
+            padding-top: 6px;
+            for h in root.view.hats: Hat { direction: h.direction; }
+            if root.view.encoders.length > 0: VerticalLayout {
+                horizontal-stretch: 1;
+                for e in root.view.encoders: EncoderRow { encoder: e; }
+            }
+        }
+    }
+
+    if root.view.axes.length > 0: VerticalLayout {
+        SectionTitle { title: @tr("Analog paddles"); note: @tr("axes, as games number them"); }
+        for a in root.view.axes: AxisRow { axis: a; }
+    }
+
+    Small {
+        text: @tr("Numbers as games read them through Proton (SDL), from 1. Some games count from 0.");
+        color: Theme.ink3;
+        font-size: 13px;
+    }
+}

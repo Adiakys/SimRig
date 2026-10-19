@@ -17,6 +17,47 @@ use evdev::{
 };
 
 pub const FAKE_INPUT: &str = "simrig-fake-input";
+
+/// Where SDL, through which Proton gives games their controllers, starts numbering buttons:
+/// codes from `BTN_JOYSTICK` up come first, then the ones below.
+const BTN_JOYSTICK: u16 = 0x120;
+/// The hat switches' axes: `ABS_HAT0X` to `ABS_HAT3Y`, in x/y pairs.
+const ABS_HAT0X: u16 = 0x10;
+const ABS_HAT3Y: u16 = 0x17;
+
+/// Buttons in the order games number them.
+pub fn game_order(keys: &mut [(u16, bool)]) {
+    keys.sort_by_key(|(code, _)| (*code < BTN_JOYSTICK, *code));
+}
+
+pub fn is_hat(code: u16) -> bool {
+    (ABS_HAT0X..=ABS_HAT3Y).contains(&code)
+}
+
+/// The kernel's name of a button code, e.g. `BTN_THUMB`.
+pub fn key_name(code: u16) -> String {
+    format!("{:?}", evdev::KeyCode::new(code))
+}
+
+/// The kernel's name of an axis code, e.g. `ABS_RX`.
+pub fn axis_name(code: u16) -> String {
+    format!("{:?}", evdev::AbsoluteAxisCode(code))
+}
+
+/// A hat switch's direction from its x and y: -1 at rest, else 0 (up) to 7, clockwise.
+pub fn hat_direction(x: i32, y: i32) -> i64 {
+    match (x.signum(), y.signum()) {
+        (0, -1) => 0,
+        (1, -1) => 1,
+        (1, 0) => 2,
+        (1, 1) => 3,
+        (0, 1) => 4,
+        (-1, 1) => 5,
+        (-1, 0) => 6,
+        (-1, -1) => 7,
+        _ => -1,
+    }
+}
 pub const FAKE_FF: &str = "simrig-fake-ff";
 
 /// The device-wide force feedback controls of the kernel's input interface, which most force
@@ -141,8 +182,28 @@ impl Inputs {
         }
     }
 
-    /// Every button the device has, in code order, with whether it is pressed.
+    /// Every button the device has, in the order games number them, with whether it is
+    /// pressed.
     pub fn buttons(&self) -> Vec<(u16, bool)> {
+        let mut keys = self.keys();
+        game_order(&mut keys);
+        keys
+    }
+
+    /// The hat switches: their x axis code and direction (see [`hat_direction`]).
+    pub fn hats(&self) -> Vec<(u16, i64)> {
+        let axes = self.axes();
+        (ABS_HAT0X..=ABS_HAT3Y)
+            .step_by(2)
+            .filter(|x| axes.contains_key(x) || axes.contains_key(&(x + 1)))
+            .map(|x| {
+                let value = |code| axes.get(&code).map(|a| a.value).unwrap_or(0);
+                (x, hat_direction(value(x), value(x + 1)))
+            })
+            .collect()
+    }
+
+    fn keys(&self) -> Vec<(u16, bool)> {
         match self {
             Inputs::Device { device, .. } => {
                 let Some(keys) = device.supported_keys() else {
@@ -271,6 +332,30 @@ fn words(line: &[String]) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buttons_in_the_order_games_number_them() {
+        // SDL: BTN_JOYSTICK (0x120) and up first, then the codes below (BTN_MISC range).
+        let mut keys = vec![
+            (0x100, false),
+            (0x2c0, false),
+            (0x121, true),
+            (0x120, false),
+        ];
+        game_order(&mut keys);
+        let codes: Vec<u16> = keys.iter().map(|(c, _)| *c).collect();
+        assert_eq!(codes, [0x120, 0x121, 0x2c0, 0x100]);
+        assert_eq!(key_name(0x121), "BTN_THUMB");
+        assert_eq!(axis_name(0x03), "ABS_RX");
+    }
+
+    #[test]
+    fn hat_directions() {
+        assert_eq!(hat_direction(0, 0), -1);
+        assert_eq!(hat_direction(0, -1), 0);
+        assert_eq!(hat_direction(1, 0), 2);
+        assert_eq!(hat_direction(-1, -1), 7);
+    }
 
     #[test]
     fn unit_positions() {

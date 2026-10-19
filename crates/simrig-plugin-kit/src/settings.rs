@@ -217,6 +217,7 @@ mod tests {
     use super::*;
     use crate::device::Binding;
     use crate::input::{FAKE_FF, FAKE_INPUT};
+    use simrig_plugin_sdk::model::ControlKind;
 
     const BINDING: Binding = Binding {
         vendor: "046D",
@@ -339,6 +340,48 @@ mod tests {
             fs::read_to_string(hid.join("combine_pedals")).unwrap(),
             "1\n"
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn controls_as_games_number_them() {
+        let (root, _) = plug(
+            "controls",
+            "1-2:1.0/0003:046D:C24F.0001",
+            "logitech",
+            "abs 0 0 0 65535\nabs 3 128 0 255\nabs 16 1 -1 1\nabs 17 0 -1 1\n\
+             key 256 1\nkey 288 0\nkey 289 0\n",
+        );
+        let d = device(&root);
+        let controls = d.controls(&[(3, "Left paddle")], &[(289, "Shift up")]);
+        let summary: Vec<(ControlKind, u32, Option<&str>, &str, usize)> = controls
+            .iter()
+            .map(|c| {
+                (
+                    c.kind,
+                    c.number,
+                    c.code.as_deref(),
+                    c.item.as_str(),
+                    c.index,
+                )
+            })
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                (ControlKind::Button, 1, Some("BTN_TRIGGER"), "buttons", 0),
+                (ControlKind::Button, 2, Some("BTN_THUMB"), "buttons", 1),
+                (ControlKind::Button, 3, Some("BTN_0"), "buttons", 2),
+                (ControlKind::Hat, 1, Some("ABS_HAT0X/ABS_HAT0Y"), "hats", 0),
+                // ABS_X is axis 1, ABS_RX axis 2 (hats are not counted).
+                (ControlKind::Axis, 2, Some("ABS_RX"), "analog_paddles", 0),
+            ]
+        );
+        assert_eq!(controls[1].label.as_deref(), Some("Shift up"));
+        assert_eq!(controls[4].bits, Some(8));
+        // Buttons in the same order; the hat to the right.
+        assert_eq!(d.buttons().supported(), Some(vec![false, false, true]));
+        assert_eq!(d.hats().supported(), Some(vec![2]));
         fs::remove_dir_all(root).unwrap();
     }
 

@@ -109,6 +109,41 @@ component DeviceCard inherits Card {
                 if root.device.rotation > 0: Small {
                     text: @tr("of {}° rotation", round(root.device.rotation));
                 }
+                // The control used a moment ago: press a button to see which it is.
+                Rectangle {
+                    height: 30px;
+                    HorizontalLayout {
+                        alignment: start;
+                        Rectangle {
+                            height: 30px;
+                            max-width: 168px;
+                            border-radius: 15px;
+                            background: Theme.raised;
+                            border-width: 1px;
+                            border-color: Theme.rule;
+                            opacity: root.device.pressed-show ? 1 : 0;
+                            animate opacity { duration: 200ms; easing: cubic-bezier(0.25, 1, 0.5, 1); }
+                            accessible-role: AccessibleRole.text;
+                            accessible-label: root.device.pressed-show ? root.device.pressed + " " + root.device.pressed-label : "";
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 8px;
+                                Rectangle {
+                                    width: 8px;
+                                    height: 8px;
+                                    y: (parent.height - 8px) / 2;
+                                    border-radius: 4px;
+                                    background: Theme.accent;
+                                    border-width: 1px;
+                                    border-color: Theme.accent-edge;
+                                }
+                                Text { text: root.device.pressed; font-family: Theme.mono; font-size: 14px; font-weight: 600; color: Theme.ink; vertical-alignment: center; }
+                                if root.device.pressed-label != "": Text { text: root.device.pressed-label; font-family: Theme.sans; font-size: 13px; color: Theme.ink2; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; min-width: 0; }
+                            }
+                        }
+                    }
+                }
             }
         }
 

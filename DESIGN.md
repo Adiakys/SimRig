@@ -315,6 +315,18 @@ lever turns on its pivot. Only the pedals the component declares are drawn. Next
 sits one **Live Value** (Label caption, Value L or XL) and at most two secondary values. A device
 whose plugin provides its own images uses them with the same animation rules.
 
+### Inputs view
+A steering wheel's screen has two views, **Settings** and **Inputs**, picked with a segmented
+control at the top of the right column, so the rim's controls never mix with its settings. The
+Inputs view shows only what the rim sends (steering and pedals have their own screens): a line
+of counts (Label caption, Value M), the **last input** in a Raised band (its number in Value M
+mono, its name, its kernel code in Ink 3), then the buttons as a grid of numbered tiles (Chrome
+Yellow with a dot while pressed, a 1 px Ink 2 outline on the last one, a Pit Orange outline and
+"held 41 s" under a button held over 30 s, with a warning notice), the hat switch as four arms,
+the encoders with their steps, and the analog paddles as bars. Numbers are the ones games read.
+On the home, the control just used shows for 1.5 s under the steering value as a pill (a Chrome
+dot, its number, its name), fading in and out in 200 ms.
+
 ## 6. Do's and Don'ts
 
 ### Do:

@@ -274,6 +274,10 @@ pub struct Wheel {
 }
 
 impl Component for Wheel {
+    fn controls(&mut self) -> Vec<Control> {
+        self.device.borrow().hid.controls(&[], &[])
+    }
+
     fn id(&self) -> String {
         format!("{}/wheel", self.device.borrow().hid.id)
     }
@@ -296,6 +300,10 @@ impl Component for Wheel {
 }
 
 impl SteeringWheel for Wheel {
+    fn hats(&mut self) -> Support<Vec<i64>> {
+        self.device.borrow().hid.hats()
+    }
+
     fn buttons(&mut self) -> Support<Vec<bool>> {
         self.device.borrow().hid.buttons()
     }

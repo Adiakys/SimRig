@@ -55,6 +55,52 @@ export struct SettingRow {
     count: int,
 }
 
+/// A steering wheel's controls, live, as games number them.
+export struct InputButton {
+    number: int,
+    label: string,
+    pressed: bool,
+    /// The control used last, when it is not pressed now.
+    last: bool,
+    /// "held 41 s", for a button held so long it may be stuck.
+    held: string,
+}
+
+export struct InputHat {
+    number: int,
+    /// -1 at rest, else 0 (up) to 7, clockwise.
+    direction: int,
+}
+
+export struct InputEncoder {
+    label: string,
+    steps: int,
+    /// "buttons 17 and 18"
+    buttons: string,
+}
+
+export struct InputAxis {
+    number: int,
+    label: string,
+    /// "ABS_RX · 8 bit"
+    code: string,
+    /// 0..1
+    value: float,
+}
+
+export struct InputsView {
+    buttons: [InputButton],
+    hats: [InputHat],
+    encoders: [InputEncoder],
+    axes: [InputAxis],
+    /// The control used last: "Button 7", its name and its kernel code.
+    last-what: string,
+    last-label: string,
+    last-code: string,
+    /// Why a button may be stuck.
+    stuck: string,
+}
+
 export struct ChipData {
     text: string,
     /// neutral, success, warning, error
@@ -238,6 +284,10 @@ export global Rig {
     in property <bool> save-privileged;
     in property <string> save-note;
     in property <bool> current-gone;
+    /// The open component lists its controls: its screen has an Inputs view.
+    in property <bool> has-inputs;
+    in property <bool> inputs-tab;
+    in property <InputsView> inputs;
 
     // Procedure in progress
     in property <Procedure> procedure;
@@ -287,6 +337,8 @@ export global Api {
     callback set-text(string, string);
     callback set-curve-point(string, int, float);
     callback toggle-advanced(string);
+    /// Settings (false) or Inputs (true) on the open component's screen.
+    callback show-inputs(bool);
     callback run-action(string);
     callback save-all();
     callback reset-values();

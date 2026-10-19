@@ -90,6 +90,13 @@ fn a_g29_on_new_lg4ff() {
     assert!((angle - 225.0).abs() < 0.1, "{angle}");
     let rim = host.read_inputs(&wheel).unwrap();
     assert_eq!(rim.get("buttons"), Some(&Value::Buttons(vec![true, false])));
+    // The rim's controls, as games number them.
+    let controls = host.find(&wheel).unwrap().description.controls.clone();
+    let names: Vec<(u32, Option<&str>)> = controls
+        .iter()
+        .map(|c| (c.number, c.code.as_deref()))
+        .collect();
+    assert_eq!(names, [(1, Some("BTN_TRIGGER")), (2, Some("BTN_THUMB"))]);
 
     let spec = host.param(&base, "rotation").unwrap();
     assert_eq!(spec.value, Value::Float(900.0));

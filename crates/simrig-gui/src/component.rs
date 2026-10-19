@@ -123,6 +123,8 @@ impl App {
         };
         self.current = Some(address.clone());
         self.component.advanced = false;
+        self.inputs.tab = false;
+        self.window().global::<Rig>().set_inputs_tab(false);
         self.component.opened = self
             .view(&address)
             .map(|v| current_values(&v.component.description))
@@ -147,6 +149,7 @@ impl App {
         rig.set_current(self.device(&address));
         rig.set_current_title(view.component.description.kind.label().into());
         rig.set_current_chips(ModelRc::new(VecModel::from(self.chips(&view))));
+        self.refresh_inputs();
 
         let rows = self.rows(&view);
         let model = self.component.rows.clone();
@@ -189,6 +192,7 @@ impl App {
         let Some(view) = self.view(&address).cloned() else {
             return;
         };
+        self.refresh_inputs();
         let window = self.window();
         let rig = window.global::<Rig>();
         let device = self.device(&address);
@@ -213,7 +217,10 @@ impl App {
                     row.enabled = true;
                     let (text, unit) = live
                         .get(&item.id)
-                        .map(|v| format::input(v, def.and_then(|d| d.unit)))
+                        .map(|v| match (item.id.as_str(), v) {
+                            ("hats", Value::Ints(hats)) => (format::hats(hats), String::new()),
+                            _ => format::input(v, def.and_then(|d| d.unit)),
+                        })
                         .unwrap_or_else(|| ("–".into(), String::new()));
                     row.value_text = text.into();
                     row.unit = unit.into();

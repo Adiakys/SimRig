@@ -29,6 +29,72 @@ pub struct ComponentDescription {
     /// Hints for the core's generic picture (e.g. the shape of a rim).
     #[serde(default, skip_serializing_if = "Appearance::is_default")]
     pub appearance: Appearance,
+    /// The physical controls the component's inputs come from (a rim's buttons, hat switches,
+    /// encoders, analog paddles), as games number them, for the app to list them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub controls: Vec<Control>,
+}
+
+/// One physical control of a component, and where its live value is.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Control {
+    pub kind: ControlKind,
+    /// As games number it among controls of its kind (buttons, axes, hats), from 1.
+    pub number: u32,
+    /// The kernel's name for it (`BTN_THUMB`, `ABS_RX`), when it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    /// What it is on the device ("Shift up"), when the plugin knows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The standard input carrying its live value (`buttons`, `hats`…), and its position there.
+    pub item: String,
+    pub index: usize,
+    /// An axis's resolution, in bits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bits: Option<u8>,
+    /// The buttons an encoder reports its steps with (their numbers).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub buttons: Vec<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlKind {
+    Button,
+    Axis,
+    Hat,
+    Encoder,
+}
+
+impl Control {
+    pub fn new(kind: ControlKind, number: u32, item: &str, index: usize) -> Self {
+        Self {
+            kind,
+            number,
+            code: None,
+            label: None,
+            item: item.into(),
+            index,
+            bits: None,
+            buttons: Vec::new(),
+        }
+    }
+
+    pub fn code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn bits(mut self, bits: u8) -> Self {
+        self.bits = Some(bits);
+        self
+    }
 }
 
 /// How the core draws a component when the plugin ships no picture of its own.

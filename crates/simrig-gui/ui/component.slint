@@ -5,6 +5,7 @@ import { Theme, Icons } from "theme.slint";
 import { Rig, Api, SettingRow, RowKind } from "api.slint";
 import { Device, LiveDevice, SteerTrack, PedalBar } from "devices.slint";
 import { Button, ButtonKind, Chip, ChipTone, QuickChip, Slider, Segmented, Toggle, Field, Eyebrow, Title, Heading, Body, Small, LiveValue, Hairline, BackRow, Notice } from "widgets.slint";
+import { InputsPanel } from "inputs.slint";
 
 /// The response curve of a pedal or handbrake: drag a point up or down.
 component CurveEditor {
@@ -524,22 +525,36 @@ export component ComponentScreen inherits Rectangle {
                             spacing: 8px;
                             alignment: start;
                             padding-top: 4px;
+                            // A steering wheel's inputs apart from its settings.
+                            if Rig.has-inputs: HorizontalLayout {
+                                padding-right: 8px;
+                                Segmented {
+                                    options: [@tr("Settings"), @tr("Inputs")];
+                                    selected: Rig.inputs-tab ? 1 : 0;
+                                    label: @tr("View");
+                                    picked(i) => { Api.show-inputs(i == 1); }
+                                }
+                            }
                             for c in Rig.current-chips: Chip {
+                                y: (parent.height - self.height) / 2;
                                 text: c.text;
                                 tone: c.tone == "success" ? ChipTone.success : c.tone == "warning" ? ChipTone.warning : ChipTone.neutral;
                                 icon: c.tone == "success" ? Icons.check : c.tone == "warning" ? Icons.warn : @image-url("");
                             }
                         }
-                        for row in Rig.rows: SettingLine { setting: row; }
+                        if !Rig.has-inputs || !Rig.inputs-tab: VerticalLayout {
+                            for row in Rig.rows: SettingLine { setting: row; }
+                        }
+                        if Rig.has-inputs && Rig.inputs-tab: InputsPanel { view: Rig.inputs; }
                     }
                 }
                 // Footer: reset on the left, save on the right with why it may ask.
-                Rectangle {
+                if !Rig.has-inputs || !Rig.inputs-tab: Rectangle {
                     height: 1px;
                     vertical-stretch: 0;
                     background: Theme.line;
                 }
-                HorizontalLayout {
+                if !Rig.has-inputs || !Rig.inputs-tab: HorizontalLayout {
                     vertical-stretch: 0;
                     padding-left: 40px;
                     padding-right: 40px;

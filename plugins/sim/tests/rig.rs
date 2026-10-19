@@ -79,6 +79,24 @@ fn standard_parameters_are_validated() {
 }
 
 #[test]
+fn the_rim_lists_its_controls() {
+    let env = Env::new("controls");
+    let mut host = env.start();
+    // The hat's live value comes with the other inputs.
+    let rim = &host.find("wheel").unwrap().description;
+    let kinds = |k: simrig_model::ControlKind| rim.controls.iter().filter(|c| c.kind == k).count();
+    assert_eq!(kinds(simrig_model::ControlKind::Button), 12);
+    assert_eq!(kinds(simrig_model::ControlKind::Hat), 1);
+    assert_eq!(kinds(simrig_model::ControlKind::Encoder), 2);
+    assert_eq!(kinds(simrig_model::ControlKind::Axis), 2);
+    let address = host.find("wheel").unwrap().address.clone();
+    assert!(matches!(
+        host.read_inputs(&address).unwrap().get("hats"),
+        Some(Value::Ints(h)) if h.len() == 1
+    ));
+}
+
+#[test]
 fn unsupported_items_carry_every_kind_of_reason() {
     let env = Env::new("reasons");
     let host = env.start();

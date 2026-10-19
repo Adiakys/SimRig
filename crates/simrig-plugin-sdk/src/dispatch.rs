@@ -76,6 +76,7 @@ impl Facade for SteeringWheelFacade<'_> {
                 self.0.shift_paddles().map(|p| Value::Buttons(p.to_vec()))
             }
             SteeringWheelInput::AnalogPaddles => self.0.analog_paddles().map(Value::Floats),
+            SteeringWheelInput::Hats => self.0.hats().map(Value::Ints),
             SteeringWheelInput::RimId => self.0.rim_id().map(Value::Text),
         })
     }
@@ -209,7 +210,7 @@ fn standard_items(kind: ComponentKind, pedals: &[PedalRole]) -> Vec<(String, Ite
 pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
     let kind = c.kind();
     let pedals = c.pedals();
-    let (id, name, model, custom, procedures, appearance) = {
+    let (id, name, model, custom, procedures, appearance, controls) = {
         let base = c.component_mut();
         (
             base.id(),
@@ -218,6 +219,7 @@ pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
             base.custom_params(),
             base.procedures(),
             base.appearance(),
+            base.controls(),
         )
     };
     let mut f = facade(c);
@@ -248,6 +250,7 @@ pub(crate) fn describe(c: &mut AnyComponent) -> ComponentDescription {
         custom,
         procedures,
         appearance,
+        controls,
     }
 }
 

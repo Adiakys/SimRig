@@ -25,6 +25,12 @@ pub trait Component {
     }
 
     /// Hints for the core's generic picture, e.g. the rim shape of a steering wheel.
+    /// The physical controls the component's inputs come from, for the app to
+    /// list them: a rim's buttons, hat switches, encoders and analog paddles.
+    fn controls(&mut self) -> Vec<simrig_model::Control> {
+        Vec::new()
+    }
+
     fn appearance(&self) -> simrig_model::Appearance {
         simrig_model::Appearance::default()
     }
@@ -96,6 +102,10 @@ pub trait SteeringWheel: Component {
         Support::not_in_driver()
     }
     fn analog_paddles(&mut self) -> Support<Vec<f64>> {
+        Support::not_in_driver()
+    }
+    /// Each hat switch's direction: -1 at rest, else 0 (up) to 7, clockwise.
+    fn hats(&mut self) -> Support<Vec<i64>> {
         Support::not_in_driver()
     }
     fn rim_id(&mut self) -> Support<String> {
