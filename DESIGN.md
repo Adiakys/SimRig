@@ -324,6 +324,19 @@ that only says all is well ("Driver active", "Tested"). At the right end of the 
 external-link icon, **Report how it works**, opens the filled-in hardware report; its tooltip
 says what the report holds. Nothing pops up to ask for a report.
 
+### Device checks
+When the system is not set up for a device as games need it (§3.6 of the architecture), its
+screen says so in one block under the chip row, above the settings and the Inputs view: a
+Surface panel with a 1 px Pit Orange border at 38%, one row per problem (the triangle, the title
+in Body semibold, the explanation in Ink 2, the facts in mono Ink 3), then the fix as an Outline
+button (with the lock when it asks for the password, and that said beside it) and, for what can
+be wanted, a Quiet **Ignore** at the right. Information (Steam Input) uses the info icon and,
+alone, a Hairline border. Ignored problems shrink to one quiet line under it ("1 problem
+ignored: …", **Show**); shown again, they read "Ignored on this device." with **Stop ignoring**
+and **Hide**. The Home card of the device carries the short form as a warning chip, on its first
+card only ("Hidden from games", "No force feedback in games"), not ghosted: the device works.
+The rig summary counts the devices that need attention. Nothing is shown when all is well.
+
 ### Inputs view
 A steering wheel's screen has two views, **Settings** and **Inputs**, picked with a segmented
 control at the top of the right column, so the rim's controls never mix with its settings. The

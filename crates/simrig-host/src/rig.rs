@@ -20,6 +20,10 @@ pub struct RigConfig {
     /// Catalog models added to the rig before being plugged in.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub planned: Vec<String>,
+    /// Problems games may have with a device that the user chose to ignore, as
+    /// `<device id>/<finding key>` (see [`crate::device_checks::Finding::key`]).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ignored: BTreeSet<String>,
 }
 
 impl RigConfig {

@@ -122,6 +122,9 @@ enum Command {
     },
     /// Report plugin problems (manifests, startup, conformance).
     Check,
+    /// Check that the system is set up for each device as games need it: access, joystick,
+    /// kernel driver, Steam Input. Exits with 1 when something needs attention.
+    DeviceChecks,
 }
 
 fn main() -> ExitCode {
@@ -290,6 +293,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Command::Driver(command) => return commands::driver(&mut host, command),
         Command::Preset(command) => commands::preset(&mut host, command)?,
         Command::System => commands::system(&host),
+        Command::DeviceChecks => return Ok(commands::device_checks(&host)),
         Command::Monitor { seconds } => commands::monitor(&mut host, seconds)?,
         Command::Check => {
             if host.problems().is_empty() {

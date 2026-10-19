@@ -353,6 +353,36 @@ what their hardware can and cannot do.
   label, with the explanation as its tooltip. Example: a force feedback strength the driver
   takes through the kernel's input interface but the device cannot report back (`WriteOnly`).
 
+### 3.6 Device checks
+
+A device can work in SimRig and still not in games, because of how the system is set up for it.
+The host checks this for every USB device of the rig (`crates/simrig-host/src/device_checks.rs`),
+as the user and without touching the device, and reports each problem as a finding: what it is,
+the facts behind it (nodes, drivers, versions), and the fix when one exists.
+
+| Finding | Checked | Fix |
+|---|---|---|
+| Games cannot read the device | its joystick input nodes open for the user (to write too when they take force feedback) | none: access is given to the user signed in at the computer |
+| Games do not list the device | udev marks one of its input nodes `ID_INPUT_JOYSTICK` (SDL, and so Proton, skips the others) | none |
+| Another driver handles it | the HID device is bound to the driver the plugin declares (`kernel_driver` in its manifest), when that driver is installed | installing the driver again, which reloads it and replugs the devices |
+| Another copy of the driver is loaded | the running module's `srcversion` is the one `modinfo` resolves, when SimRig installed the driver | none: the user removes the other copy, or uninstalls SimRig's |
+| Steam Input is on | Steam's own files: forced on for an installed game, or on for generic controllers | none: the setting is Steam's |
+
+- **Brand knowledge stays in plugins**: a plugin declares the kernel driver its devices need
+  (`[match] kernel_driver`, or per `usb` entry), and `virtual_joystick = true` when games see a
+  joystick its driver creates instead of the device (the access and joystick checks then do not
+  apply). The checks themselves know no brand.
+- **Said once**: a driver not installed, or waiting for a restart, already has its chip; the
+  findings it causes are not checked. A device excluded from the rig is not checked.
+- **Steam Input is information**, not a warning: what Steam hides is decided while a game runs,
+  and its settings only say it may.
+- **Ignoring**: what can be wanted (another driver, another copy, Steam Input) can be ignored,
+  per device and per cause (`ignored` in `rig.toml`, as `<device id>/<finding key>`): another
+  driver, another copy or another game shows it again. A device games cannot see is never
+  wanted: a device not used in games is excluded from the rig instead.
+- The app checks again every few seconds and after every change of the rig; the hardware report
+  lists the findings, ignored ones too; `simrig-cli device-checks` prints them.
+
 ## 4. Catalog and images
 
 The catalog is **data** provided by plugins:
@@ -441,9 +471,11 @@ driver  = "driver/driver.toml"            # optional: absent when the stock kern
 tested  = ["fanatec/csl-dd"]              # models confirmed on real hardware ("*": every device)
 
 [match]
-usb = [{ vid = 0x0eb7 }]                  # pid optional
+usb = [{ vid = 0x0eb7 }]                  # pid optional; an entry may name its kernel_driver
+kernel_driver = "fanatec"                 # optional: the HID driver games need (§3.6)
 # virtual = true                          # the plugin provides devices itself (simulated rig)
 # on_request = true                       # generic plugin: only USB devices the user assigns to it
+# virtual_joystick = true                 # games see a joystick the driver creates, not the device
 ```
 
 ### 5.3 Adapter protocol

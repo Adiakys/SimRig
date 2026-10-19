@@ -35,7 +35,11 @@ Everything lives under `target/dev`: your real configuration is not touched. Wit
 ```
 
 `--screen` takes `home`, `component:<component>`, `procedure:<component>/<id>`, `plugins`,
-`settings`, `add`, `first:<step>`, and can chain actions with `;` (see `src/main.rs`).
+`settings`, `add`, `first:<step>`, and can chain actions with `;` (see `src/main.rs`). Device
+checks can be shown on the simulated rig with made-up findings on the open device, e.g.
+`component:base;findings:driver,!steam` (`!` marks one ignored; `;ignored` shows those again).
+
+`simrig-cli device-checks` runs the device checks on the real devices.
 
 ### A development build with real hardware
 

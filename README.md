@@ -17,6 +17,8 @@ Your devices keep working in every game with SimRig closed.
   a driver, and leaves nothing running when you close it.
 - **Honest about your hardware.** What a device or its driver cannot do is shown greyed out
   with the reason, never hidden.
+- **Works here, not in the game?** SimRig checks what games need from each device (access,
+  the right kernel driver, Steam Input) and says what is wrong and how to fix it.
 
 > **Early development.** SimRig works, but most devices have not been tested on real hardware
 > yet: see the table below. Have a Moza, Logitech, Thrustmaster, PXN or another wheel? See the

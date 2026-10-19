@@ -8,8 +8,8 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use simrig_host::{
-    ApplyOutcome, DriverStatus, DriverUpdate, Host, HostComponent, HostEvent, HostOptions, Image,
-    PluginLocation, PluginState, Preset, SystemInfo, Target,
+    ApplyOutcome, DeviceFindings, DriverStatus, DriverUpdate, Host, HostComponent, HostEvent,
+    HostOptions, Image, PluginLocation, PluginState, Preset, SystemInfo, Target,
 };
 use simrig_model::{DeviceInfo, ProcedureState, Value};
 
@@ -18,6 +18,9 @@ const LIVE_RATE_HZ: f64 = 60.0;
 const FRAME: Duration = Duration::from_millis(16);
 /// USB hotplug is checked less often than plugins.
 const USB_SCAN: Duration = Duration::from_millis(750);
+/// What games need is checked again now and then too: access and drivers change with udev, not
+/// only with the rig.
+const DEVICE_CHECKS: Duration = Duration::from_secs(3);
 
 pub enum Command {
     Set {
@@ -62,6 +65,12 @@ pub enum Command {
     RestartPlugin(String),
     /// Guided procedures a device offers (e.g. the setup of a generic device).
     ListProcedures(Target),
+    /// Ignores a problem games may have with a device, or shows it again.
+    SetIgnored {
+        device: String,
+        key: String,
+        ignored: bool,
+    },
 }
 
 /// The whole rig, sent again whenever something structural changes.
@@ -73,6 +82,8 @@ pub struct Snapshot {
     pub presets: Vec<String>,
     pub problems: Vec<String>,
     pub system: Option<SystemInfo>,
+    /// What may keep games from using the devices.
+    pub findings: Vec<DeviceFindings>,
 }
 
 #[derive(Clone, Debug)]
@@ -157,6 +168,8 @@ pub enum Update {
         target: Target,
         procedures: Vec<simrig_model::ProcedureDescriptor>,
     },
+    /// What games need changed (see [`Snapshot::findings`]).
+    Findings(Vec<DeviceFindings>),
 }
 
 pub struct Backend {
@@ -202,6 +215,8 @@ struct Dirty {
     /// Driver states are read by running hooks: only after driver or plugin changes.
     drivers: bool,
     components: BTreeSet<String>,
+    /// Check what games need again now (an ignored problem changed).
+    games: bool,
 }
 
 fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
@@ -211,16 +226,20 @@ fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
     let system = host.system();
     resubscribe(&mut host, &mut subscribed);
     refresh_drivers(&host, &mut drivers);
-    let full = |host: &mut Host, drivers: &Drivers| {
+    let full = |host: &mut Host, drivers: &Drivers, findings: &mut Vec<DeviceFindings>| {
         let mut s = snapshot(host, drivers);
         s.system = Some(system.clone());
+        *findings = host.device_checks(&statuses(drivers));
+        s.findings = findings.clone();
         Box::new(s)
     };
-    deliver(Update::Snapshot(full(&mut host, &drivers)));
+    let mut findings = Vec::new();
+    deliver(Update::Snapshot(full(&mut host, &drivers, &mut findings)));
 
     let mut live: BTreeMap<String, BTreeMap<String, Value>> = BTreeMap::new();
     let mut last_frame = Instant::now();
     let mut last_scan = Instant::now();
+    let mut last_check = Instant::now();
     loop {
         let wait = FRAME.saturating_sub(last_frame.elapsed());
         let mut dirty = Dirty::default();
@@ -269,11 +288,20 @@ fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
         }
         if dirty.rig || dirty.drivers {
             resubscribe(&mut host, &mut subscribed);
-            deliver(Update::Snapshot(full(&mut host, &drivers)));
+            deliver(Update::Snapshot(full(&mut host, &drivers, &mut findings)));
+            last_check = Instant::now();
         } else {
             for address in dirty.components {
                 if let Some(view) = component_view(&mut host, &address) {
                     deliver(Update::Component(Box::new(view)));
+                }
+            }
+            if dirty.games || last_check.elapsed() >= DEVICE_CHECKS {
+                last_check = Instant::now();
+                let now = host.device_checks(&statuses(&drivers));
+                if now != findings {
+                    findings = now;
+                    deliver(Update::Findings(findings.clone()));
                 }
             }
         }
@@ -337,6 +365,13 @@ struct DriverView {
 }
 
 type Drivers = BTreeMap<String, DriverView>;
+
+fn statuses(drivers: &Drivers) -> BTreeMap<String, Option<DriverStatus>> {
+    drivers
+        .iter()
+        .map(|(id, d)| (id.clone(), d.status.clone()))
+        .collect()
+}
 
 fn refresh_drivers(host: &Host, drivers: &mut Drivers) {
     drivers.clear();
@@ -468,6 +503,7 @@ fn snapshot(host: &mut Host, drivers: &Drivers) -> Snapshot {
         presets,
         problems: host.problems().to_vec(),
         system: None,
+        findings: Vec::new(),
     }
 }
 
@@ -628,6 +664,17 @@ fn execute(host: &mut Host, command: Command, deliver: &impl Fn(Update), dirty: 
         Command::ListProcedures(target) => {
             let procedures = host.procedures(&target).unwrap_or_default();
             deliver(Update::Procedures { target, procedures });
+            false
+        }
+        Command::SetIgnored {
+            device,
+            key,
+            ignored,
+        } => {
+            if let Err(e) = host.set_ignored(&device, &key, ignored) {
+                fail(e.to_string());
+            }
+            dirty.games = true;
             false
         }
         Command::RestartPlugin(plugin) => {

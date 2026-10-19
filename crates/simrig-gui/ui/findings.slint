@@ -1,0 +1,172 @@
+// What may keep games from using a device: one block above the settings, only when something
+// is found. Ignored problems shrink to one quiet line.
+
+import { Theme, Icons } from "theme.slint";
+import { Api, FindingData } from "api.slint";
+import { Button, ButtonKind, Small } from "widgets.slint";
+
+component FindingRow inherits HorizontalLayout {
+    in property <FindingData> finding;
+    /// Ignored findings, open again: they can be hidden.
+    in property <bool> can-hide;
+    spacing: 12px;
+    VerticalLayout {
+        alignment: start;
+        padding-top: 1px;
+        Image {
+            source: root.finding.info ? Icons.info : Icons.warn;
+            colorize: root.finding.info ? Theme.ink2 : Theme.warning;
+            width: 18px;
+            height: 18px;
+            accessible-role: AccessibleRole.image;
+            accessible-label: root.finding.info ? @tr("Information") : @tr("Warning");
+        }
+    }
+    VerticalLayout {
+        spacing: 6px;
+        horizontal-stretch: 1;
+        Text {
+            text: root.finding.title;
+            font-family: Theme.sans;
+            font-size: 16px;
+            font-weight: 600;
+            color: Theme.ink;
+            wrap: word-wrap;
+        }
+        Text {
+            text: root.finding.body;
+            font-family: Theme.sans;
+            font-size: 14px;
+            color: Theme.ink2;
+            wrap: word-wrap;
+        }
+        if root.finding.detail != "": Text {
+            text: root.finding.detail;
+            font-family: Theme.mono;
+            font-size: 12px;
+            color: Theme.ink3;
+            wrap: word-wrap;
+        }
+        if root.finding.fix != "" || root.finding.ignorable: HorizontalLayout {
+            padding-top: 6px;
+            spacing: 12px;
+            if root.finding.fix != "": Button {
+                kind: ButtonKind.outline;
+                text: root.finding.fix;
+                privileged: root.finding.fix-privileged;
+                enabled: !root.finding.fixing;
+                clicked => { Api.fix-finding(root.finding.key); }
+            }
+            if root.finding.fix-note != "": Small {
+                text: root.finding.fix-note;
+                font-size: 13px;
+                color: Theme.ink3;
+                vertical-alignment: center;
+            }
+            if root.finding.ignored: Small {
+                text: @tr("Ignored on this device.");
+                font-size: 13px;
+                color: Theme.ink3;
+                vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            if root.finding.ignorable && !root.finding.ignored: Button {
+                kind: ButtonKind.quiet;
+                text: @tr("Ignore");
+                clicked => { Api.ignore-finding(root.finding.key, true); }
+            }
+            if root.finding.ignored: Button {
+                kind: ButtonKind.quiet;
+                text: @tr("Stop ignoring");
+                clicked => { Api.ignore-finding(root.finding.key, false); }
+            }
+            if root.can-hide: Button {
+                kind: ButtonKind.quiet;
+                text: @tr("Hide");
+                clicked => { Api.open-ignored(false); }
+            }
+        }
+    }
+}
+
+/// The problems found on a device, warnings first. The border is a warning's only when one is.
+export component FindingsBlock inherits Rectangle {
+    in property <[FindingData]> findings;
+    in property <bool> can-hide;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: findings.length > 0 && !findings[0].info ? Theme.warning.with-alpha(0.38) : Theme.line;
+    background: Theme.surface;
+    min-height: l.min-height;
+    preferred-height: l.preferred-height;
+    l := VerticalLayout {
+        padding-left: 18px;
+        padding-right: 18px;
+        padding-top: 16px;
+        padding-bottom: 16px;
+        spacing: 0;
+        for f[i] in root.findings: VerticalLayout {
+            if i > 0: VerticalLayout {
+                padding-top: 14px;
+                padding-bottom: 12px;
+                Rectangle { height: 1px; background: Theme.line; }
+            }
+            FindingRow {
+                finding: f;
+                can-hide: root.can-hide && i == root.findings.length - 1;
+            }
+        }
+    }
+}
+
+/// Problems the user chose to ignore, in one line: open it to see them again.
+export component IgnoredLine inherits Rectangle {
+    in property <string> summary;
+    in property <string> first;
+    height: 38px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Theme.line;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 4px;
+        spacing: 10px;
+        Image {
+            y: (parent.height - self.height) / 2;
+            source: Icons.info;
+            colorize: Theme.ink3;
+            width: 16px;
+            height: 16px;
+        }
+        HorizontalLayout {
+            spacing: 0;
+            horizontal-stretch: 1;
+            Text {
+                horizontal-stretch: 0;
+                text: root.first == "" ? root.summary : root.summary + ":";
+                font-family: Theme.sans;
+                font-size: 14px;
+                font-weight: 500;
+                color: Theme.ink2;
+                vertical-alignment: center;
+            }
+            Text {
+                text: root.first == "" ? "" : " " + root.first;
+                font-family: Theme.sans;
+                font-size: 14px;
+                color: Theme.ink3;
+                vertical-alignment: center;
+                overflow: elide;
+                horizontal-stretch: 1;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                kind: ButtonKind.quiet;
+                text: @tr("Show");
+                clicked => { Api.open-ignored(true); }
+            }
+        }
+    }
+}

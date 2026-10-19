@@ -11,3 +11,5 @@ tested = ["*"]
 
 [match]
 on_request = true
+# Games see the virtual joystick of its service, not the device.
+virtual_joystick = true

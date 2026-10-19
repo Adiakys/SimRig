@@ -41,6 +41,7 @@ pub struct App {
     snapshot_count: usize,
     pub updates: crate::update::Updates,
     pub inputs: crate::inputs::InputsState,
+    pub checks: crate::checks::ChecksState,
 }
 
 pub struct Models {
@@ -157,6 +158,7 @@ impl App {
             snapshot_count: 0,
             updates: Default::default(),
             inputs: Default::default(),
+            checks: Default::default(),
         }
         .published()
     }
@@ -238,6 +240,7 @@ impl App {
             } => this.preset_applied(name, saved, applied, ignored),
             Update::DriverDone { plugin, ok, text } => this.driver_done(plugin, ok, text),
             Update::Procedures { target, procedures } => this.flow_procedures(target, procedures),
+            Update::Findings(findings) => this.findings_changed(findings),
         }
     }
 
@@ -281,9 +284,7 @@ impl App {
         let rig = window.global::<Rig>();
         rig.set_device_count(count as i32);
         rig.set_starting(false);
-        let (text, tone) = self.rig_status(count);
-        rig.set_status_text(text.into());
-        rig.set_status_tone(tone.into());
+        self.refresh_rig_status();
         let presets: Vec<ui::PresetItem> = self
             .snapshot
             .presets
@@ -294,6 +295,15 @@ impl App {
             })
             .collect();
         rig.set_presets(ModelRc::new(VecModel::from(presets)));
+    }
+
+    /// The summary at the top right of the Home.
+    pub fn refresh_rig_status(&self) {
+        let window = self.window();
+        let rig = window.global::<Rig>();
+        let (text, tone) = self.rig_status(rig.get_device_count().max(0) as usize);
+        rig.set_status_text(text.into());
+        rig.set_status_tone(tone.into());
     }
 
     fn rig_status(&self, count: usize) -> (String, &'static str) {
@@ -312,6 +322,11 @@ impl App {
                 },
                 "error",
             );
+        }
+        match self.needing_attention() {
+            0 => {}
+            1 => return ("1 device needs attention".into(), "warning"),
+            n => return (format!("{n} devices need attention"), "warning"),
         }
         // Devices whose setup was left halfway are not a problem to point at: they wait in
         // "New device", marked to set up.
@@ -396,6 +411,11 @@ impl App {
             rim: d.appearance.rim.map(|r| r.key()).unwrap_or("round").into(),
             ..Device::default()
         };
+        // Working, but not as games need it: the card says so, not ghosted.
+        if let Some(text) = self.attention(address) {
+            device.state = "attention".into();
+            device.state_text = text.into();
+        }
         match &view.image {
             Image::User(path) | Image::Model(path) => {
                 if let Some(picture) = self.picture(path) {

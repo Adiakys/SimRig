@@ -123,6 +123,7 @@ impl App {
         };
         self.current = Some(address.clone());
         self.component.advanced = false;
+        self.checks.ignored_open = false;
         self.inputs.tab = false;
         self.window().global::<Rig>().set_inputs_tab(false);
         self.component.opened = self
@@ -150,6 +151,7 @@ impl App {
         rig.set_current_title(view.component.description.kind.label().into());
         rig.set_current_chips(ModelRc::new(VecModel::from(self.chips(&view))));
         rig.set_current_untested(view.untested);
+        self.refresh_findings();
         self.refresh_inputs();
 
         let rows = self.rows(&view);

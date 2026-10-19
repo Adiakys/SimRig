@@ -41,7 +41,8 @@ component StateChip inherits Chip {
 /// One device on the home: its drawing, one big live value and at most two small ones.
 component DeviceCard inherits Card {
     in property <Device> device;
-    property <bool> down: device.state != "ready";
+    // Unplugged or failed: ghosted. A device that needs attention still works.
+    property <bool> down: device.state != "ready" && device.state != "attention";
     interactive: true;
     label: device.kind-label + " " + device.name;
     activated => { Api.open-component(device.address); }
@@ -52,7 +53,7 @@ component DeviceCard inherits Card {
         spacing: 8px;
         HorizontalLayout {
             CardHead { device: root.device; }
-            if root.down: StateChip { device: root.device; }
+            if root.down || (root.device.state == "attention" && root.device.kind != "wheel_base"): StateChip { device: root.device; }
         }
 
         if root.device.kind == "wheel_base": VerticalLayout {

@@ -10,6 +10,8 @@ description = "Fanatec wheel bases, steering wheels and pedals, on the open sour
 
 # The devices hid-fanatecff drives (hid-ftec.h); a test keeps this list in step with it.
 [match]
+# Without hid-fanatecff the kernel's generic HID driver takes them: no force feedback.
+kernel_driver = "fanatec"
 usb = [
     { vid = 0x0eb7, pid = 0x0001 },
     { vid = 0x0eb7, pid = 0x0004 },

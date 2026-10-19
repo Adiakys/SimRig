@@ -4,6 +4,7 @@
 
 pub mod catalog;
 pub mod conformance;
+pub mod device_checks;
 mod drivers;
 mod error;
 mod host;
@@ -12,12 +13,14 @@ pub mod paths;
 pub mod presets;
 mod process;
 pub mod rig;
+mod steam;
 pub mod system;
 #[cfg(feature = "testing")]
 pub mod testing;
 pub mod usb;
 
 pub use catalog::{Catalog, CatalogEntry, Image, Model};
+pub use device_checks::{DeviceFindings, Finding, Fix, Problem, SystemRoot};
 pub use drivers::DriverUpdate;
 pub use error::HostError;
 pub use host::{Host, HostComponent, HostEvent, HostOptions, Plugin, PluginState, Target};

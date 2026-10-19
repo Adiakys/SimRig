@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use simrig_host::Target;
 use simrig_host::testing::{PluginEnv, reason, step, until};
+use simrig_host::{Problem, Target};
 use simrig_model::{ProcedureState, RimShape, Value};
 
 const HID: &str = "1-2:1.0/0003:0EB7:0020.0001";
@@ -248,6 +248,48 @@ fn without_the_driver_everything_says_so() {
     let base = host.find("base").unwrap().address.clone();
     assert!(reason(&mut host, &base, "rotation").contains("driver to be installed"));
     assert!(reason(&mut host, &base, "angle").contains("hid-fanatec"));
+}
+
+/// The device checks: with the driver installed, a base the generic HID driver took is pointed
+/// out, and can be ignored, which is remembered.
+#[test]
+fn a_base_the_generic_driver_took_is_pointed_out() {
+    let env = Env::new("generic");
+    env.plug(false);
+    env.env.bind(&env.hid, "hid-generic");
+    let mut host = env.start();
+    until(&mut host, "components", |h| !h.components().is_empty());
+    let none = [("fanatec".to_string(), None)].into();
+    // Not installed: the driver's own chip says it, nothing more.
+    assert!(host.device_checks(&none).is_empty());
+
+    host.install_driver("fanatec").unwrap();
+    let drivers = [(
+        "fanatec".to_string(),
+        host.driver_status("fanatec").unwrap(),
+    )]
+    .into();
+    let checks = host.device_checks(&drivers);
+    let [device] = checks.as_slice() else {
+        panic!("{checks:?}");
+    };
+    let finding = &device.findings[0];
+    assert_eq!(
+        finding.problem,
+        Problem::WrongDriver {
+            bound: Some("hid-generic".into()),
+            expected: "fanatec".into(),
+        }
+    );
+    // A development plugin builds no module: nothing to reload.
+    assert_eq!(finding.fix, None);
+    assert!(finding.ignorable());
+
+    host.set_ignored(&device.device, &finding.key(), true)
+        .unwrap();
+    assert!(host.device_checks(&drivers)[0].findings[0].ignored);
+    let again = env.start();
+    assert!(again.device_checks(&drivers)[0].findings[0].ignored);
 }
 
 /// The manifest claims exactly the devices the bundled driver handles.

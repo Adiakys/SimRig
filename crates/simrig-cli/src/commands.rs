@@ -230,6 +230,48 @@ pub fn preset(host: &mut Host, command: PresetCommand) -> Result<()> {
     Ok(())
 }
 
+pub fn device_checks(host: &Host) -> ExitCode {
+    let drivers = host
+        .plugins()
+        .iter()
+        .filter(|p| !p.devices.is_empty())
+        .map(|p| {
+            let id = p.manifest.id.clone();
+            let status = host.driver_status(&id).ok().flatten();
+            (id, status)
+        })
+        .collect();
+    let checks = host.device_checks(&drivers);
+    let mut attention = false;
+    for device in &checks {
+        println!("{}/{}", device.plugin, device.device);
+        for f in &device.findings {
+            let mark = if f.ignored {
+                "ignored"
+            } else if f.informational() {
+                "info"
+            } else {
+                attention = true;
+                "attention"
+            };
+            println!("  [{mark}] {}", f.title());
+            println!("    {}", f.explanation());
+            println!("    {}", f.detail());
+            if f.fix.is_some() {
+                println!("    fix: simrig-cli driver install {}", device.plugin);
+            }
+        }
+    }
+    if checks.is_empty() {
+        println!("every device is set up as games need it");
+    }
+    if attention {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
 pub fn system(host: &Host) {
     let s = host.system();
     let or_unknown = |v: Option<String>| v.unwrap_or_else(|| "unknown".into());

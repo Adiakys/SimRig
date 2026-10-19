@@ -17,6 +17,7 @@ use simrig_protocol::{
 
 use crate::catalog::{Catalog, Image};
 use crate::conformance;
+use crate::device_checks::{self, DeviceFindings, Expect, Finding, Fix, SystemRoot};
 use crate::drivers::{DriverManager, DriverUpdate, find_helper};
 use crate::error::HostError;
 use crate::manifest::{self, Manifest, PluginLocation};
@@ -52,6 +53,8 @@ pub struct HostOptions {
     pub dev_state_dir: PathBuf,
     /// `simrig-helper`; found next to the executable or in `/usr/libexec/simrig` by default.
     pub helper: Option<PathBuf>,
+    /// Where the checks of what games need look (device nodes, udev, modules).
+    pub system_root: SystemRoot,
 }
 
 impl Default for HostOptions {
@@ -68,6 +71,7 @@ impl Default for HostOptions {
             data_dir: paths::data_dir().unwrap_or_else(fallback),
             dev_state_dir: paths::state_dir().unwrap_or_else(fallback).join("dev"),
             helper: None,
+            system_root: SystemRoot::default(),
         }
     }
 }
@@ -1037,6 +1041,103 @@ impl Host {
                     .map(move |d| (p.manifest.id.clone(), d.clone()))
             })
             .collect()
+    }
+
+    // ---------------------------------------------------------------- what games need
+
+    /// What may keep games from using the devices of the rig, per device (excluded ones are
+    /// not checked), with the ones the user ignored marked. `drivers` holds each plugin's driver
+    /// status, as [`Host::driver_status`] reads it.
+    pub fn device_checks(
+        &self,
+        drivers: &BTreeMap<String, Option<DriverStatus>>,
+    ) -> Vec<DeviceFindings> {
+        let mut all = Vec::new();
+        let steam = device_checks::steam_problems(&self.options.system_root);
+        for p in &self.plugins {
+            let id = &p.manifest.id;
+            let status = drivers.get(id).cloned().flatten();
+            let has_driver = p.manifest.driver.is_some();
+            // Without a driver of its own, the kernel's is the one.
+            let ready = !has_driver
+                || status
+                    .as_ref()
+                    .is_some_and(|s| s.provided_by_system || (s.installed && !s.needs_reboot));
+            let ours = status
+                .as_ref()
+                .is_some_and(|s| s.installed && !s.provided_by_system);
+            let fixable = has_driver && p.location == PluginLocation::System && ours;
+            for device in &p.devices {
+                let Bus::Usb {
+                    vid, pid, sysfs, ..
+                } = &device.bus
+                else {
+                    continue;
+                };
+                let components: Vec<&HostComponent> = self
+                    .components
+                    .iter()
+                    .filter(|c| c.plugin == *id && c.device.id == device.id)
+                    .collect();
+                if !components.is_empty() && components.iter().all(|c| c.excluded) {
+                    continue;
+                }
+                let expect = Expect {
+                    kernel_driver: p.manifest.matching.kernel_driver(*vid, *pid),
+                    own_input: !p.manifest.matching.virtual_joystick,
+                    driver_ready: ready,
+                    driver_ours: ours,
+                };
+                let mut problems = device_checks::check_device(
+                    Path::new(sysfs),
+                    &self.options.system_root,
+                    &expect,
+                );
+                if expect.own_input {
+                    problems.extend(steam.iter().cloned());
+                }
+                let findings: Vec<Finding> = problems
+                    .into_iter()
+                    .map(|problem| {
+                        let fix = matches!(problem, device_checks::Problem::WrongDriver { .. })
+                            .then_some(Fix::Rebind)
+                            .filter(|_| fixable);
+                        let mut finding = Finding {
+                            problem,
+                            fix,
+                            ignored: false,
+                        };
+                        finding.ignored = finding.ignorable()
+                            && self.rig.ignored.contains(&format!(
+                                "{}/{}",
+                                device.id,
+                                finding.key()
+                            ));
+                        finding
+                    })
+                    .collect();
+                if !findings.is_empty() {
+                    all.push(DeviceFindings {
+                        plugin: id.clone(),
+                        device: device.id.clone(),
+                        findings,
+                    });
+                }
+            }
+        }
+        all
+    }
+
+    /// Ignores a problem games may have with a device (or shows it again). Saved in
+    /// `rig.toml`.
+    pub fn set_ignored(&mut self, device: &str, key: &str, ignored: bool) -> Result<(), HostError> {
+        let entry = format!("{device}/{key}");
+        if ignored {
+            self.rig.ignored.insert(entry);
+        } else {
+            self.rig.ignored.remove(&entry);
+        }
+        self.rig.save(&self.options.config_dir)
     }
 
     // ---------------------------------------------------------------- procedures

@@ -44,7 +44,7 @@ pub struct Flows {
     installed: BTreeSet<String>,
     /// The first run: 0 welcome, 1 devices, 2 your rig.
     pub first_step: i32,
-    first_installing: BTreeSet<String>,
+    pub first_installing: BTreeSet<String>,
 }
 
 fn has_components(snapshot: &Snapshot, plugin: &str, device: &str) -> bool {

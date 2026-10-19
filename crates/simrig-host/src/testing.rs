@@ -112,6 +112,11 @@ impl PluginEnv {
             data_dir: self.root.join("data"),
             dev_state_dir: self.root.join("state"),
             helper: Some(helper(&bin_dir)),
+            // Not the Steam settings of whoever runs the tests.
+            system_root: crate::SystemRoot {
+                home: None,
+                ..Default::default()
+            },
             ..HostOptions::default()
         })
     }

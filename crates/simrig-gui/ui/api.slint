@@ -104,6 +104,27 @@ export struct InputsView {
     stuck: string,
 }
 
+/// A problem of the system set-up that may keep games from using a device.
+export struct FindingData {
+    key: string,
+    title: string,
+    body: string,
+    /// The facts, in monospace: nodes, drivers, versions.
+    detail: string,
+    /// Information rather than a warning.
+    info: bool,
+    /// The fix, when there is one: its button.
+    fix: string,
+    /// The fix asks for the password.
+    fix-privileged: bool,
+    /// The fix runs now.
+    fixing: bool,
+    /// Said under the fix button: what it fixes, whether it asks for the password.
+    fix-note: string,
+    ignorable: bool,
+    ignored: bool,
+}
+
 export struct ChipData {
     text: string,
     /// neutral, success, warning, error
@@ -293,6 +314,11 @@ export global Rig {
     in property <InputsView> inputs;
     /// The open component's model is not confirmed on real hardware yet.
     in property <bool> current-untested;
+    /// What may keep games from using the open component's device, and what is ignored.
+    in property <[FindingData]> current-findings;
+    in property <[FindingData]> current-ignored;
+    in property <string> ignored-summary;
+    in property <bool> ignored-open;
 
     // Procedure in progress
     in property <Procedure> procedure;
@@ -346,6 +372,10 @@ export global Api {
     callback show-inputs(bool);
     /// Opens a filled-in hardware report on the open component, in the browser.
     callback report-device();
+    /// Runs the fix of a finding of the open device, by key.
+    callback fix-finding(string);
+    callback ignore-finding(string, bool);
+    callback open-ignored(bool);
     callback run-action(string);
     callback save-all();
     callback reset-values();

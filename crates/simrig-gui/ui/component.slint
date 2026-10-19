@@ -6,6 +6,7 @@ import { Rig, Api, SettingRow, RowKind } from "api.slint";
 import { Device, LiveDevice, SteerTrack, PedalBar } from "devices.slint";
 import { Button, ButtonKind, Chip, ChipTone, QuickChip, Slider, Segmented, Toggle, Field, Eyebrow, Title, Heading, Body, Small, LiveValue, Hairline, BackRow, Notice } from "widgets.slint";
 import { InputsPanel } from "inputs.slint";
+import { FindingsBlock, IgnoredLine } from "findings.slint";
 
 /// The response curve of a pedal or handbrake: drag a point up or down.
 component CurveEditor {
@@ -578,6 +579,25 @@ export component ComponentScreen inherits Rectangle {
                             Rectangle { horizontal-stretch: 1; }
                             // Quiet: a report is there for whoever looks for it.
                             ReportLink { }
+                        }
+                        // What may keep games from using the device: only when something is found.
+                        if Rig.current-findings.length > 0: VerticalLayout {
+                            padding-top: 12px;
+                            FindingsBlock { findings: Rig.current-findings; }
+                        }
+                        if Rig.current-ignored.length > 0 && !Rig.ignored-open: VerticalLayout {
+                            padding-top: 12px;
+                            IgnoredLine {
+                                summary: Rig.ignored-summary;
+                                first: Rig.current-ignored.length == 1 ? Rig.current-ignored[0].title : "";
+                            }
+                        }
+                        if Rig.current-ignored.length > 0 && Rig.ignored-open: VerticalLayout {
+                            padding-top: 12px;
+                            FindingsBlock {
+                                findings: Rig.current-ignored;
+                                can-hide: true;
+                            }
                         }
                         if !Rig.has-inputs || !Rig.inputs-tab: VerticalLayout {
                             for row in Rig.rows: SettingLine { setting: row; }

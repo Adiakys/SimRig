@@ -3,6 +3,7 @@
 
 mod app;
 mod backend;
+mod checks;
 mod component;
 mod devices;
 mod flows;
@@ -225,6 +226,12 @@ mod callbacks {
         let a = app.clone();
         api.on_report_device(move || a.borrow_mut().report_device());
         let a = app.clone();
+        api.on_fix_finding(move |key| a.borrow_mut().fix_finding(&key));
+        let a = app.clone();
+        api.on_ignore_finding(move |key, on| a.borrow_mut().ignore_finding(&key, on));
+        let a = app.clone();
+        api.on_open_ignored(move |on| a.borrow_mut().open_ignored(on));
+        let a = app.clone();
         api.on_run_action(move |item| a.borrow_mut().run_component_action(&item));
         let a = app.clone();
         api.on_save_all(move || a.borrow_mut().save_component());
@@ -365,6 +372,10 @@ mod callbacks {
             }
             // update:<version>[/<stage>], the update window on a made-up release
             "update" => a.preview_update(arg),
+            // findings:<problems>, made up on the open device, e.g. findings:driver,!steam
+            "findings" => a.preview_findings(arg),
+            // The ignored problems of the open device, shown again.
+            "ignored" => a.open_ignored(true),
             "driver" => a.install_driver(arg),
             "generic" => a.add_generic(arg),
             "choose" => a.add_choose(arg),

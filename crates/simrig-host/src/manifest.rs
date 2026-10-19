@@ -48,6 +48,15 @@ pub struct Match {
     /// It never gets devices on its own.
     #[serde(default)]
     pub on_request: bool,
+    /// The kernel driver (as `/sys/bus/hid/drivers` names it) that must handle the devices for
+    /// games to get everything, force feedback included; an entry of `usb` may name its own.
+    /// Absent when any driver will do.
+    #[serde(default)]
+    pub kernel_driver: Option<String>,
+    /// Games do not use the devices' own input nodes: the driver hides them and offers a virtual
+    /// joystick instead. Their access and joystick checks do not apply.
+    #[serde(default)]
+    pub virtual_joystick: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -57,6 +66,9 @@ pub struct UsbMatch {
     /// Any product of the vendor when absent.
     #[serde(default)]
     pub pid: Option<u16>,
+    /// The kernel driver these products need, when not the one of the whole plugin.
+    #[serde(default)]
+    pub kernel_driver: Option<String>,
 }
 
 impl UsbMatch {
@@ -78,6 +90,16 @@ impl Match {
             .filter(|m| m.matches(vid, pid))
             .map(UsbMatch::specificity)
             .max()
+    }
+
+    /// The kernel driver a device needs: that of its most specific entry, or the plugin's.
+    pub fn kernel_driver(&self, vid: u16, pid: u16) -> Option<&str> {
+        self.usb
+            .iter()
+            .filter(|m| m.matches(vid, pid) && m.kernel_driver.is_some())
+            .max_by_key(|m| m.specificity())
+            .and_then(|m| m.kernel_driver.as_deref())
+            .or(self.kernel_driver.as_deref())
     }
 }
 
@@ -288,6 +310,8 @@ mod tests {
                 usb,
                 virtual_devices: false,
                 on_request: false,
+                kernel_driver: None,
+                virtual_joystick: false,
             },
             driver: None,
             tested: Vec::new(),
@@ -328,6 +352,7 @@ mod tests {
             vec![UsbMatch {
                 vid: 0x0eb7,
                 pid: None,
+                kernel_driver: None,
             }],
         );
         let moza = manifest(
@@ -335,6 +360,7 @@ mod tests {
             vec![UsbMatch {
                 vid: 0x346e,
                 pid: None,
+                kernel_driver: None,
             }],
         );
         let generic = manifest(
@@ -342,6 +368,7 @@ mod tests {
             vec![UsbMatch {
                 vid: 0x346e,
                 pid: Some(0x1000),
+                kernel_driver: None,
             }],
         );
         let devices = [
@@ -366,6 +393,7 @@ mod tests {
             vec![UsbMatch {
                 vid: 0x0eb7,
                 pid: None,
+                kernel_driver: None,
             }],
         );
         let b = manifest(
@@ -373,6 +401,7 @@ mod tests {
             vec![UsbMatch {
                 vid: 0x0eb7,
                 pid: None,
+                kernel_driver: None,
             }],
         );
         let (assigned, problems) =
@@ -400,6 +429,32 @@ mod tests {
         let overrides = [("usb:1234:0001".to_string(), "generic-usb".to_string())].into();
         let (assigned, _) = assign_usb(&[&generic], &[unknown], &overrides);
         assert_eq!(assigned[0].len(), 1);
+    }
+
+    #[test]
+    fn kernel_driver_of_a_device() {
+        let mut m = manifest(
+            "brand",
+            vec![
+                UsbMatch {
+                    vid: 0x046d,
+                    pid: None,
+                    kernel_driver: None,
+                },
+                UsbMatch {
+                    vid: 0x046d,
+                    pid: Some(0xc262),
+                    kernel_driver: Some("logitech-hidpp-device".into()),
+                },
+            ],
+        );
+        assert_eq!(m.matching.kernel_driver(0x046d, 0xc24f), None);
+        m.matching.kernel_driver = Some("logitech".into());
+        assert_eq!(m.matching.kernel_driver(0x046d, 0xc24f), Some("logitech"));
+        assert_eq!(
+            m.matching.kernel_driver(0x046d, 0xc262),
+            Some("logitech-hidpp-device")
+        );
     }
 
     #[test]

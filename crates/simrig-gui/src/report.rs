@@ -2,7 +2,7 @@
 //! device (model, USB id, driver, system, what it sees as supported). The user reads it, says
 //! how it went and sends it from the browser: SimRig sends nothing.
 
-use simrig_host::SystemInfo;
+use simrig_host::{DeviceFindings, SystemInfo};
 use simrig_model::{Bus, ItemClass, Support};
 
 use crate::backend::{ComponentView, PluginView};
@@ -17,6 +17,8 @@ pub struct Report<'a> {
     pub system: Option<&'a SystemInfo>,
     pub version: &'a str,
     pub format: Option<Format>,
+    /// What the device checks found, ignored problems included.
+    pub findings: Option<&'a DeviceFindings>,
 }
 
 impl Report<'_> {
@@ -92,6 +94,14 @@ impl Report<'_> {
         lines.push(format!("Supported: {}.", supported.join(", ")));
         if !unsupported.is_empty() {
             lines.push(format!("Not supported: {}.", unsupported.join(", ")));
+        }
+        for f in self.findings.iter().flat_map(|d| &d.findings) {
+            lines.push(format!(
+                "Device check{}: {} ({}).",
+                if f.ignored { ", ignored" } else { "" },
+                f.title(),
+                f.detail()
+            ));
         }
         lines.join("\n")
     }
@@ -171,6 +181,7 @@ impl crate::app::App {
             system: self.snapshot.system.as_ref(),
             version: env!("CARGO_PKG_VERSION"),
             format: Format::installed(),
+            findings: self.findings_of(&address),
         }
         .url();
         crate::update::open_url(&url);
@@ -266,6 +277,15 @@ mod tests {
             system: None,
             version: "0.1.0",
             format: Some(Format::Deb),
+            findings: Some(&DeviceFindings {
+                plugin: "fanatec".into(),
+                device: "usb-0eb7-0020".into(),
+                findings: vec![simrig_host::Finding {
+                    problem: simrig_host::Problem::SteamGeneric,
+                    fix: None,
+                    ignored: true,
+                }],
+            }),
         }
         .url();
         assert!(url.starts_with(FORM), "{url}");
@@ -273,6 +293,10 @@ mod tests {
         assert!(url.contains("&usb=0eb7%3A0020%20FANATEC%20Wheel"), "{url}");
         assert!(url.contains("&install=.deb%20package&"), "{url}");
         assert!(url.contains("model%20%60fanatec%2Fcsl-dd%60"), "{url}");
+        assert!(
+            url.contains("Device%20check%2C%20ignored%3A%20Steam%20Input"),
+            "{url}"
+        );
     }
 
     #[test]
