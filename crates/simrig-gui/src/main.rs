@@ -10,6 +10,7 @@ mod format;
 mod inputs;
 mod procedure;
 mod raster;
+mod report;
 mod settings;
 mod shot;
 mod update;
@@ -221,6 +222,8 @@ mod callbacks {
         api.on_toggle_advanced(move |_| a.borrow_mut().toggle_advanced());
         let a = app.clone();
         api.on_show_inputs(move |on| a.borrow_mut().show_inputs(on));
+        let a = app.clone();
+        api.on_report_device(move || a.borrow_mut().report_device());
         let a = app.clone();
         api.on_run_action(move |item| a.borrow_mut().run_component_action(&item));
         let a = app.clone();

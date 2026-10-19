@@ -4,6 +4,8 @@ version = "0.1.0"
 api = 1
 exec = "simrig-plugin-fanatec"
 driver = "driver/driver.toml"
+# Confirmed on real hardware; the app marks the other models as untested.
+tested = ["fanatec/csl-dd"]
 description = "Fanatec wheel bases, steering wheels and pedals, on the open source hid-fanatecff driver."
 
 # The devices hid-fanatecff drives (hid-ftec.h); a test keeps this list in step with it.

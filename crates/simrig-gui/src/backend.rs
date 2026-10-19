@@ -82,6 +82,8 @@ pub struct ComponentView {
     pub plugin_name: String,
     /// The plugin is installed system-wide: saving may ask for the password.
     pub system_plugin: bool,
+    /// Its model is not confirmed on real hardware yet.
+    pub untested: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -376,6 +378,8 @@ fn component_view(host: &mut Host, address: &str) -> Option<ComponentView> {
         .map(|p| p.manifest.name.clone())
         .unwrap_or_else(|| component.plugin.clone());
     let system_plugin = plugin.is_some_and(|p| p.location == PluginLocation::System);
+    let untested =
+        plugin.is_some_and(|p| p.manifest.untested(component.description.model.as_deref()));
     let image = host.image(address).unwrap_or(Image::Generic {
         kind: component.description.kind,
         rim: component.description.appearance.rim,
@@ -385,6 +389,7 @@ fn component_view(host: &mut Host, address: &str) -> Option<ComponentView> {
         image,
         plugin_name,
         system_plugin,
+        untested,
     })
 }
 

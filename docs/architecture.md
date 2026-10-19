@@ -335,6 +335,11 @@ what their hardware can and cannot do.
   enables itself.
 - **Wizard**: calibration and test steps for unsupported items are shown as skipped, with the reason.
 - **Custom parameters** follow the same rules (`availability`, `enabled_if`).
+- **Untested models are said so.** A plugin lists the models confirmed on real hardware
+  (`tested` in its manifest); the screen of any other device carries an "Untested" chip, and every
+  device's screen a quiet "Report how it works" link. It opens the project's hardware report form
+  in the browser, filled in with what the app knows (model, USB id, driver and its state, system,
+  what is supported): the user reads it, adds how it went and sends it. The app sends nothing.
 - **Partly supported, marked**: a parameter that works but not fully carries a `Caveat`, which
   plugins report the same way as an unsupported item's reason (a standard `CaveatReason` the core
   explains, plus an optional detail), on standard and custom parameters alike, read anew with
@@ -427,6 +432,7 @@ version = "0.3.0"
 api     = 1                               # adapter protocol version
 exec    = "simrig-plugin-fanatec"         # file name inside the plugin directory
 driver  = "driver/driver.toml"            # optional: absent when the stock kernel is enough
+tested  = ["fanatec/csl-dd"]              # models confirmed on real hardware ("*": every device)
 
 [match]
 usb = [{ vid = 0x0eb7 }]                  # pid optional

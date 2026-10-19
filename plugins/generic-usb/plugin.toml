@@ -6,5 +6,8 @@ exec = "simrig-plugin-generic-usb"
 driver = "driver/driver.toml"
 description = "Sets up any USB device as a shifter or a handbrake: its inputs are mapped by moving it, and its driver turns it into a standard joystick for every game."
 
+# Confirmed on real hardware (an H-pattern shifter and a handbrake), whatever the device.
+tested = ["*"]
+
 [match]
 on_request = true

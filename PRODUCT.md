@@ -41,6 +41,7 @@ What to keep from manufacturers' apps: **big, readable live values** (angle, ped
 3. **Readable from the seat.** Live values and the current state must be legible at a distance and at a glance, in both themes.
 4. **The app is a guest.** It never needs root to run, asks for a password only when something touches the system, and leaves nothing running when closed. The interface should feel as light as that promise.
 5. **Brand-agnostic by construction.** Nothing in the interface favours a manufacturer; a mixed rig looks as native as a single-brand one.
+6. **Say it once, and only when it matters.** Every piece of information appears in one place on a screen, never repeated in a chip or a second label. Status is shown when something needs attention (a driver to install, a restart, an untested model), not to confirm that all is well: no "active", "tested" or "OK" badges.
 
 ## Accessibility & Inclusion
 

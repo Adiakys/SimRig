@@ -149,6 +149,7 @@ impl App {
         rig.set_current(self.device(&address));
         rig.set_current_title(view.component.description.kind.label().into());
         rig.set_current_chips(ModelRc::new(VecModel::from(self.chips(&view))));
+        rig.set_current_untested(view.untested);
         self.refresh_inputs();
 
         let rows = self.rows(&view);
@@ -242,41 +243,30 @@ impl App {
         }
     }
 
+    /// What needs attention on the device: its driver, when something is to be done about it.
+    /// The plugin's name is already under the title, the firmware among the live values, and a
+    /// driver working needs no chip.
     fn chips(&self, view: &ComponentView) -> Vec<ChipData> {
-        let mut chips = vec![ChipData {
-            text: view.plugin_name.clone().into(),
-            tone: "neutral".into(),
-        }];
-        if let Some(plugin) = self
+        let Some(plugin) = self
             .snapshot
             .plugins
             .iter()
             .find(|p| p.id == view.component.plugin)
-            && plugin.has_driver
-        {
-            let (text, tone) = match &plugin.driver {
-                Some(s) if s.provided_by_system => ("Driver provided by the system", "success"),
-                Some(s) if s.needs_reboot => ("Driver needs a restart", "warning"),
-                Some(s) if s.installed && s.active => ("Driver active", "success"),
-                Some(s) if s.installed => ("Driver installed", "success"),
-                _ => ("Driver not installed", "warning"),
-            };
-            chips.push(ChipData {
-                text: text.into(),
-                tone: tone.into(),
-            });
-        }
-        if let Some(Value::Text(firmware)) = self
-            .live
-            .get(&view.component.address)
-            .and_then(|l| l.get("firmware"))
-        {
-            chips.push(ChipData {
-                text: format!("Firmware {firmware}").into(),
-                tone: "neutral".into(),
-            });
-        }
-        chips
+            .filter(|p| p.has_driver)
+        else {
+            return Vec::new();
+        };
+        let text = match &plugin.driver {
+            Some(s) if s.provided_by_system => return Vec::new(),
+            Some(s) if s.needs_reboot => "Driver needs a restart",
+            Some(s) if s.installed && plugin.driver_update.is_some() => "Driver update available",
+            Some(s) if s.installed => return Vec::new(),
+            _ => "Driver not installed",
+        };
+        vec![ChipData {
+            text: text.into(),
+            tone: "warning".into(),
+        }]
     }
 
     fn rows(&mut self, view: &ComponentView) -> Vec<SettingRow> {

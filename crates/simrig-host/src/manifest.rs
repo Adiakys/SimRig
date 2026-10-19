@@ -30,6 +30,10 @@ pub struct Manifest {
     /// Path of the driver contract (`driver.toml`), when the plugin ships a driver.
     #[serde(default)]
     pub driver: Option<String>,
+    /// Catalog models confirmed on real hardware (`fanatec/csl-dd`), or `*` for every device
+    /// the plugin handles. The app marks the others as untested, and invites a report.
+    #[serde(default)]
+    pub tested: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -143,6 +147,18 @@ pub enum PluginLocation {
 }
 
 impl Manifest {
+    /// A device of this catalog model has not been confirmed on real hardware. Devices a
+    /// plugin provides by itself (a simulated rig) are not real hardware to confirm.
+    pub fn untested(&self, model: Option<&str>) -> bool {
+        if self.matching.virtual_devices {
+            return false;
+        }
+        !self
+            .tested
+            .iter()
+            .any(|t| t == "*" || Some(t.as_str()) == model)
+    }
+
     pub fn load(path: &Path) -> Result<Self, HostError> {
         let invalid = |message: String| HostError::Invalid {
             path: path.to_path_buf(),
@@ -274,7 +290,24 @@ mod tests {
                 on_request: false,
             },
             driver: None,
+            tested: Vec::new(),
         }
+    }
+
+    #[test]
+    fn untested_models() {
+        let mut m = manifest("fanatec", vec![]);
+        assert!(m.untested(Some("fanatec/csl-dd")));
+        m.tested = vec!["fanatec/csl-dd".into()];
+        assert!(!m.untested(Some("fanatec/csl-dd")));
+        assert!(m.untested(Some("fanatec/csl-elite")));
+        assert!(m.untested(None));
+        m.tested = vec!["*".into()];
+        assert!(!m.untested(None));
+        // A simulated rig is not hardware to confirm.
+        let mut sim = manifest("sim", vec![]);
+        sim.matching.virtual_devices = true;
+        assert!(!sim.untested(None));
     }
 
     fn device(vid: u16, pid: u16) -> UsbDevice {

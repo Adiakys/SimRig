@@ -315,6 +315,15 @@ lever turns on its pivot. Only the pedals the component declares are drawn. Next
 sits one **Live Value** (Label caption, Value L or XL) and at most two secondary values. A device
 whose plugin provides its own images uses them with the same animation rules.
 
+### Chips and report link of a device
+The chips at the top of a device's settings say only what needs attention: the driver when
+something is to be done (not installed, needs a restart, an update; Pit Orange with the triangle)
+and, for a model not confirmed on real hardware, **Untested** (neutral). Nothing that is shown
+elsewhere (the plugin's name is under the title, the firmware among the live values) and nothing
+that only says all is well ("Driver active", "Tested"). At the right end of the same row, a Quiet button with the
+external-link icon, **Report how it works**, opens the filled-in hardware report; its tooltip
+says what the report holds. Nothing pops up to ask for a report.
+
 ### Inputs view
 A steering wheel's screen has two views, **Settings** and **Inputs**, picked with a segmented
 control at the top of the right column, so the rim's controls never mix with its settings. The
@@ -340,6 +349,8 @@ dot, its number, its name), fading in and out in 200 ms.
 - **Do** check both themes for every screen; live values must reach 7:1 on their background.
 
 ### Don't:
+- **Don't** repeat information on a screen, or add a chip or badge that only says all is well
+  ("Active", "Tested", "OK"): status appears when something needs attention.
 - **Don't** use the **aggressive RGB gamer** look: no neon, no glows, no cut corners, no fake
   carbon fibre, no RGB gradients.
 - **Don't** build an **overloaded cockpit**: no more than one big value and two small ones per

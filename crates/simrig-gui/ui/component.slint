@@ -77,6 +77,37 @@ component CurveEditor {
     }
 }
 
+/// Opens a filled-in hardware report in the browser; the tooltip says what it holds.
+component ReportLink inherits Rectangle {
+    width: b.preferred-width;
+    b := Button {
+        y: (parent.height - self.height) / 2;
+        kind: ButtonKind.quiet;
+        icon: Icons.external;
+        text: @tr("Report how it works");
+        clicked => { Api.report-device(); }
+    }
+    Tooltip {
+        Rectangle {
+            border-radius: 6px;
+            background: Theme.raised;
+            border-width: 1px;
+            border-color: Theme.rule;
+            width: 320px;
+            height: tip.preferred-height + 16px;
+            tip := Text {
+                x: 10px;
+                width: parent.width - 20px;
+                text: @tr("Opens a filled-in report on GitHub: this device, its driver, your kernel and what SimRig sees. It is read before sending it.");
+                font-family: Theme.sans;
+                font-size: 13px;
+                color: Theme.ink;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
 /// A setting that may not work fully: a yellow mark, the explanation as its tooltip.
 component CaveatMark inherits Rectangle {
     in property <string> text;
@@ -523,7 +554,6 @@ export component ComponentScreen inherits Rectangle {
                         padding-bottom: 24px;
                         HorizontalLayout {
                             spacing: 8px;
-                            alignment: start;
                             padding-top: 4px;
                             // A steering wheel's inputs apart from its settings.
                             if Rig.has-inputs: HorizontalLayout {
@@ -541,6 +571,13 @@ export component ComponentScreen inherits Rectangle {
                                 tone: c.tone == "success" ? ChipTone.success : c.tone == "warning" ? ChipTone.warning : ChipTone.neutral;
                                 icon: c.tone == "success" ? Icons.check : c.tone == "warning" ? Icons.warn : @image-url("");
                             }
+                            if Rig.current-untested: Chip {
+                                y: (parent.height - self.height) / 2;
+                                text: @tr("Untested");
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                            // Quiet: a report is there for whoever looks for it.
+                            ReportLink { }
                         }
                         if !Rig.has-inputs || !Rig.inputs-tab: VerticalLayout {
                             for row in Rig.rows: SettingLine { setting: row; }
