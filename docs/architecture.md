@@ -132,6 +132,12 @@ as a single-brand rig.
 - **Several components of the same type** are allowed: two pedal sets, an H-pattern and a
   sequential shifter, a base with a separate USB rim. Components are always addressed by
   `<plugin>/<component id>`, never by type alone.
+- **Addresses follow the device, not the port.** A USB device's id, at the start of its
+  components' ids, is made of what it is: `usb-<vendor>-<product>-<serial>`, or
+  `usb-<vendor>-<product>` without a serial (`moza/usb-346e-0003/pedals`). Moved to another port
+  or dock, a device keeps its exclusions and the preset values aimed at it. Only two devices
+  alike plugged in together (same model, no serial or the same one) also get their port
+  (`-at-1-4`). Addresses saved when ids held the port are rewritten when the device shows up.
 - **Optional components can be excluded** from the rig by the user, e.g. the pedal inputs a
   Fanatec base always exposes when the pedals actually used are Moza ones. Excluded components are
   listed apart and can be re-enabled; this is the user's rig composition, unrelated to
@@ -785,7 +791,7 @@ ffb_strength = 70
 [pedals]
 "brake.curve" = [[0, 0], [0.5, 0.35], [1, 1]]
 
-[component."moza/usb-1-4/pedals"]           # only this pedal set, when there are several
+[component."moza/usb-346e-0003/pedals"]     # only this pedal set, when there are several
 "brake.max_force" = 60
 
 [custom.fanatec]                            # applied only when a Fanatec device is present

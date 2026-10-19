@@ -271,6 +271,7 @@ impl Host {
             presets: PresetStore::new(&options.config_dir),
         };
         let usb = usb::scan_dir(&options.usb_root);
+        host.migrate_addresses(&usb);
         let assigned = host.assign(&usb);
         host.usb = usb;
         for (i, devices) in assigned.into_iter().enumerate() {
@@ -596,6 +597,7 @@ impl Host {
         if added.is_empty() {
             return;
         }
+        self.migrate_addresses(&added);
         for (i, devices) in self.assign(&added).into_iter().enumerate() {
             if devices.is_empty() {
                 continue;
@@ -608,6 +610,17 @@ impl Host {
             } else {
                 self.start_plugin(i, devices);
             }
+        }
+    }
+
+    /// Choices saved when addresses held the port follow the devices to their ids.
+    fn migrate_addresses(&mut self, devices: &[UsbDevice]) {
+        let mut migrated = false;
+        for device in devices {
+            migrated |= self.rig.migrate_device(&device.legacy_id(), &device.id);
+        }
+        if migrated && let Err(e) = self.rig.save(&self.options.config_dir) {
+            self.problem(format!("cannot save the rig: {e}"));
         }
     }
 

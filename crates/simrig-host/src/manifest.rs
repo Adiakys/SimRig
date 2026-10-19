@@ -284,6 +284,7 @@ mod tests {
             sysfs: PathBuf::from(format!("/sys/bus/usb/devices/{vid:04x}-{pid:04x}")),
             name: format!("{vid:04x}:{pid:04x}"),
             serial: None,
+            id: format!("usb-{vid:04x}-{pid:04x}"),
         }
     }
 

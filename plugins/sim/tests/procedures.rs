@@ -236,11 +236,16 @@ fn generic_plugins_take_only_devices_assigned_to_them() {
     host.choose_plugin("usb:1234:0001", Some(GENERIC_PLUGIN))
         .unwrap();
     assert_eq!(generic(&host), PluginState::Running);
-    let target = host.target(&format!("{GENERIC_PLUGIN}/usb-3-2")).unwrap();
+    let target = host
+        .target(&format!("{GENERIC_PLUGIN}/usb-1234-0001"))
+        .unwrap();
     assert_eq!(host.procedures(&target).unwrap()[0].id, "setup");
 
     // Clearing the choice gives the device back.
     host.choose_plugin("usb:1234:0001", None).unwrap();
     assert_eq!(generic(&host), PluginState::Idle);
-    assert!(host.target(&format!("{GENERIC_PLUGIN}/usb-3-2")).is_err());
+    assert!(
+        host.target(&format!("{GENERIC_PLUGIN}/usb-1234-0001"))
+            .is_err()
+    );
 }

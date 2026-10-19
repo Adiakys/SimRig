@@ -14,6 +14,9 @@ pub struct UsbDevice {
     pub sysfs: PathBuf,
     pub name: String,
     pub serial: Option<String>,
+    /// The device's id for plugins, in component addresses: the same on any port (see
+    /// [`stable_id`]).
+    pub id: String,
 }
 
 impl UsbDevice {
@@ -27,14 +30,22 @@ impl UsbDevice {
         }
     }
 
-    pub fn device_info(&self) -> DeviceInfo {
-        let port = self
-            .sysfs
+    /// The USB port, as sysfs names it (`1-2`, `3-1.4`).
+    pub fn port(&self) -> String {
+        self.sysfs
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+            .unwrap_or_default()
+    }
+
+    /// The id component addresses had before it was stable: the port.
+    pub fn legacy_id(&self) -> String {
+        format!("usb-{}", self.port())
+    }
+
+    pub fn device_info(&self) -> DeviceInfo {
         DeviceInfo {
-            id: format!("usb-{port}"),
+            id: self.id.clone(),
             name: self.name.clone(),
             bus: Bus::Usb {
                 vid: self.vid,
@@ -87,11 +98,42 @@ pub fn scan_dir(root: &Path) -> Vec<UsbDevice> {
                 sysfs: path,
                 name,
                 serial,
+                id: String::new(),
             })
         })
         .collect();
     devices.sort_by(|a, b| a.sysfs.cmp(&b.sysfs));
+    let ids: Vec<String> = devices.iter().map(stable_id).collect();
+    for (i, device) in devices.iter_mut().enumerate() {
+        // Two devices alike (same model, no serial or the same one): the port tells them apart.
+        let alike = ids.iter().filter(|id| **id == ids[i]).count() > 1;
+        device.id = if alike {
+            format!("{}-at-{}", ids[i], device.port().replace('.', "-"))
+        } else {
+            ids[i].clone()
+        };
+    }
     devices
+}
+
+/// A device's id from what it is, not where it is plugged in: `usb-vvvv-pppp-<serial>`, or
+/// `usb-vvvv-pppp` without a serial. The serial is kept to lower-case letters and digits, as
+/// ids are parts of addresses.
+pub fn stable_id(device: &UsbDevice) -> String {
+    let base = format!("usb-{:04x}-{:04x}", device.vid, device.pid);
+    let serial: String = device
+        .serial
+        .as_deref()
+        .unwrap_or_default()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    if serial.is_empty() {
+        base
+    } else {
+        format!("{base}-{serial}")
+    }
 }
 
 #[cfg(test)]
@@ -116,6 +158,40 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(devices.len(), 1);
         assert_eq!((devices[0].vid, devices[0].pid), (0x0eb7, 0x0020));
-        assert_eq!(devices[0].device_info().id, "usb-1-2");
+        assert_eq!(devices[0].device_info().id, "usb-0eb7-0020");
+        assert_eq!(devices[0].legacy_id(), "usb-1-2");
+    }
+
+    fn plug(root: &Path, port: &str, pid: &str, serial: Option<&str>) {
+        let dev = root.join(port);
+        fs::create_dir_all(&dev).unwrap();
+        fs::write(dev.join("idVendor"), "046d\n").unwrap();
+        fs::write(dev.join("idProduct"), format!("{pid}\n")).unwrap();
+        if let Some(serial) = serial {
+            fs::write(dev.join("serial"), format!("{serial}\n")).unwrap();
+        }
+    }
+
+    #[test]
+    fn ids_follow_the_device_not_the_port() {
+        let root = std::env::temp_dir().join(format!("simrig-usb-ids-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        plug(&root, "1-2", "c24f", Some("AB:12-cd"));
+        plug(&root, "1-3", "c262", None);
+        plug(&root, "3-1.4", "c262", None);
+        plug(&root, "1-5", "c29b", Some("0000"));
+        plug(&root, "1-6", "c29b", Some("0000"));
+        let ids: Vec<String> = scan_dir(&root).into_iter().map(|d| d.id).collect();
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(
+            ids,
+            [
+                "usb-046d-c24f-ab12cd",
+                "usb-046d-c262-at-1-3",
+                "usb-046d-c29b-0000-at-1-5",
+                "usb-046d-c29b-0000-at-1-6",
+                "usb-046d-c262-at-3-1-4",
+            ]
+        );
     }
 }

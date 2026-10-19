@@ -138,7 +138,7 @@ fn pedals_handbrake_and_pedals_on_the_base() {
     until(&mut host, "components", |h| h.components().len() == 4);
 
     // The SR-P's axes are known: no mapping.
-    let srp = "moza/usb-1-4/pedals";
+    let srp = "moza/usb-346e-0003/pedals";
     assert_eq!(host.find(srp).unwrap().description.pedals.len(), 3);
     let inputs = host.read_inputs(srp).unwrap();
     let Some(Value::Axis(throttle)) = inputs.get("throttle.position") else {
@@ -154,7 +154,7 @@ fn pedals_handbrake_and_pedals_on_the_base() {
         &base,
         "abs 0 32767 0 65535\nabs 2 0 0 65535\nabs 5 65535 0 65535\nabs 6 0 0 65535\n",
     );
-    let on_base = "moza/usb-1-3/pedals";
+    let on_base = "moza/usb-346e-0002/pedals";
     assert_eq!(host.find(on_base).unwrap().description.pedals.len(), 3);
     let inputs = host.read_inputs(on_base).unwrap();
     let Some(Value::Axis(brake)) = inputs.get("brake.position") else {

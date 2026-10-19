@@ -104,7 +104,7 @@ fn a_v12_has_inputs_and_forces_but_no_settings() {
     // Its pedals are not in a known table: mapping them is part of adding the base.
     let procedures = host.procedures(&simrig_host::Target::Device {
         plugin: "pxn".into(),
-        device: "usb-1-11".into(),
+        device: "usb-11ff-1212".into(),
     });
     let map = procedures
         .unwrap()

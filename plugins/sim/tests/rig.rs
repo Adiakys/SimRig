@@ -379,7 +379,7 @@ fn usb_hotplug_with_mixed_brands() {
     assert_eq!(usb_plugin(&host), PluginState::Running);
     // Two pedal sets from two "brands": addressed by plugin, never by type alone.
     assert!(host.find("pedals").is_err());
-    let usb_pedals = "sim-usb/usb-3-1/pedals";
+    let usb_pedals = "sim-usb/usb-fffe-0001/pedals";
     assert_eq!(
         host.find(usb_pedals).unwrap().description.model.as_deref(),
         Some("sim/usb-pedals")
@@ -414,6 +414,59 @@ fn usb_hotplug_with_mixed_brands() {
     );
     assert_eq!(usb_plugin(&host), PluginState::Idle);
     assert!(host.find(usb_pedals).is_err());
+}
+
+/// Choices about a device follow it to another port: its address does not hold the port.
+#[test]
+fn a_device_moved_to_another_port_keeps_its_address() {
+    let env = Env::new("usb-port");
+    env.add_usb_plugin();
+    let mut host = env.start();
+    let usb_pedals = "sim-usb/usb-fffe-0001/pedals";
+    env.plug_usb("3-1");
+    poll_until(
+        &mut host,
+        "usb pedals",
+        |e| matches!(e, HostEvent::DeviceAdded { plugin, .. } if plugin == USB_PLUGIN),
+    );
+    host.set_excluded(usb_pedals, true).unwrap();
+
+    env.unplug_usb("3-1");
+    poll_until(&mut host, "unplugged", |e| {
+        matches!(e, HostEvent::DeviceRemoved { .. })
+    });
+    env.plug_usb("2-4");
+    poll_until(
+        &mut host,
+        "usb pedals again",
+        |e| matches!(e, HostEvent::DeviceAdded { plugin, .. } if plugin == USB_PLUGIN),
+    );
+    assert!(host.find(usb_pedals).unwrap().excluded);
+}
+
+/// A rig saved when addresses held the port: its choices move to the device's id.
+#[test]
+fn addresses_with_the_port_are_migrated() {
+    let env = Env::new("usb-legacy");
+    env.add_usb_plugin();
+    fs::create_dir_all(env.root.join("config")).unwrap();
+    fs::write(
+        env.root.join("config/rig.toml"),
+        "excluded = [\"sim-usb/usb-3-1/pedals\"]\n",
+    )
+    .unwrap();
+    env.plug_usb("3-1");
+    let mut host = env.start();
+    let address = "sim-usb/usb-fffe-0001/pedals";
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while host.find(address).is_err() && std::time::Instant::now() < deadline {
+        host.poll();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(host.find(address).unwrap().excluded);
+    let rig = fs::read_to_string(env.root.join("config/rig.toml")).unwrap();
+    assert!(rig.contains("sim-usb/usb-fffe-0001/pedals"), "{rig}");
+    assert!(!rig.contains("usb-3-1"), "{rig}");
 }
 
 #[test]

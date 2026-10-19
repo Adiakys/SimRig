@@ -23,6 +23,27 @@ pub struct RigConfig {
 }
 
 impl RigConfig {
+    /// Rewrites addresses of a device from the id it had before ids were stable (its port,
+    /// `usb-1-4`) to its id now; true when anything changed.
+    pub fn migrate_device(&mut self, legacy: &str, id: &str) -> bool {
+        if legacy == id {
+            return false;
+        }
+        let moved: Vec<String> = self
+            .excluded
+            .iter()
+            .filter(|a| a.split('/').nth(1) == Some(legacy))
+            .cloned()
+            .collect();
+        for address in &moved {
+            self.excluded.remove(address);
+            let mut parts: Vec<&str> = address.split('/').collect();
+            parts[1] = id;
+            self.excluded.insert(parts.join("/"));
+        }
+        !moved.is_empty()
+    }
+
     pub fn path(config_dir: &Path) -> PathBuf {
         config_dir.join("rig.toml")
     }

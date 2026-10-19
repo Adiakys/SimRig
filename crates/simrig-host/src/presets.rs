@@ -10,7 +10,7 @@
 //! [pedals]
 //! "brake.curve" = [[0, 0], [0.5, 0.35], [1, 1]]
 //!
-//! [component."moza/usb-1-4/pedals"]     # only this component
+//! [component."moza/usb-346e-0003/pedals"]     # only this component
 //! "brake.max_force" = 60
 //!
 //! [custom.fanatec]                      # custom parameters of a plugin's components
@@ -295,7 +295,7 @@ mod tests {
             rotation = 540
             [pedals]
             "brake.curve" = [[0, 0], [0.5, 0.35], [1, 1]]
-            [component."moza/usb-1-4/pedals"]
+            [component."moza/usb-346e-0003/pedals"]
             "brake.max_force" = 60
             [custom.fanatec]
             ffb_scaling = 1
