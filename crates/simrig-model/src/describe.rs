@@ -56,6 +56,42 @@ pub struct Control {
     /// The buttons an encoder reports its steps with (their numbers).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub buttons: Vec<u32>,
+    /// The symbol printed on it, when it is one of the controllers' standard ones: the app
+    /// draws it instead of the name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<ControlSymbol>,
+}
+
+/// The face-button symbols of controllers, which rims and wheels print too.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlSymbol {
+    Cross,
+    Square,
+    Circle,
+    Triangle,
+}
+
+impl ControlSymbol {
+    pub fn key(self) -> &'static str {
+        match self {
+            ControlSymbol::Cross => "cross",
+            ControlSymbol::Square => "square",
+            ControlSymbol::Circle => "circle",
+            ControlSymbol::Triangle => "triangle",
+        }
+    }
+
+    /// The symbol a control's name stands for ("Cross" → the cross).
+    pub fn for_name(name: &str) -> Option<Self> {
+        match name {
+            "Cross" => Some(ControlSymbol::Cross),
+            "Square" => Some(ControlSymbol::Square),
+            "Circle" => Some(ControlSymbol::Circle),
+            "Triangle" => Some(ControlSymbol::Triangle),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -78,6 +114,7 @@ impl Control {
             index,
             bits: None,
             buttons: Vec::new(),
+            symbol: None,
         }
     }
 
@@ -86,8 +123,11 @@ impl Control {
         self
     }
 
+    /// Its name, and the symbol the name stands for, if any.
     pub fn label(mut self, label: impl Into<String>) -> Self {
-        self.label = Some(label.into());
+        let label = label.into();
+        self.symbol = ControlSymbol::for_name(&label);
+        self.label = Some(label);
         self
     }
 

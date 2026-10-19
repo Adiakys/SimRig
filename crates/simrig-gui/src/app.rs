@@ -430,10 +430,11 @@ impl App {
                     }
                 }
                 if d.kind == ComponentKind::SteeringWheel {
-                    if let Some((what, label)) = self.recent_press(&c.address) {
+                    if let Some((what, label, symbol)) = self.recent_press(&c.address) {
                         device.pressed_show = true;
                         device.pressed = what.into();
                         device.pressed_label = label.into();
+                        device.pressed_symbol = symbol.into();
                     }
                     let pivot = self.geometry.steering_wheel.pivot;
                     if let Some(raster) = &mut self.raster {

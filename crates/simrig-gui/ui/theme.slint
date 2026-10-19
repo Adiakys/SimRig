@@ -77,4 +77,18 @@ export global Icons {
     out property <image> mark: @image-url("icons/mark.svg");
     out property <image> update: @image-url("icons/update.svg");
     out property <image> external: @image-url("icons/external.svg");
+    // Controllers' face-button symbols.
+    out property <image> face-cross: @image-url("icons/face-cross.svg");
+    out property <image> face-square: @image-url("icons/face-square.svg");
+    out property <image> face-circle: @image-url("icons/face-circle.svg");
+    out property <image> face-triangle: @image-url("icons/face-triangle.svg");
+
+    /// The icon of a face-button symbol (`cross`…), none for anything else.
+    public pure function face(symbol: string) -> image {
+        if symbol == "cross" { return self.face-cross; }
+        if symbol == "square" { return self.face-square; }
+        if symbol == "circle" { return self.face-circle; }
+        if symbol == "triangle" { return self.face-triangle; }
+        return @image-url("");
+    }
 }

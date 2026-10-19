@@ -1,6 +1,6 @@
 // The Inputs view of a steering wheel: what the rim sends, as games number it, live.
 
-import { Theme } from "theme.slint";
+import { Theme, Icons } from "theme.slint";
 import { InputsView, InputButton, InputHat, InputEncoder, InputAxis } from "api.slint";
 import { Eyebrow, Heading, Small, LiveValue, Hairline, Notice } from "widgets.slint";
 
@@ -42,26 +42,37 @@ component ButtonTile inherits Rectangle {
     animate background { duration: 120ms; easing: cubic-bezier(0.25, 1, 0.5, 1); }
     accessible-role: AccessibleRole.text;
     accessible-label: @tr("Button {}", button.number) + (button.label != "" ? ", " + button.label : "") + (button.pressed ? ", " + @tr("pressed") : "");
-    VerticalLayout {
-        alignment: center;
-        spacing: 3px;
-        Text {
-            text: root.button.number;
-            font-family: Theme.mono;
-            font-size: 15px;
-            font-weight: 600;
-            horizontal-alignment: center;
-            color: root.button.pressed ? Theme.on-accent : Theme.ink;
-        }
-        if root.button.label != "": Text {
-            text: root.button.label;
-            font-family: Theme.sans;
-            font-size: 11px;
-            font-weight: 500;
-            horizontal-alignment: center;
-            overflow: elide;
-            color: root.button.pressed ? Theme.on-accent : Theme.ink3;
-        }
+    // The number in the middle of every tile, the name or symbol small along its bottom edge:
+    // numbers line up, and a tile without a name has nothing missing.
+    Text {
+        y: (parent.height - self.height) / 2 - 2px;
+        width: parent.width;
+        text: root.button.number;
+        font-family: Theme.mono;
+        font-size: 15px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        color: root.button.pressed ? Theme.on-accent : Theme.ink;
+    }
+    if root.button.symbol != "": Image {
+        source: Icons.face(root.button.symbol);
+        colorize: root.button.pressed ? Theme.on-accent : Theme.ink2;
+        width: 14px;
+        height: 14px;
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 4px;
+    }
+    if root.button.symbol == "" && root.button.label != "": Text {
+        x: 4px;
+        y: parent.height - self.height - 4px;
+        width: parent.width - 8px;
+        text: root.button.label;
+        font-family: Theme.sans;
+        font-size: 10px;
+        font-weight: 500;
+        horizontal-alignment: center;
+        overflow: elide;
+        color: root.button.pressed ? Theme.on-accent : Theme.ink3;
     }
     if root.button.pressed: Rectangle {
         x: parent.width - 12px;
@@ -206,7 +217,16 @@ export component InputsPanel inherits VerticalLayout {
                 color: Theme.ink;
                 vertical-alignment: center;
             }
-            if root.view.last-label != "": Text { text: root.view.last-label; font-family: Theme.sans; font-size: 16px; font-weight: 500; color: Theme.ink; vertical-alignment: center; }
+            if root.view.last-symbol != "": Image {
+                source: Icons.face(root.view.last-symbol);
+                colorize: Theme.ink;
+                width: 20px;
+                height: 20px;
+                y: (parent.height - self.height) / 2;
+                accessible-role: AccessibleRole.image;
+                accessible-label: root.view.last-label;
+            }
+            if root.view.last-symbol == "" && root.view.last-label != "": Text { text: root.view.last-label; font-family: Theme.sans; font-size: 16px; font-weight: 500; color: Theme.ink; vertical-alignment: center; }
             Text { text: root.view.last-code; font-family: Theme.mono; font-size: 13px; color: Theme.ink3; vertical-alignment: center; horizontal-stretch: 1; }
         }
     }

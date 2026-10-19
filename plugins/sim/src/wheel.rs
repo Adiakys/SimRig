@@ -86,7 +86,16 @@ impl Component for SimWheel {
     /// Like a real rim's: buttons named where a plugin would know them, encoders that step
     /// with a pair of buttons, a hat switch, and on the formula rim two analog paddles.
     fn controls(&mut self) -> Vec<Control> {
-        const NAMES: [&str; 6] = ["Shift down", "Shift up", "Radio", "Flash", "Pit", "Neutral"];
+        const NAMES: [&str; 8] = [
+            "Shift down",
+            "Shift up",
+            "Cross",
+            "Square",
+            "Circle",
+            "Triangle",
+            "Pit",
+            "Radio",
+        ];
         let count = self.buttons_count();
         let mut controls: Vec<Control> = (0..count)
             .map(|i| {

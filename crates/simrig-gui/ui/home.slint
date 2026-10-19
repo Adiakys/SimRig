@@ -139,7 +139,14 @@ component DeviceCard inherits Card {
                                     border-color: Theme.accent-edge;
                                 }
                                 Text { text: root.device.pressed; font-family: Theme.mono; font-size: 14px; font-weight: 600; color: Theme.ink; vertical-alignment: center; }
-                                if root.device.pressed-label != "": Text { text: root.device.pressed-label; font-family: Theme.sans; font-size: 13px; color: Theme.ink2; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; min-width: 0; }
+                                if root.device.pressed-symbol != "": Image {
+                                    source: Icons.face(root.device.pressed-symbol);
+                                    colorize: Theme.ink2;
+                                    width: 14px;
+                                    height: 14px;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                if root.device.pressed-symbol == "" && root.device.pressed-label != "": Text { text: root.device.pressed-label; font-family: Theme.sans; font-size: 13px; color: Theme.ink2; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; min-width: 0; }
                             }
                         }
                     }

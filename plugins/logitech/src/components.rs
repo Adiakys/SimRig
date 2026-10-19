@@ -199,7 +199,8 @@ pub struct Wheel {
 
 impl Component for Wheel {
     fn controls(&mut self) -> Vec<Control> {
-        self.device.borrow().hid.controls(&[], &[])
+        let d = self.device.borrow();
+        d.hid.controls(&[], crate::buttons::labels(d.model.pid))
     }
 
     fn id(&self) -> String {

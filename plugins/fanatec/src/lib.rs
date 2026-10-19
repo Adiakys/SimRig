@@ -3,6 +3,7 @@
 //! game: sysfs attributes for settings, the event node for inputs and force feedback.
 
 pub mod adapter;
+pub mod buttons;
 pub mod components;
 pub mod device;
 pub mod models;

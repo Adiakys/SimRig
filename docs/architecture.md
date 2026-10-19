@@ -283,7 +283,13 @@ Games under Proton get their controllers through SDL, which numbers buttons from
 `BTN_JOYSTICK` and up, then the ones below, and axes in code order without the hat switches'.
 The kit (`HidDevice::controls`) numbers them the same way, and gives `buttons` in that order, so
 "Button 7" in SimRig is button 7 in a game. Plugins add what only they know: names, which axes
-are analog paddles.
+are analog paddles. Each keeps its names in `src/buttons.rs`, by kernel code: per model where
+the rim is part of the wheel (Logitech, from layouts captured on the wheels), or by the
+firmware's index where every rim shares one (Fanatec, from the driver's key map, used only when
+the driver keeps its default numbering). Naming another wheel's buttons is a table there: the
+Inputs view shows the number and code of the button just pressed. A name that is a controller's
+face-button symbol (Cross, Square, Circle, Triangle) also sets the control's `symbol`, which the
+app draws instead of the name.
 
 ### 3.4 Custom parameters
 

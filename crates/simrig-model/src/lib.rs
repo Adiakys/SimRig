@@ -22,7 +22,7 @@ pub use component::{
 pub use custom::{Condition, CustomParam};
 pub use describe::{
     ActionOutcome, ActionSpec, Appearance, ComponentDescription, Control, ControlKind,
-    ItemDescription, ItemSpec, RimShape,
+    ControlSymbol, ItemDescription, ItemSpec, RimShape,
 };
 pub use device::{Bus, DeviceInfo};
 pub use param::{ChoiceOption, ParamSpec, ParamType, Persistence, ValueError};

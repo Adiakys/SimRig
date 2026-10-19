@@ -92,6 +92,11 @@ impl Presses {
     }
 }
 
+/// The face-button symbol drawn for a control (`cross`…), or empty.
+pub fn symbol(c: &Control) -> &'static str {
+    c.symbol.map(|s| s.key()).unwrap_or_default()
+}
+
 /// "Button 7", "Hat 1", "Axis 4", "Encoder 2".
 pub fn title(c: &Control) -> String {
     let kind = match c.kind {
@@ -134,6 +139,7 @@ pub fn view(
             InputButton {
                 number: c.number as i32,
                 label: c.label.clone().unwrap_or_default().into(),
+                symbol: symbol(c).into(),
                 pressed,
                 last: last == Some(i) && !pressed,
                 held: held.into(),
@@ -208,6 +214,7 @@ pub fn view(
             .unwrap_or_default()
             .into(),
         last_code: used.and_then(|c| c.code.clone()).unwrap_or_default().into(),
+        last_symbol: used.map(symbol).unwrap_or_default().into(),
         stuck: stuck_text.into(),
     }
 }
@@ -302,8 +309,8 @@ impl crate::app::App {
         }
     }
 
-    /// The control a steering wheel used a moment ago, for its card: title and name.
-    pub fn recent_press(&self, address: &str) -> Option<(String, String)> {
+    /// The control a steering wheel used a moment ago, for its card: title, name, symbol.
+    pub fn recent_press(&self, address: &str) -> Option<(String, String, &'static str)> {
         let controls = self.controls_of(address)?;
         let c = self
             .inputs
@@ -311,7 +318,7 @@ impl crate::app::App {
             .get(address)?
             .recent(&controls, Instant::now())?;
         let label = c.label.clone().filter(|l| *l != title(c));
-        Some((title(c), label.unwrap_or_default()))
+        Some((title(c), label.unwrap_or_default(), symbol(c)))
     }
 
     /// Settings or Inputs on the open component's screen.

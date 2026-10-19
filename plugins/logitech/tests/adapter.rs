@@ -97,6 +97,9 @@ fn a_g29_on_new_lg4ff() {
         .map(|c| (c.number, c.code.as_deref()))
         .collect();
     assert_eq!(names, [(1, Some("BTN_TRIGGER")), (2, Some("BTN_THUMB"))]);
+    // Named from the G29's layout.
+    assert_eq!(controls[0].label.as_deref(), Some("Cross"));
+    assert_eq!(controls[1].label.as_deref(), Some("Square"));
 
     let spec = host.param(&base, "rotation").unwrap();
     assert_eq!(spec.value, Value::Float(900.0));

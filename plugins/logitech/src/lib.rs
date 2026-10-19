@@ -5,6 +5,7 @@
 //! WingMan wheels work with the kernel's `hid-logitech` and `iforce`.
 
 pub mod adapter;
+pub mod buttons;
 pub mod components;
 pub mod device;
 pub mod models;

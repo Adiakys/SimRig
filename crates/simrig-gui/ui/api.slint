@@ -59,6 +59,8 @@ export struct SettingRow {
 export struct InputButton {
     number: int,
     label: string,
+    /// A face-button symbol drawn instead of the label: cross, square, circle, triangle.
+    symbol: string,
     pressed: bool,
     /// The control used last, when it is not pressed now.
     last: bool,
@@ -96,6 +98,7 @@ export struct InputsView {
     /// The control used last: "Button 7", its name and its kernel code.
     last-what: string,
     last-label: string,
+    last-symbol: string,
     last-code: string,
     /// Why a button may be stuck.
     stuck: string,
