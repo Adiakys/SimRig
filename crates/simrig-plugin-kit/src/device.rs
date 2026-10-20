@@ -14,8 +14,8 @@ use simrig_plugin_sdk::model::{Control, ControlKind};
 /// Which HID devices below the USB device belong to the driver.
 #[derive(Clone, Copy, Debug)]
 pub struct Binding {
-    /// USB vendor in hex, e.g. `"0EB7"`.
-    pub vendor: &'static str,
+    /// USB vendor id.
+    pub vendor: u16,
     /// Names of the kernel drivers (as in `/sys/bus/hid/drivers`) that count.
     pub drivers: &'static [&'static str],
     /// Entries that mark the HID device to talk to, when there are several.

@@ -18,7 +18,7 @@ use crate::serial::{self, Link};
 pub const FFB_DRIVER: &str = "hid-universal-pidff";
 
 pub const BINDING: Binding = Binding {
-    vendor: "346E",
+    vendor: 0x346e,
     // Accessories stay on hid-generic; a base without hid-universal-pidff has inputs, no forces.
     drivers: &[FFB_DRIVER, "hid-generic"],
     rich: &["input"],

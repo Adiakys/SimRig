@@ -62,7 +62,7 @@ impl Component for Base {
     }
 
     fn model(&self) -> Option<String> {
-        Some(self.device.borrow().model.model.into())
+        self.device.borrow().model.model.map(Into::into)
     }
 
     fn custom_params(&mut self) -> Vec<CustomParam> {

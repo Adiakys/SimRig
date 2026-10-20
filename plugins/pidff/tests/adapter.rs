@@ -52,6 +52,36 @@ fn a_cammus_c5_with_force_feedback() {
 }
 
 #[test]
+fn any_base_is_taken_when_chosen() {
+    let env = env("unknown");
+    let hid = env.plug(
+        "1-4",
+        0x1d50,
+        0x6100,
+        "DIY FFB wheel",
+        "1-4:1.0/0003:1D50:6100.0001",
+        Some("hid-generic"),
+    );
+    env.input(&hid, "abs 0 32768 0 65535\n");
+    let mut host = env.start();
+    assert!(host.components().is_empty());
+
+    host.choose_plugin("usb:1d50:6100", Some("pidff")).unwrap();
+    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    let base = host.find("base").unwrap().address.clone();
+    assert_eq!(
+        host.find(&base).unwrap().description.name,
+        "Force feedback wheel base"
+    );
+    // Not in hid-universal-pidff: only the kernel's generic driver can give it forces.
+    let why = reason(&mut host, &base, "test_effect");
+    assert!(
+        why.contains("6.15") && !why.contains("hid-universal-pidff"),
+        "{why}"
+    );
+}
+
+#[test]
 fn without_the_module_there_is_no_force_feedback() {
     let env = env("noffb");
     let hid = env.plug(

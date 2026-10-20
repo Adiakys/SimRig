@@ -13,7 +13,7 @@ use crate::models::{Driver, Kind, Model};
 
 const fn binding(drivers: &'static [&'static str], unbound: &'static str) -> Binding {
     Binding {
-        vendor: "044F",
+        vendor: 0x044f,
         drivers,
         rich: &["range", "input"],
         unbound,

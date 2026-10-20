@@ -95,7 +95,11 @@ impl Adapter for ThrustmasterAdapter {
         };
         let model = models::model(*pid)
             .filter(|_| *vid == models::VENDOR)
-            .ok_or_else(|| Error::NotFound(format!("{vid:04x}:{pid:04x} is not supported")))?;
+            .ok_or_else(|| {
+                Error::NotFound(format!(
+                    "{vid:04x}:{pid:04x} is not among the Thrustmaster devices SimRig knows"
+                ))
+            })?;
         let shared: Shared = Rc::new(RefCell::new(TmDevice::new(
             &device.id,
             model,

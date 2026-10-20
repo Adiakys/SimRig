@@ -88,8 +88,9 @@ impl Adapter for PxnAdapter {
                 device.id
             )));
         };
-        let model = models::model(*vid, *pid)
-            .ok_or_else(|| Error::NotFound(format!("{vid:04x}:{pid:04x} is not supported")))?;
+        let model = models::model(*vid, *pid).ok_or_else(|| {
+            Error::NotFound(format!("{vid:04x}:{pid:04x} is not a PXN wheel base"))
+        })?;
         let shared: Shared = Rc::new(RefCell::new(PxnDevice::new(
             &device.id,
             model,

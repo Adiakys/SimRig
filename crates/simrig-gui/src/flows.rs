@@ -34,8 +34,8 @@ pub struct Flows {
     known_usb: BTreeSet<String>,
     show_all: bool,
     pub adding: Option<Adding>,
-    /// A USB device assigned to a generic plugin, until the plugin attaches it.
-    assigning: Option<String>,
+    /// A USB device and the plugin it was given to, until the plugin attaches it.
+    assigning: Option<(String, String)>,
     busy: bool,
     error: String,
     /// What the plugin said when the setup finished.
@@ -123,6 +123,7 @@ impl App {
                     plugin_name: plugin.name.clone().into(),
                     is_new: !key.is_empty() && !self.flows.known_usb.contains(&key),
                     preview,
+                    ..Default::default()
                 });
             }
         }
@@ -149,6 +150,12 @@ impl App {
                     .into(),
                     state: if generic { "unknown" } else { "unsupported" }.into(),
                     is_new: new,
+                    plugins: ModelRc::new(VecModel::from(
+                        self.brand_candidates(&usb.key)
+                            .iter()
+                            .map(|c| self.plugin_name(c).into())
+                            .collect::<Vec<slint::SharedString>>(),
+                    )),
                     ..Default::default()
                 });
             }
@@ -163,19 +170,33 @@ impl App {
         let window = self.window();
         let rig = window.global::<Rig>();
 
-        // The device being assigned to a generic plugin has been attached: go on.
-        if let Some(key) = self.flows.assigning.clone() {
-            let attached = self.snapshot.usb.iter().find(|u| u.key == key);
-            if let Some(plugin) = attached.and_then(|u| u.plugin.clone()) {
-                let device = attached.map(|u| u.device.clone()).unwrap_or_default();
-                let name = attached.map(|u| u.name.clone()).unwrap_or_default();
-                self.flows.assigning = None;
-                self.flows.adding = Some(Adding {
-                    plugin,
-                    device,
-                    name,
-                });
-                self.add_next();
+        // The device being assigned has been attached: go on. Or its plugin refused it.
+        if let Some((key, chosen)) = self.flows.assigning.clone() {
+            let usb = self.snapshot.usb.iter().find(|u| u.key == key).cloned();
+            if let Some(usb) = usb {
+                if let Some(plugin) = usb.plugin.clone() {
+                    self.flows.assigning = None;
+                    self.flows.adding = Some(Adding {
+                        plugin,
+                        device: usb.device,
+                        name: usb.name,
+                    });
+                    self.add_next();
+                } else if usb.chosen.as_ref() == Some(&chosen) {
+                    let refused = format!("cannot attach {}: ", usb.name);
+                    let reason = self
+                        .snapshot
+                        .problems
+                        .iter()
+                        .rev()
+                        .find_map(|p| p.split_once(&refused).map(|(_, r)| r.to_string()));
+                    let name = self.plugin_name(&chosen);
+                    self.flows.assigning = None;
+                    self.flows.error = match reason {
+                        Some(r) => format!("{name} cannot handle {}: {r}", usb.name),
+                        None => format!("{name} cannot handle {}.", usb.name),
+                    };
+                }
             }
         }
 
@@ -285,13 +306,58 @@ impl App {
         let Some(plugin) = self.snapshot.plugins.iter().find(|p| p.on_request) else {
             return;
         };
-        self.flows.assigning = Some(usb_key.to_string());
+        let plugin = plugin.id.clone();
+        self.assign(usb_key, plugin);
+    }
+
+    /// An unknown USB device is given to a brand plugin, which accepts it or says why not.
+    pub fn add_assign(&mut self, usb_key: &str, index: i32) {
+        let Some(plugin) = usize::try_from(index)
+            .ok()
+            .and_then(|i| self.brand_candidates(usb_key).into_iter().nth(i))
+        else {
+            return;
+        };
+        self.assign(usb_key, plugin);
+    }
+
+    fn assign(&mut self, usb_key: &str, plugin: String) {
+        self.flows.assigning = Some((usb_key.to_string(), plugin.clone()));
         self.flows.error.clear();
         self.send(Command::ChoosePlugin {
             device: usb_key.to_string(),
-            plugin: Some(plugin.id.clone()),
+            plugin: Some(plugin),
         });
         self.refresh_flows();
+    }
+
+    /// The plugins a USB device can be given to, generic ones aside, by name.
+    fn brand_candidates(&self, usb_key: &str) -> Vec<String> {
+        let Some(usb) = self.snapshot.usb.iter().find(|u| u.key == usb_key) else {
+            return Vec::new();
+        };
+        let mut brands: Vec<String> = usb
+            .candidates
+            .iter()
+            .filter(|c| {
+                self.snapshot
+                    .plugins
+                    .iter()
+                    .any(|p| &&p.id == c && !p.on_request)
+            })
+            .cloned()
+            .collect();
+        brands.sort_by_key(|c| self.plugin_name(c));
+        brands
+    }
+
+    fn plugin_name(&self, id: &str) -> String {
+        self.snapshot
+            .plugins
+            .iter()
+            .find(|p| p.id == id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| id.to_string())
     }
 
     /// Moves to the first step the device still needs.

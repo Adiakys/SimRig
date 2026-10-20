@@ -68,7 +68,7 @@ From **Add device** in the top bar, or when an unknown device is plugged in whil
 ```mermaid
 flowchart LR
   C[Connect<br/>devices found live] -->|recognized| N{Driver needed?}
-  C -->|not recognized| G[Set up as a generic device]
+  C -->|not recognized| G[Choose a plugin<br/>or set up as generic]
   G --> N
   N -->|no| S
   N -->|yes| D[Driver<br/>why, then one password]
@@ -79,7 +79,7 @@ flowchart LR
 
 | Step | Screen | Notes |
 |---|---|---|
-| Connect | `add-1-connect` | Listening state; devices appear as they are plugged in. Unknown devices offer **Set up as generic** (the generic USB plugin), never automatically. |
+| Connect | `add-1-connect` | Listening state; devices appear as they are plugged in. Unknown devices offer **Choose a plugin** (a brand plugin, which takes the device or says why not) and **Set up as generic** (the generic USB plugin), never automatically. |
 | Driver | `add-2-driver` | What will be installed and the three promises (works with the app closed, starts only with the device, removable). The password line sits right above **Install the driver**. Skipped when the driver is already there or provided by the system. |
 | Set up | `add-3-setup` | A procedure defined by the plugin, rendered generically: here mapping the gears of a 6+R shifter, advancing by itself as each gear is detected. The drawing follows the configuration (6+R or 7+R). |
 | Done | `add-4-done` | The device moving live, the state saved in the driver, **Back to the rig** (primary) and **Open settings**. |

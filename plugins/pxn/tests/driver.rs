@@ -67,7 +67,8 @@ fn a_module_built_by_the_moza_driver_is_shared() {
     assert!(sb.dkms().contains("hid-universal-pidff"), "{}", sb.dkms());
 }
 
-/// The bases rebound after a build, and the plugin's models, are the ones the module drives.
+/// The bases rebound after a build, and the plugin's models marked as in the module, are the ones
+/// the module drives.
 #[test]
 fn bases_agree_with_the_module() {
     let ids = fs::read_to_string(Path::new(DRIVER).join("universal-pidff/hid-ids.h")).unwrap();
@@ -94,6 +95,7 @@ fn bases_agree_with_the_module() {
     from_module.sort();
     let mut modelled: Vec<(u16, u16)> = simrig_plugin_pxn::models::MODELS
         .iter()
+        .filter(|m| m.module)
         .map(|m| (m.vid, m.pid))
         .collect();
     modelled.sort();

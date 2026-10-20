@@ -16,7 +16,7 @@ use crate::models::{Kind, Model};
 use crate::unlock::{Menu, Slots, Unlock};
 
 pub const BINDING: Binding = Binding {
-    vendor: "0EB7",
+    vendor: 0x0eb7,
     drivers: &["fanatec"],
     // A base has several HID devices bound to the driver; the one with its settings and its
     // inputs is the one to talk to (the others only carry raw HID).

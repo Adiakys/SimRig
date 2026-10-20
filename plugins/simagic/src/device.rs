@@ -140,7 +140,7 @@ pub enum Drive {
 
 pub struct SimagicDevice {
     pub hid: HidDevice,
-    pub model: &'static Model,
+    pub model: Model,
 }
 
 pub type Shared = Rc<RefCell<SimagicDevice>>;
@@ -184,13 +184,9 @@ pub fn declares_pid(descriptor: &[u8]) -> bool {
 }
 
 impl SimagicDevice {
-    pub fn new(id: &str, model: &'static Model, usb: PathBuf, config: PathBuf) -> Self {
+    pub fn new(id: &str, model: Model, usb: PathBuf, config: PathBuf) -> Self {
         let binding = Binding {
-            vendor: if model.vid == models::VENDOR {
-                "3670"
-            } else {
-                "0483"
-            },
+            vendor: model.vid,
             drivers: &["simagic-ff", "hid-generic"],
             rich: &["max_angle", "input"],
             unbound: "No HID driver handles the base: plug it in again.",
@@ -215,6 +211,15 @@ impl SimagicDevice {
         }
     }
 
+    /// Inputs only on the kernel's generic driver: simagic-ff, unless it does not know the base.
+    fn needs_driver(&self) -> Unsupported {
+        if self.model.model.is_some() {
+            Unsupported::new(Reason::NeedsDriver).with_detail(NEEDS_DRIVER)
+        } else {
+            Unsupported::not_in_driver().with_detail("simagic-ff does not know this base yet.")
+        }
+    }
+
     /// Why settings are unavailable, if they are.
     pub fn no_settings(&self) -> Option<Unsupported> {
         match self.drive() {
@@ -225,9 +230,7 @@ impl SimagicDevice {
                  which has no settings: set them in Simagic's software, or update the firmware \
                  for SimRig to show them.",
             )),
-            Drive::NeedsDriver => {
-                Some(Unsupported::new(Reason::NeedsDriver).with_detail(NEEDS_DRIVER))
-            }
+            Drive::NeedsDriver => Some(self.needs_driver()),
         }
     }
 
@@ -235,9 +238,7 @@ impl SimagicDevice {
     pub fn no_force(&self) -> Option<Unsupported> {
         match self.drive() {
             Drive::Unbound => self.hid.unbound(),
-            Drive::NeedsDriver => {
-                Some(Unsupported::new(Reason::NeedsDriver).with_detail(NEEDS_DRIVER))
-            }
+            Drive::NeedsDriver => Some(self.needs_driver()),
             _ => (!self.hid.inputs.force_feedback()).then(|| {
                 Unsupported::new(Reason::Unavailable)
                     .with_detail("The driver gives the base no force feedback.")

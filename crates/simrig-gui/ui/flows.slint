@@ -5,7 +5,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme, Icons } from "theme.slint";
 import { Rig, Api, Link, FoundDevice, PluginRow, SystemCheck, ExcludedRow, PresetItem, UsbRow } from "api.slint";
 import { Device, LiveDevice } from "devices.slint";
-import { Button, ButtonKind, Chip, ChipTone, Segmented, Toggle, Eyebrow, Title, Heading, Body, Small, Hairline, BackRow, Notice, Steps } from "widgets.slint";
+import { Button, ButtonKind, Chip, ChipTone, Picker, Segmented, Toggle, Eyebrow, Title, Heading, Body, Small, Hairline, BackRow, Notice, Steps } from "widgets.slint";
 
 /// A small picture of a device: drawn live when it has components, else the USB mark.
 component Thumb inherits Rectangle {
@@ -29,7 +29,7 @@ component Thumb inherits Rectangle {
 
 component FoundLine inherits VerticalLayout {
     in property <FoundDevice> found;
-    /// Offer the actions of the add flow (set up, generic).
+    /// Offer the actions of the add flow (set up, a plugin, generic).
     in property <bool> actions: true;
     HorizontalLayout {
         padding-top: 14px;
@@ -61,7 +61,7 @@ component FoundLine inherits VerticalLayout {
                 tone: ChipTone.warning;
             }
             if root.found.state == "setup" && !root.actions: Chip { text: @tr("To set up"); }
-            if root.found.state == "unsupported": Chip { text: @tr("Not supported"); }
+            if root.found.state == "unsupported" && (!root.actions || root.found.plugins.length == 0): Chip { text: @tr("Not supported"); }
             // Only a device just plugged in gets the accent: one signal per screen.
             if root.actions && (root.found.state == "driver" || root.found.state == "setup"): Button {
                 kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
@@ -69,11 +69,21 @@ component FoundLine inherits VerticalLayout {
                 enabled: !Rig.add-busy;
                 clicked => { Api.add-choose(root.found.key); }
             }
-            if root.actions && root.found.state == "unknown": Button {
-                kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
-                text: @tr("Set up as generic");
-                enabled: !Rig.add-busy;
-                clicked => { Api.add-generic(root.found.key); }
+            if root.actions && (root.found.state == "unknown" || root.found.state == "unsupported"): HorizontalLayout {
+                spacing: 10px;
+                if root.found.plugins.length > 0: Picker {
+                    options: root.found.plugins;
+                    placeholder: @tr("Choose a plugin");
+                    label: @tr("Plugin of {}", root.found.name);
+                    enabled: !Rig.add-busy;
+                    picked(i) => { Api.add-assign(root.found.key, i); }
+                }
+                if root.found.state == "unknown": Button {
+                    kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
+                    text: @tr("Set up as generic");
+                    enabled: !Rig.add-busy;
+                    clicked => { Api.add-generic(root.found.key); }
+                }
             }
         }
     }
@@ -184,7 +194,7 @@ export component AddScreen inherits Rectangle {
                         }
                     }
                     Text {
-                        text: @tr("Connect the device to a USB port. Known devices are recognized automatically; a device no plugin knows can be set up as a generic device.");
+                        text: @tr("Connect the device to a USB port. Known devices are recognized automatically; a device no plugin knows can be given to a plugin or set up as a generic device.");
                         font-family: Theme.sans;
                         font-size: 16px;
                         color: Theme.ink2;
@@ -676,7 +686,7 @@ export component SettingsScreen inherits Rectangle {
                             spacing: 10px;
                             HorizontalLayout {
                                 alignment: start;
-                                Segmented {
+                                Picker {
                                     options: d.options;
                                     selected: d.selected;
                                     label: @tr("Plugin of {}", d.name);

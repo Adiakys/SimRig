@@ -9,7 +9,7 @@ use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
 use crate::models::Model;
 
 pub const BINDING: Binding = Binding {
-    vendor: "046D",
+    vendor: 0x046d,
     // iforce: a USB driver, bound to the WingMan Formula Force's interface.
     drivers: &["logitech", "logitech-hidpp-device", "logitech-dd", "iforce"],
     // The interface with the settings and the inputs, when there are several.

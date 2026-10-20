@@ -109,7 +109,7 @@ impl Match {
 /// Returns the devices of each plugin, in the order of `manifests`, and the ties found.
 ///
 /// `overrides` maps a device key ([`UsbDevice::keys`]) to the plugin the user chose for it; the
-/// choice wins as long as that plugin claims the device at all.
+/// choice always wins, and the plugin's `attach` accepts the device or says why not.
 pub fn assign_usb(
     manifests: &[&Manifest],
     devices: &[UsbDevice],
@@ -124,13 +124,7 @@ pub fn assign_usb(
             .filter_map(|(i, m)| m.matching.usb_claim(device.vid, device.pid).map(|s| (i, s)))
             .collect();
         let chosen = device.keys().iter().find_map(|k| overrides.get(k).cloned());
-        // The user's choice wins if that plugin claims the device or takes devices on request.
-        let chosen = chosen.and_then(|p| {
-            manifests
-                .iter()
-                .position(|m| m.id == p)
-                .filter(|i| manifests[*i].matching.on_request || claims.iter().any(|(c, _)| c == i))
-        });
+        let chosen = chosen.and_then(|p| manifests.iter().position(|m| m.id == p));
         if let Some(i) = chosen {
             assigned[i].push(device.clone());
             continue;
@@ -428,6 +422,28 @@ mod tests {
         assert!(assigned[0].is_empty());
         let overrides = [("usb:1234:0001".to_string(), "generic-usb".to_string())].into();
         let (assigned, _) = assign_usb(&[&generic], &[unknown], &overrides);
+        assert_eq!(assigned[0].len(), 1);
+    }
+
+    #[test]
+    fn the_users_choice_wins_over_the_manifest() {
+        let brand = manifest(
+            "brand",
+            vec![UsbMatch {
+                vid: 0x36e6,
+                pid: Some(0x400f),
+                kernel_driver: None,
+            }],
+        );
+        let unknown = device(0x36e6, 0x400d);
+        let (assigned, _) = assign_usb(
+            &[&brand],
+            std::slice::from_ref(&unknown),
+            &Default::default(),
+        );
+        assert!(assigned[0].is_empty());
+        let overrides = [("usb:36e6:400d".to_string(), "brand".to_string())].into();
+        let (assigned, _) = assign_usb(&[&brand], &[unknown], &overrides);
         assert_eq!(assigned[0].len(), 1);
     }
 

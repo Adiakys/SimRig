@@ -268,6 +268,8 @@ mod callbacks {
         let a = app.clone();
         api.on_add_generic(move |key| a.borrow_mut().add_generic(&key));
         let a = app.clone();
+        api.on_add_assign(move |key, i| a.borrow_mut().add_assign(&key, i));
+        let a = app.clone();
         api.on_add_show_all(move |on| a.borrow_mut().add_show_all(on));
         let a = app.clone();
         api.on_add_install_driver(move || a.borrow_mut().add_install_driver());

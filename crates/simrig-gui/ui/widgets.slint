@@ -483,6 +483,138 @@ export component Segmented {
     }
 }
 
+/// One choice among more than the Segmented control holds, from a menu that floats under it.
+export component Picker {
+    in property <[string]> options;
+    /// -1 while nothing is chosen: the placeholder shows.
+    in property <int> selected: -1;
+    in property <string> placeholder;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback picked(int);
+    height: 40px;
+    min-width: max(200px, l.min-width);
+    preferred-width: max(200px, l.preferred-width);
+    horizontal-stretch: 0;
+    forward-focus: fs;
+    accessible-role: AccessibleRole.combobox;
+    accessible-label: label;
+    accessible-value: root.selected >= 0 ? root.options[root.selected] : "";
+    accessible-enabled: enabled;
+    accessible-action-default => { menu.show(); }
+
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" || e.text == Key.DownArrow {
+                menu.show();
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 9px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    Rectangle {
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: Theme.rule;
+        background: ta.has-hover && root.enabled ? Theme.raised : Theme.bg;
+        l := HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 10px;
+            spacing: 10px;
+            Text {
+                text: root.selected >= 0 ? root.options[root.selected] : root.placeholder;
+                font-family: Theme.sans;
+                font-size: 15px;
+                font-weight: root.selected >= 0 ? 600 : 400;
+                color: !root.enabled || root.selected < 0 ? Theme.ink3 : Theme.ink;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+            Image {
+                source: Icons.down;
+                colorize: root.enabled ? Theme.ink : Theme.ink3;
+                width: 16px;
+                height: 16px;
+                y: (parent.height - 16px) / 2;
+            }
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            fs.focus();
+            menu.show();
+        }
+    }
+    menu := PopupWindow {
+        x: 0;
+        y: root.height + 6px;
+        width: max(root.width, 240px);
+        Rectangle {
+            border-radius: 10px;
+            background: Theme.surface;
+            border-width: Theme.dark ? 1px : 0px;
+            border-color: Theme.rule;
+            drop-shadow-blur: Theme.float-blur;
+            drop-shadow-offset-y: 12px;
+            drop-shadow-color: Theme.float-shadow;
+            VerticalLayout {
+                padding: 8px;
+                spacing: 2px;
+                for option[i] in root.options: Rectangle {
+                    height: 40px;
+                    border-radius: 6px;
+                    background: ot.has-hover ? Theme.raised : transparent;
+                    accessible-role: AccessibleRole.button;
+                    accessible-label: option;
+                    accessible-checked: i == root.selected;
+                    accessible-action-default => { root.picked(i); menu.close(); }
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 8px;
+                        spacing: 10px;
+                        Text {
+                            text: option;
+                            font-family: Theme.sans;
+                            font-size: 16px;
+                            font-weight: i == root.selected ? 600 : 400;
+                            color: Theme.ink;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                        }
+                        if i == root.selected: Image {
+                            source: Icons.check;
+                            colorize: Theme.accent-ink;
+                            width: 18px;
+                            height: 18px;
+                            y: (parent.height - 18px) / 2;
+                        }
+                    }
+                    ot := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            if i != root.selected { root.picked(i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 export component Toggle {
     in property <bool> checked;
     in property <bool> enabled: true;

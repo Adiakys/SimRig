@@ -115,7 +115,11 @@ impl Adapter for FanatecAdapter {
         };
         let model = models::model(*pid)
             .filter(|_| *vid == models::VENDOR)
-            .ok_or_else(|| Error::NotFound(format!("{vid:04x}:{pid:04x} is not supported")))?;
+            .ok_or_else(|| {
+                Error::NotFound(format!(
+                    "{vid:04x}:{pid:04x} is not among the Fanatec devices SimRig knows"
+                ))
+            })?;
         let shared: Shared = Rc::new(RefCell::new(FanatecDevice::new(
             &device.id,
             model,

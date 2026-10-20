@@ -21,7 +21,7 @@ fn spec(device: &Shared, setting: &Setting) -> Support<ParamSpec> {
     };
     // Whether the base keeps its settings when unplugged is not known yet: they are shown as
     // lasting until then.
-    Support::Supported(if setting.switch {
+    let spec = if setting.switch {
         ParamSpec::bool(raw != 0)
     } else {
         ParamSpec::float(
@@ -29,6 +29,13 @@ fn spec(device: &Shared, setting: &Setting) -> Support<ParamSpec> {
             setting.min,
             setting.max,
             setting.step,
+        )
+    };
+    Support::Supported(if d.model.verified {
+        spec
+    } else {
+        spec.with_caveat(
+            Caveat::unverified().with_detail("The settings protocol is confirmed on the VD6 only."),
         )
     })
 }
@@ -71,7 +78,7 @@ impl Component for Base {
     }
 
     fn model(&self) -> Option<String> {
-        Some(self.device.borrow().model.model.into())
+        self.device.borrow().model.model.map(Into::into)
     }
 
     fn custom_params(&mut self) -> Vec<CustomParam> {
@@ -105,8 +112,9 @@ impl Component for Base {
             if advanced {
                 p = p.advanced();
             }
-            if let Support::Unsupported(u) = support {
-                p = p.availability(Support::Unsupported(u));
+            match support {
+                Support::Supported(s) => p = p.caveat(s.caveat),
+                Support::Unsupported(u) => p = p.availability(Support::Unsupported(u)),
             }
             params.push(p);
         }

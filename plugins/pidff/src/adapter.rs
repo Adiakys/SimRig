@@ -89,8 +89,7 @@ impl Adapter for PidffAdapter {
                 device.id
             )));
         };
-        let model = models::model(*vid, *pid)
-            .ok_or_else(|| Error::NotFound(format!("{vid:04x}:{pid:04x} is not supported")))?;
+        let model = models::model(*vid, *pid);
         let shared: Shared = Rc::new(RefCell::new(PidffDevice::new(
             &device.id,
             model,

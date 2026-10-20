@@ -9,18 +9,14 @@ use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
 use simrig_plugin_sdk::prelude::*;
 
 use crate::control::{self, Control};
-use crate::models::{self, Model};
+use crate::models::Model;
 use crate::protocol::{self, BASE_SIZE};
 
 const UNBOUND: &str = "The base has no HID driver bound: plug it in again.";
 
 fn binding(model: &Model) -> Binding {
     Binding {
-        vendor: if model.vid == models::PXN {
-            "36E6"
-        } else {
-            "11FF"
-        },
+        vendor: model.vid,
         // hid-generic gives the inputs, and force feedback too from Linux 6.15.
         drivers: &["hid-universal-pidff", "hid-generic"],
         rich: &["input"],
@@ -30,7 +26,7 @@ fn binding(model: &Model) -> Binding {
 
 pub struct PxnDevice {
     pub hid: HidDevice,
-    pub model: &'static Model,
+    pub model: Model,
     control: Option<Box<dyn Control>>,
     /// Why the control interface cannot be used, while it cannot.
     control_error: Option<String>,
@@ -50,9 +46,9 @@ impl HasHid for PxnDevice {
 }
 
 impl PxnDevice {
-    pub fn new(id: &str, model: &'static Model, usb: PathBuf, config: PathBuf) -> Self {
+    pub fn new(id: &str, model: Model, usb: PathBuf, config: PathBuf) -> Self {
         let key = format!("{:04x}-{:04x}", model.vid, model.pid);
-        let hid = HidDevice::new(id, usb, binding(model), config, &key, Some(0));
+        let hid = HidDevice::new(id, usb, binding(&model), config, &key, Some(0));
         let mut device = Self {
             hid,
             model,
@@ -158,9 +154,14 @@ impl PxnDevice {
             return Some(u);
         }
         (!self.hid.inputs.force_feedback()).then(|| {
-            Unsupported::new(Reason::NeedsDriver).with_detail(
-                "No force feedback: it needs hid-universal-pidff, or Linux 6.15 or newer.",
-            )
+            if self.model.module {
+                Unsupported::new(Reason::NeedsDriver).with_detail(
+                    "No force feedback: it needs hid-universal-pidff, or Linux 6.15 or newer.",
+                )
+            } else {
+                Unsupported::not_in_driver()
+                    .with_detail("No force feedback: it needs Linux 6.15 or newer.")
+            }
         })
     }
 }

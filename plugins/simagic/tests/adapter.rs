@@ -162,6 +162,60 @@ fn a_newer_firmware_needs_simagic_ff() {
     assert!(reason(&mut host, &base, "test_effect").contains("simagic-ff"));
 }
 
+#[test]
+fn a_base_not_in_the_table_is_taken_when_chosen() {
+    let env = env("unknown");
+    let hid = env.plug(
+        "1-4",
+        0x3670,
+        0x0510,
+        "Simagic Alpha EVO X",
+        "1-4:1.0/0003:3670:0510.0001",
+        Some("hid-generic"),
+    );
+    fs::write(
+        hid.join("report_descriptor"),
+        [0x05, 0x01, 0x09, 0x04, 0xa1, 0x01, 0x06, 0x00, 0xff, 0xc0],
+    )
+    .unwrap();
+    env.input(&hid, "abs 0 32768 0 65535\n");
+    env.plug(
+        "1-5",
+        0x0483,
+        0x5750,
+        "STM device",
+        "1-5:1.0/0003:0483:5750.0002",
+        Some("hid-generic"),
+    );
+    let mut host = env.start();
+    assert!(host.components().is_empty());
+
+    host.choose_plugin("usb:3670:0510", Some("simagic"))
+        .unwrap();
+    until(&mut host, "base", |h| h.find("base").is_ok());
+    let base = host.find("base").unwrap().address.clone();
+    assert_eq!(
+        host.find(&base).unwrap().description.name,
+        "Simagic wheel base"
+    );
+    // Installing simagic-ff would not help: it does not know the base.
+    let why = reason(&mut host, &base, "test_effect");
+    assert!(
+        why.contains("does not know") && !why.contains("install"),
+        "{why}"
+    );
+
+    host.choose_plugin("usb:0483:5750", Some("simagic"))
+        .unwrap();
+    assert!(
+        host.problems()
+            .iter()
+            .any(|p| p.contains("not a Simagic wheel base")),
+        "{:?}",
+        host.problems()
+    );
+}
+
 /// The manifest claims exactly the plugin's models.
 #[test]
 fn manifest_matches_the_models() {

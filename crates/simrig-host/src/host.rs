@@ -922,11 +922,9 @@ impl Host {
         self.rig.save(&self.options.config_dir)
     }
 
-    /// Chooses which plugin handles a device (`usb:vvvv:pppp[:serial]`), or clears the
-    /// choice. Takes effect the next time the device is plugged in or the app starts.
-    /// Chooses which plugin handles a device (`usb:vvvv:pppp[:serial]`), or clears the
-    /// choice. A generic plugin (`on_request`) gets a device only this way. Applied at once if
-    /// the device is connected, and remembered for the next time.
+    /// Chooses which plugin handles a device (`usb:vvvv:pppp[:serial]`), any plugin, or clears
+    /// the choice. A generic plugin (`on_request`) gets a device only this way. Applied at once
+    /// if the device is connected, and remembered for the next time.
     pub fn choose_plugin(
         &mut self,
         device_key: &str,
@@ -994,28 +992,32 @@ impl Host {
         self.rig.save(&self.options.config_dir)
     }
 
-    /// USB devices currently connected, with the plugin handling each one.
-    /// Plugins that can handle a USB device, most specific first: those whose manifest matches
-    /// it, then generic ones (`on_request`).
+    /// Plugins the user can give a USB device to, most specific first: those whose manifest
+    /// matches it, then generic ones (`on_request`), then the others, whose `attach` decides.
+    /// Plugins that only provide devices by themselves are left out.
     pub fn candidate_plugins(&self, device: &UsbDevice) -> Vec<String> {
         let mut claims: Vec<(u8, String)> = self
             .plugins
             .iter()
-            .filter_map(|p| {
+            .filter(|p| {
                 let m = &p.manifest.matching;
-                let claim = m.usb_claim(device.vid, device.pid);
-                let rank = match (claim, m.on_request) {
+                !(m.virtual_devices && m.usb.is_empty() && !m.on_request)
+            })
+            .map(|p| {
+                let m = &p.manifest.matching;
+                let rank = match (m.usb_claim(device.vid, device.pid), m.on_request) {
                     (Some(c), _) => c + 1,
-                    (None, true) => 0,
-                    (None, false) => return None,
+                    (None, true) => 1,
+                    (None, false) => 0,
                 };
-                Some((rank, p.manifest.id.clone()))
+                (rank, p.manifest.id.clone())
             })
             .collect();
         claims.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
         claims.into_iter().map(|(_, id)| id).collect()
     }
 
+    /// USB devices currently connected, with the plugin handling each one.
     pub fn usb_devices(&self) -> Vec<(UsbDevice, Option<String>)> {
         self.usb
             .iter()

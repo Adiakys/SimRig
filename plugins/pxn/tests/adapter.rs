@@ -1,5 +1,5 @@
-//! End to end through the host: a fake VD6 (inputs, force feedback, a control interface that
-//! answers like the real one) and a V12.
+//! End to end through the host: a fake VD6 and VD4 (inputs, force feedback, a control interface
+//! that answers like the real one) and a V12.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,15 +17,15 @@ fn env(name: &str) -> PluginEnv {
     )
 }
 
-/// A VD6 on hid-generic (force feedback from Linux 6.15), its settings block: 900°, overall
+/// A VD base on hid-generic (force feedback from Linux 6.15), its settings block: 900°, overall
 /// force 80, game friction 20, the rest 0.
-fn vd6(env: &PluginEnv) -> PathBuf {
+fn vd(env: &PluginEnv, pid: u16, name: &str) -> PathBuf {
     let hid = env.plug(
         "1-10",
         0x36e6,
-        0x400f,
-        "PXN-VD6",
-        "1-10:1.0/0003:36E6:400F.0001",
+        pid,
+        name,
+        &format!("1-10:1.0/0003:36E6:{pid:04X}.0001"),
         Some("hid-generic"),
     );
     let mut block = [0u8; 31];
@@ -50,7 +50,7 @@ fn block(env: &PluginEnv) -> Vec<u8> {
 #[test]
 fn a_vd6_and_its_settings() {
     let env = env("vd6");
-    vd6(&env);
+    vd(&env, 0x400f, "PXN-VD6");
     let mut host = env.start();
     until(&mut host, "base and rim", |h| h.components().len() == 2);
     let base = host.find("base").unwrap().address.clone();
@@ -83,6 +83,73 @@ fn a_vd6_and_its_settings() {
 
     // Force feedback through the kernel.
     assert!(reason(&mut host, &base, "test_effect").is_empty());
+}
+
+#[test]
+fn a_vd4_has_unconfirmed_settings_and_forces_from_linux_6_15() {
+    let env = env("vd4");
+    let hid = vd(&env, 0x400d, "PXN-VD4");
+    let mut host = env.start();
+    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    let base = host.find("base").unwrap().address.clone();
+    assert_eq!(host.find(&base).unwrap().description.name, "PXN VD4");
+
+    let spec = host.param(&base, "rotation").unwrap();
+    assert_eq!(spec.value, Value::Float(900.0));
+    assert!(spec.caveat.is_some());
+    let reverse = host
+        .describe(&base)
+        .unwrap()
+        .custom
+        .iter()
+        .find(|p| p.id == "ffb_reverse");
+    assert!(reverse.unwrap().caveat.is_some());
+    host.set(&base, "rotation", Value::Float(1080.0)).unwrap();
+    let b = block(&env);
+    assert_eq!(u16::from_le_bytes([b[0], b[1]]), 1080);
+
+    // Not in hid-universal-pidff: an older kernel gives no force feedback.
+    env.input(&hid, "abs 0 49151 0 65535\n");
+    until(&mut host, "no force feedback", |h| {
+        !reason(h, &base, "test_effect").is_empty()
+    });
+    let why = reason(&mut host, &base, "test_effect");
+    assert!(
+        why.contains("6.15") && !why.contains("hid-universal-pidff"),
+        "{why}"
+    );
+}
+
+#[test]
+fn a_base_not_in_the_table_is_taken_when_chosen() {
+    let env = env("unknown");
+    vd(&env, 0x4011, "PXN-VD10");
+    env.plug(
+        "1-12",
+        0x046d,
+        0xc24f,
+        "G29",
+        "1-12:1.0/0003:046D:C24F.0002",
+        Some("hid-generic"),
+    );
+    let mut host = env.start();
+    assert!(host.components().is_empty());
+
+    host.choose_plugin("usb:36e6:4011", Some("pxn")).unwrap();
+    until(&mut host, "base and rim", |h| h.components().len() == 2);
+    let base = host.find("base").unwrap().address.clone();
+    assert_eq!(host.find(&base).unwrap().description.name, "PXN wheel base");
+    assert!(host.param(&base, "rotation").unwrap().caveat.is_some());
+
+    host.choose_plugin("usb:046d:c24f", Some("pxn")).unwrap();
+    assert_eq!(host.components().len(), 2);
+    assert!(
+        host.problems()
+            .iter()
+            .any(|p| p.contains("not a PXN wheel base")),
+        "{:?}",
+        host.problems()
+    );
 }
 
 #[test]

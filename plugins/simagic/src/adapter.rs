@@ -92,8 +92,9 @@ impl Adapter for SimagicAdapter {
                 device.id
             )));
         };
-        let model = models::model(*vid, *pid)
-            .ok_or_else(|| Error::NotFound(format!("{vid:04x}:{pid:04x} is not supported")))?;
+        let model = models::model(*vid, *pid).ok_or_else(|| {
+            Error::NotFound(format!("{vid:04x}:{pid:04x} is not a Simagic wheel base"))
+        })?;
         let shared: Shared = Rc::new(RefCell::new(SimagicDevice::new(
             &device.id,
             model,

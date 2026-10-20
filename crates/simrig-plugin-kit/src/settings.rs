@@ -220,7 +220,7 @@ mod tests {
     use simrig_plugin_sdk::model::ControlKind;
 
     const BINDING: Binding = Binding {
-        vendor: "046D",
+        vendor: 0x046d,
         drivers: &["logitech", "iforce"],
         rich: &["input"],
         unbound: "No driver.",

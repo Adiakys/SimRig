@@ -128,7 +128,9 @@ as a single-brand rig.
 
 - **Each device belongs to exactly one plugin.** When several plugins match the same USB device,
   the most specific match wins (vendor and product over vendor only); a tie goes to the plugin
-  found first and is reported. *(Planned)* the user can override the choice per device.
+  found first and is reported. The user can give any USB device to any plugin instead
+  (`choose_plugin`): the choice always wins, and the plugin's `attach` takes the device or says
+  why not. A device no manifest lists, such as a newer model of a known brand, works this way.
 - **Several components of the same type** are allowed: two pedal sets, an H-pattern and a
   sequential shifter, a base with a separate USB rim. Components are always addressed by
   `<plugin>/<component id>`, never by type alone.
@@ -1097,7 +1099,9 @@ Tested end to end on a fake T300 RS, T150, T500 RS and T80.
 PXN bases are direct drive bases with standard HID PID force feedback, like Moza's: the V10,
 V12 and GT987 (Lite Star's vendor id) are driven by `hid-universal-pidff`, in Linux from 6.15;
 the VD6 (PXN's own vendor id) by the kernel's generic PID force feedback from 6.15 too, and by
-the bundled universal-pidff on older kernels. The driver is Moza's, with SimRig's udev rules for
+the bundled universal-pidff on older kernels. The VD4 is not in universal-pidff: it has force
+feedback from 6.15 only. Another base of these vendors, given to the plugin by the user, gets a
+generic model: a VD base for PXN's vendor id, a V-series base for Lite Star's. The driver is Moza's, with SimRig's udev rules for
 PXN; both bundle the same universal-pidff, and a module one of them built is used as it is by
 the other.
 
@@ -1109,7 +1113,8 @@ the base sends 100 times a second skipped. Rotation, force feedback strength, na
 friction and inertia and the spring and damper effect strengths are standard parameters;
 torque, speed, centering, end stops, road feel, filter, the other effect strengths, hands-off
 protection and reversed forces are custom ones. Whether the base keeps them when unplugged is
-not verified, so they are not offered as saved. The V10 and V12 families have no known settings
+not verified, so they are not offered as saved. On the VD4 the protocol is assumed the same and
+its settings carry an unverified caveat. The V10 and V12 families have no known settings
 protocol: their settings are shown as unavailable, with the reason. Force feedback is offered
 when the event node takes effects. Tested end to end on a fake VD6 whose control interface
 answers like the real one, and a fake V12. Without the settings protocol, the force feedback
@@ -1124,8 +1129,9 @@ None has a known settings protocol, and the rotation lives in each brand's softw
 `pidff` plugin gives their inputs, the force feedback test, and the strength and centering
 spring through the input interface (marked), and shows the steering angle over each model's
 usual rotation. Its driver is PXN's and Moza's: SimRig's udev rules, and the bundled
-universal-pidff on kernels older than 6.15, shared with theirs. Tested end to end on a fake
-Cammus C5 and Asetek Forte.
+universal-pidff on kernels older than 6.15, shared with theirs. Any other device the user gives
+the plugin is taken as a generic base, shown over 900°, with force feedback from the kernel's
+generic driver (Linux 6.15). Tested end to end on a fake Cammus C5 and Asetek Forte.
 
 ### 11.6 Simagic
 
@@ -1149,6 +1155,9 @@ the wheel outside the new one: SimRig refuses that change until the wheel is tur
 as Simagic's software does, and does not save the rotation for the next plug-in, when the wheel
 could be anywhere. An older firmware's settings are shown as unavailable, with the reason. Pedal
 sets, shifters and handbrakes on their own USB are not handled yet: their ids are not known.
+Another base of Simagic's own vendor id, given to the plugin by the user, gets a generic model;
+simagic-ff does not know it, so the reason says so instead of offering the driver. Alpha's
+vendor id is STMicroelectronics', shared with other devices: only its known id is taken.
 Tested end to end on a fake EVO Pro and fake Alphas with either firmware.
 
 ## 12. Decisions
