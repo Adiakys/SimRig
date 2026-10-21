@@ -58,7 +58,7 @@ pub const MODELS: &[Model] = &[
         name: "PXN VD4",
         model: Some("pxn/vd4"),
         vd: true,
-        verified: false,
+        verified: true,
         module: false,
         max_range: 2700,
     },

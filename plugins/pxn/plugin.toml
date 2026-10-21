@@ -4,6 +4,8 @@ version = "0.1.0"
 api = 1
 exec = "simrig-plugin-pxn"
 driver = "driver/driver.toml"
+# Confirmed on real hardware; the app marks the other models as untested.
+tested = ["pxn/vd4"]
 description = "PXN wheel bases: V10, V12, V12 Lite, VD4, VD6, with force feedback through the kernel; the VD series' settings too."
 
 # The bases of src/models.rs; a test keeps them in step.

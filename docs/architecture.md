@@ -1113,8 +1113,8 @@ the base sends 100 times a second skipped. Rotation, force feedback strength, na
 friction and inertia and the spring and damper effect strengths are standard parameters;
 torque, speed, centering, end stops, road feel, filter, the other effect strengths, hands-off
 protection and reversed forces are custom ones. Whether the base keeps them when unplugged is
-not verified, so they are not offered as saved. On the VD4 the protocol is assumed the same and
-its settings carry an unverified caveat. The V10 and V12 families have no known settings
+not verified, so they are not offered as saved. The protocol is confirmed on a VD4 too; on
+other VD bases, given to the plugin by the user, the settings carry an unverified caveat. The V10 and V12 families have no known settings
 protocol: their settings are shown as unavailable, with the reason. Force feedback is offered
 when the event node takes effects. Tested end to end on a fake VD6 whose control interface
 answers like the real one, and a fake V12. Without the settings protocol, the force feedback

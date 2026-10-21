@@ -35,7 +35,8 @@ fn spec(device: &Shared, setting: &Setting) -> Support<ParamSpec> {
         spec
     } else {
         spec.with_caveat(
-            Caveat::unverified().with_detail("The settings protocol is confirmed on the VD6 only."),
+            Caveat::unverified()
+                .with_detail("The settings protocol is confirmed on the VD6 and VD4 only."),
         )
     })
 }

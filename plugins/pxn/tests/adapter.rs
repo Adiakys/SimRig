@@ -86,7 +86,7 @@ fn a_vd6_and_its_settings() {
 }
 
 #[test]
-fn a_vd4_has_unconfirmed_settings_and_forces_from_linux_6_15() {
+fn a_vd4_has_settings_and_forces_from_linux_6_15() {
     let env = env("vd4");
     let hid = vd(&env, 0x400d, "PXN-VD4");
     let mut host = env.start();
@@ -96,14 +96,14 @@ fn a_vd4_has_unconfirmed_settings_and_forces_from_linux_6_15() {
 
     let spec = host.param(&base, "rotation").unwrap();
     assert_eq!(spec.value, Value::Float(900.0));
-    assert!(spec.caveat.is_some());
+    assert!(spec.caveat.is_none());
     let reverse = host
         .describe(&base)
         .unwrap()
         .custom
         .iter()
         .find(|p| p.id == "ffb_reverse");
-    assert!(reverse.unwrap().caveat.is_some());
+    assert!(reverse.unwrap().caveat.is_none());
     host.set(&base, "rotation", Value::Float(1080.0)).unwrap();
     let b = block(&env);
     assert_eq!(u16::from_le_bytes([b[0], b[1]]), 1080);
