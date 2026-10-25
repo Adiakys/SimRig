@@ -113,3 +113,8 @@ their own licenses: see [THIRD-PARTY.md](THIRD-PARTY.md).
 Product and brand names (Fanatec, Moza, Logitech, Thrustmaster…) belong to their owners and are
 used only to say which hardware SimRig works with. SimRig is not affiliated with, endorsed by or
 sponsored by any of them.
+
+## Acknowledgements
+
+Claude Code did a lot of the typing on this project. The direction, design, testing, and
+debugging stayed on me.
