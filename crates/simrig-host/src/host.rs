@@ -210,6 +210,10 @@ pub struct Host {
     catalog: Catalog,
     drivers: DriverManager,
     presets: PresetStore,
+    /// Live input subscriptions (rate by address). An adapter forgets a subscription with its
+    /// component, so it is renewed whenever a component comes back at the same address: the
+    /// adapter restarted after a driver install, the device plugged in again, a rim swapped.
+    subscriptions: BTreeMap<String, f64>,
 }
 
 impl Host {
@@ -273,6 +277,7 @@ impl Host {
                 options.default_dirs,
             ),
             presets: PresetStore::new(&options.config_dir),
+            subscriptions: BTreeMap::new(),
         };
         let usb = usb::scan_dir(&options.usb_root);
         host.migrate_addresses(&usb);
@@ -514,11 +519,16 @@ impl Host {
             self.components.retain(|c| c.address != address);
             self.components.push(HostComponent {
                 excluded: self.rig.excluded.contains(&address),
-                address,
+                address: address.clone(),
                 plugin: plugin.into(),
                 device: device.clone(),
                 description,
             });
+            if let Some(rate_hz) = self.subscriptions.get(&address).copied()
+                && let Err(e) = self.subscribe(&address, rate_hz)
+            {
+                self.problem(format!("plugin '{plugin}': live inputs of {address}: {e}"));
+            }
         }
     }
 
@@ -851,19 +861,26 @@ impl Host {
 
     /// Live inputs then arrive as [`HostEvent::Inputs`] from [`Host::poll`], or through
     /// [`Host::next_input_state`].
+    /// Subscribes to a component's live inputs, until [`Host::unsubscribe`]: kept across the
+    /// component going away and coming back.
     pub fn subscribe(&mut self, address: &str, rate_hz: f64) -> Result<(), HostError> {
         let (i, local) = self.route(address)?;
-        self.plugins[i].call(
+        let full = format!("{}/{local}", self.plugins[i].manifest.id);
+        self.plugins[i].call::<_, ()>(
             method::INPUT_SUBSCRIBE,
             SubscribeParams {
                 component: local,
                 rate_hz,
             },
-        )
+        )?;
+        self.subscriptions.insert(full, rate_hz);
+        Ok(())
     }
 
     pub fn unsubscribe(&mut self, address: &str) -> Result<(), HostError> {
         let (i, local) = self.route(address)?;
+        self.subscriptions
+            .remove(&format!("{}/{local}", self.plugins[i].manifest.id));
         self.plugins[i].call(
             method::INPUT_UNSUBSCRIBE,
             ComponentParams { component: local },

@@ -223,6 +223,39 @@ fn live_inputs() {
     host.unsubscribe("pedals").unwrap();
 }
 
+/// Live inputs keep coming when a component comes back at the same address: the adapter
+/// restarted after a driver install, a rim swapped. Adapters forget subscriptions with their
+/// components; the host renews them.
+#[test]
+fn live_inputs_survive_restarts_and_rim_swaps() {
+    let env = Env::new("inputs-restart");
+    let mut host = env.start();
+    host.subscribe("pedals", 50.0).unwrap();
+    host.subscribe("wheel", 50.0).unwrap();
+    let inputs_of = |host: &mut Host, address: &'static str| {
+        poll_until(
+            host,
+            address,
+            |e| matches!(e, HostEvent::Inputs { address: a, .. } if a == address),
+        );
+    };
+    inputs_of(&mut host, "sim/pedals0/pedals");
+
+    // The driver install restarts the adapter.
+    host.install_driver("sim").unwrap();
+    inputs_of(&mut host, "sim/pedals0/pedals");
+
+    // A rim swap brings the wheel back.
+    host.set("base", "custom.rim", Value::Choice("gt".into()))
+        .unwrap();
+    poll_until(
+        &mut host,
+        "rim swap",
+        |e| matches!(e, HostEvent::ComponentsChanged { device, .. } if device == "rig0"),
+    );
+    inputs_of(&mut host, "sim/rig0/wheel");
+}
+
 #[test]
 fn rim_swap_changes_the_components() {
     let env = Env::new("rim");
