@@ -1,6 +1,7 @@
-# simrig — Requirements
+# SimRig: requirements
 
-> Working project name. Status: draft 0.8 (2026-10-17). See also [architecture.md](architecture.md).
+> What SimRig must do. Version 0.9 (2026-10-25). How it is built is in
+> [architecture.md](architecture.md).
 
 ## 1. Vision
 
@@ -75,7 +76,10 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
   Fanatec base and wheel with Moza pedals), and several components of the same type (two pedal
   sets, an H-pattern and a sequential shifter).
 - **FR-07** Each device is handled by exactly one plugin: the most specific match wins, ties are
-  reported, and the user can override the choice.
+  reported, and the user can give any device to any plugin, which takes it or says why not (e.g.
+  a model the plugin does not list yet).
+- **FR-07b** A device keeps its identity, and the choices made about it, when it is moved to
+  another USB port.
 - **FR-08** The user can exclude from the rig an optional component a device exposes but that is
   not in use (e.g. the pedal inputs of a base when other pedals are used), and re-enable it.
 - **FR-09** Plugins may define **guided procedures** (calibration, input mapping, device setup…) on
@@ -94,7 +98,9 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
   reason (not in hardware, not in driver, needs firmware, needs another component, depends on
   another setting, temporarily unavailable).
 - **FR-20a** The UI never hides unsupported items: it shows them disabled, in their usual place,
-  with the explanation of why. Items depending on another setting enable themselves live.
+  with the explanation of why. Items depending on another setting enable themselves live. Items
+  that work only in part (e.g. the driver takes a value but the device cannot report it back)
+  carry a caveat saying why.
 - **FR-20b** Plugins may declare additional **custom parameters** at runtime, fully self-described
   (type, range, unit, labels, group, dependencies, availability, persistence). The app loads and renders them
   dynamically. No brand-specific parameter is written in the core.
@@ -145,6 +151,12 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
   processes of its own. The app neither starts nor depends on them.
 - **FR-56** The SDK provides ready-made recipes for common cases (DKMS with Secure Boot signing,
   udev rules, HID-BPF, per-device service, persistent settings via udev).
+- **FR-57** A driver shipped with a newer version or revision than the installed copy is offered
+  as an update, from the app's plugin list.
+- **FR-58** The app checks what may keep games from using a device (its input nodes do not open,
+  udev does not list it as a joystick, the kernel driver it needs does not handle it, the driver
+  running is not the one installed, Steam's settings) and says it once, with the fix when the
+  plugin's driver has one.
 
 ### Plugins
 - **FR-60** Each manufacturer's support is a plugin separate from the app: manifest, driver,
@@ -171,11 +183,17 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 - **FR-81** Record traffic from a real device and replay it in tests.
 - **FR-82** Command-line interface with the same capabilities as the core.
 - **FR-83** Export a diagnostics bundle for bug reports.
+- **FR-84** From a device's screen, open a hardware report on the project's tracker, filled in
+  with what SimRig knows about the device; the user reads it and sends it. SimRig sends nothing.
+
+### Updates
+- **FR-90** The app tells when a new version is out and installs it, from the project's releases
+  (pre-releases only when the user asks for them).
 
 ## 5. Non-functional requirements
 
-- **NFR-01 Portability**: all major distros and all desktops, Wayland and X11. Reached gradually
-  (see roadmap), but no choice may tie the project to Ubuntu or GNOME.
+- **NFR-01 Portability**: all major distros and all desktops, Wayland and X11. Reached gradually,
+  but no choice may tie the project to Ubuntu or GNOME.
 - **NFR-02 Privileges**: the app is started and runs as a normal user. Reading inputs, changing
   settings (rotation, force feedback…), running force-feedback tests and applying presets live
   never need privileges. Authorization is asked only when needed: installing or removing drivers,
@@ -202,7 +220,8 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 - **NFR-12 Standards**: configuration and data in XDG directories.
 - **NFR-13 Licensing**: app GPL-3.0-or-later. Shipped drivers keep their own license (GPL-2.0 for
   kernel modules). Model images carry a per-file license: no manufacturer photos without permission.
-- **NFR-14 Privacy**: no telemetry. Works offline.
+- **NFR-14 Privacy**: no telemetry. Works offline. The only request SimRig makes on its own is
+  the check for a new version, which sends nothing about the user or the rig.
 
 ## 6. Out of scope for v1
 
@@ -215,26 +234,16 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
 - Automatic driver installation on immutable distros (Silverblue, SteamOS): instructions only.
 - Flatpak build with driver installation (the sandbox does not allow it): native packages only.
 
-## 7. Roadmap
+## 7. Open questions
 
-| Phase | Content | Done when |
-|---|---|---|
-| **M0** ✅ | Core: domain model, plugin protocol and SDK, host (hotplug and events, driver contract and privileged helper, persistence, rig composition, presets, catalog, system check, plugin-defined guided procedures, generic plugins), CLI, simulated rig with fake driver, end-to-end tests | Everything the GUI needs works from `simrig-cli` on the simulated rig; CI green |
-| **M1** ✅ | GUI on the core: rig view, live inputs, parameters, wizard, presets | Full wizard and daily use work on the simulated rig |
-| **M2** (in progress) | Generic USB plugin: any unbranded device set up and mapped by its own procedure, with a driver service translating raw inputs | An unbranded device with no usable HID descriptor, set up as a shifter (H-pattern or sequential) or a handbrake (pedals and wheels later), works in games with the app closed, set up entirely from the app |
-| **M3** (in progress) | Fanatec plugin: `hid-fanatecff` + driver recipes (DKMS, udev) + PackageKit prerequisites | From scratch: install the package, the wizard installs the driver and configures the CSL DD; after a reboot, with the app closed, the saved rotation is applied |
-| **M4** | Logitech, Moza, more brands | Each brand has at least one tester with the hardware; a mixed-brand rig (e.g. Fanatec base + Moza pedals) works end to end |
-| **M5** | Multi-distro packages (AUR, OBS, COPR), in-app uninstall | Installation verified on Ubuntu, Fedora, Arch |
+1. Third-party plugins: for now, same trust level as any installed software.
 
-## 8. Open questions
-
-1. Final project name (`simrig` is the working name until decided).
-2. Third-party plugins: for now, same trust level as any installed software.
-
-## 9. Resolved
+## 8. Resolved
 
 | Question | Decision |
 |---|---|
 | GUI toolkit | Slint (architecture D9) |
 | Documentation and code language | English (NFR-11) |
 | Mixing brands in one rig | allowed without constraints (FR-06, architecture §3.1.1) |
+| Project name | SimRig |
+| Where releases are published | GitHub releases (packages attached); not GitHub Packages, which has no registry for deb, rpm or Arch packages |

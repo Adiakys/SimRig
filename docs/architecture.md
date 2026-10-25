@@ -1,7 +1,6 @@
 # simrig — Architecture
 
-> Draft 0.10 (2026-10-17). Core (M0) and app (M1) implemented; generic USB plugin (M2) and Fanatec
-> plugin (M3) implemented, to be verified on more hardware. Companion to [requirements.md](requirements.md).
+> Draft 0.10 (2026-10-17). Companion to [requirements.md](requirements.md).
 
 ## 1. Principles
 

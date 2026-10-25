@@ -11,6 +11,7 @@ plugins (each an adapter plus a driver).
 - `PRODUCT.md` and `DESIGN.md`: who the app is for, and the design system (tokens, components,
   rules). Every UI change follows them.
 - `docs/development.md`: building, running on real hardware, repository layout, checks, releases.
+- `docs/requirements.md`: what SimRig must do.
 - `docs/design/flows.md`: how people move through the app.
 - `THIRD-PARTY.md`: what is bundled or derived, and from whom.
 
