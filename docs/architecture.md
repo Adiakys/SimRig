@@ -1134,7 +1134,8 @@ spring through the input interface (marked), and shows the steering angle over e
 usual rotation. Its driver is PXN's and Moza's: SimRig's udev rules, and the bundled
 universal-pidff on kernels older than 6.15, shared with theirs. Any other device the user gives
 the plugin is taken as a generic base, shown over 900°, with force feedback from the kernel's
-generic driver (Linux 6.15). Tested end to end on a fake Cammus C5 and Asetek Forte.
+generic driver (Linux 6.15), if its report descriptor declares force feedback; a device that
+does not (pedals, a handbrake) is refused with that reason. Tested end to end on a fake Cammus C5 and Asetek Forte.
 
 ### 11.6 Simagic
 
