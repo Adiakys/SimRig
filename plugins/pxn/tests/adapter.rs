@@ -135,6 +135,16 @@ fn a_base_not_in_the_table_is_taken_when_chosen() {
     let mut host = env.start();
     assert!(host.components().is_empty());
 
+    // PXN's vendor id: the plugin is offered for the model it does not list.
+    let makers: Vec<Option<String>> = host
+        .usb_devices()
+        .iter()
+        .map(|(d, _)| host.maker_plugin(d))
+        .collect();
+    assert_eq!(makers, [Some("pxn".into()), None]);
+    let (vd10, _) = &host.usb_devices()[0];
+    assert_eq!(host.automatic_plugin(vd10), None);
+
     host.choose_plugin("usb:36e6:4011", Some("pxn")).unwrap();
     until(&mut host, "base and rim", |h| h.components().len() == 2);
     let base = host.find("base").unwrap().address.clone();

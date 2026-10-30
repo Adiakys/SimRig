@@ -129,7 +129,10 @@ as a single-brand rig.
   the most specific match wins (vendor and product over vendor only); a tie goes to the plugin
   found first and is reported. The user can give any USB device to any plugin instead
   (`choose_plugin`): the choice always wins, and the plugin's `attach` takes the device or says
-  why not. A device no manifest lists, such as a newer model of a known brand, works this way.
+  why not. A device no manifest lists, such as a newer model of a known brand, works this way:
+  the plugin whose manifest alone lists its vendor id is its maker's (`Host::maker_plugin`), and
+  the app offers it first. A vendor id several plugins list (a chip maker's, used by many brands)
+  has no maker, nor has a keyboard or a mouse (a HID interface with the boot protocol).
 - **Several components of the same type** are allowed: two pedal sets, an H-pattern and a
   sequential shifter, a base with a separate USB rim. Components are always addressed by
   `<plugin>/<component id>`, never by type alone.

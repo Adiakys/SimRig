@@ -1,7 +1,7 @@
 //! Flows and management screens: add a device, plugins and drivers, general settings and the
 //! first run.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
@@ -9,7 +9,7 @@ use simrig_host::{PluginLocation, PluginState, Target};
 use simrig_model::{Bus, ComponentKind, ProcedureDescriptor};
 
 use crate::app::App;
-use crate::backend::{Command, PluginView, Snapshot};
+use crate::backend::{Command, PluginView, Snapshot, UsbView};
 use crate::settings::ThemeMode;
 use crate::ui::{self, Rig, Screen};
 
@@ -38,6 +38,8 @@ pub struct Flows {
     assigning: Option<(String, String)>,
     busy: bool,
     error: String,
+    /// USB devices a plugin did not take, by key: the plugin and what it said.
+    refused: BTreeMap<String, (String, String)>,
     /// What the plugin said when the setup finished.
     pub done_message: String,
     /// Drivers installed in this session: the result can arrive before the rig is sent again.
@@ -108,12 +110,24 @@ impl App {
                     Bus::Virtual => String::new(),
                 };
                 let (state, detail) = if needs_driver(plugin) {
-                    ("driver", format!("{} · needs a driver", plugin.name))
+                    ("driver", format!("{} plugin · needs a driver", plugin.name))
                 } else if !set_up {
-                    ("setup", format!("{} · to set up", plugin.name))
+                    ("setup", format!("{} plugin · to set up", plugin.name))
                 } else {
-                    ("ready", format!("{} · {kinds}", plugin.name))
+                    ("ready", format!("{} plugin · {kinds}", plugin.name))
                 };
+                let usb = s
+                    .usb
+                    .iter()
+                    .find(|u| u.plugin.as_ref() == Some(&plugin.id) && u.device == device.id);
+                let (choices, choice) = usb
+                    .map(|u| self.plugin_choices(u, None))
+                    .unwrap_or_default();
+                let untested = s.components.iter().any(|c| {
+                    c.component.plugin == plugin.id
+                        && c.component.device.id == device.id
+                        && c.untested
+                });
                 found.push(ui::FoundDevice {
                     key: format!("{}/{}", plugin.id, device.id).into(),
                     name: device.name.clone().into(),
@@ -123,6 +137,11 @@ impl App {
                     plugin_name: plugin.name.clone().into(),
                     is_new: !key.is_empty() && !self.flows.known_usb.contains(&key),
                     preview,
+                    usb: usb.map(|u| u.key.clone()).unwrap_or_default().into(),
+                    choices: ModelRc::new(VecModel::from(choices)),
+                    choice,
+                    refused: usb.map(|u| self.refused(u)).unwrap_or_default().into(),
+                    untested,
                     ..Default::default()
                 });
             }
@@ -134,21 +153,29 @@ impl App {
                     continue;
                 }
                 let generic = s.plugins.iter().any(|p| p.on_request);
+                // The maker's plugin is offered first, until it has said no.
+                let maker = usb
+                    .maker
+                    .clone()
+                    .filter(|m| self.flows.refused.get(&usb.key).is_none_or(|(p, _)| p != m));
+                let maker_name = maker.as_deref().map(|m| self.plugin_name(m));
+                let knows = match &maker_name {
+                    Some(name) => format!("the {name} plugin knows its maker, not this model"),
+                    None if generic => "no plugin knows it".into(),
+                    None => "no plugin knows it, and no generic plugin is installed".into(),
+                };
+                let (choices, choice) = self.plugin_choices(usb, maker.as_deref());
                 found.push(ui::FoundDevice {
                     key: usb.key.clone().into(),
                     name: usb.name.clone().into(),
-                    detail: format!(
-                        "USB {:04x}:{:04x} · {}",
-                        usb.vid,
-                        usb.pid,
-                        if generic {
-                            "no plugin knows it"
-                        } else {
-                            "no plugin knows it, and no generic plugin is installed"
-                        }
-                    )
-                    .into(),
+                    detail: format!("USB {:04x}:{:04x} · {knows}", usb.vid, usb.pid).into(),
                     state: if generic { "unknown" } else { "unsupported" }.into(),
+                    usb: usb.key.clone().into(),
+                    maker: maker.clone().unwrap_or_default().into(),
+                    maker_name: maker_name.unwrap_or_default().into(),
+                    choices: ModelRc::new(VecModel::from(choices)),
+                    choice,
+                    refused: self.refused(usb).into(),
                     is_new: new,
                     plugins: ModelRc::new(VecModel::from(
                         self.brand_candidates(&usb.key)
@@ -190,12 +217,15 @@ impl App {
                         .iter()
                         .rev()
                         .find_map(|p| p.split_once(&refused).map(|(_, r)| r.to_string()));
-                    let name = self.plugin_name(&chosen);
                     self.flows.assigning = None;
-                    self.flows.error = match reason {
-                        Some(r) => format!("{name} cannot handle {}: {r}", usb.name),
-                        None => format!("{name} cannot handle {}.", usb.name),
-                    };
+                    self.flows
+                        .refused
+                        .insert(key.clone(), (chosen, reason.unwrap_or_default()));
+                    // Back to the plugin that handles it by itself, if any.
+                    self.send(Command::ChoosePlugin {
+                        device: key,
+                        plugin: None,
+                    });
                 }
             }
         }
@@ -270,6 +300,7 @@ impl App {
         self.flows.done_message.clear();
         self.flows.busy = false;
         self.flows.error.clear();
+        self.flows.refused.clear();
         self.flows.show_all = false;
         self.refresh_flows();
         self.go(Screen::Add);
@@ -321,8 +352,22 @@ impl App {
         self.assign(usb_key, plugin);
     }
 
+    /// A USB device is given to a plugin of its menu, or back to the automatic one (empty).
+    pub fn add_pick(&mut self, usb_key: &str, plugin: &str) {
+        if plugin.is_empty() {
+            self.flows.refused.remove(usb_key);
+            self.send(Command::ChoosePlugin {
+                device: usb_key.to_string(),
+                plugin: None,
+            });
+        } else {
+            self.assign(usb_key, plugin.to_string());
+        }
+    }
+
     fn assign(&mut self, usb_key: &str, plugin: String) {
         self.flows.assigning = Some((usb_key.to_string(), plugin.clone()));
+        self.flows.refused.remove(usb_key);
         self.flows.error.clear();
         self.send(Command::ChoosePlugin {
             device: usb_key.to_string(),
@@ -349,6 +394,66 @@ impl App {
             .collect();
         brands.sort_by_key(|c| self.plugin_name(c));
         brands
+    }
+
+    /// The plugins of a device's menu: "Automatic" when a plugin knows the model, then the
+    /// other brand plugins, then the generic ones; `skip` is offered apart (the maker's plugin).
+    /// Returns them with the index of the current one (-1 when none is).
+    fn plugin_choices(&self, usb: &UsbView, skip: Option<&str>) -> (Vec<ui::PluginChoice>, i32) {
+        let mut choices = Vec::new();
+        if let Some(auto) = &usb.automatic {
+            choices.push(ui::PluginChoice {
+                id: "".into(),
+                label: "Automatic".into(),
+                detail: format!("{} plugin, which knows this model", self.plugin_name(auto)).into(),
+                section: "".into(),
+            });
+        }
+        let on_request = |id: &str| {
+            self.snapshot
+                .plugins
+                .iter()
+                .any(|p| p.id == id && p.on_request)
+        };
+        for (generic, section) in [(false, "OTHER PLUGINS"), (true, "GENERIC")] {
+            let mut ids: Vec<&String> = usb
+                .candidates
+                .iter()
+                .filter(|c| on_request(c) == generic)
+                .filter(|c| Some(c.as_str()) != skip && Some(*c) != usb.automatic.as_ref())
+                .collect();
+            ids.sort_by_key(|c| self.plugin_name(c));
+            for (i, id) in ids.into_iter().enumerate() {
+                choices.push(ui::PluginChoice {
+                    id: id.clone().into(),
+                    label: self.plugin_name(id).into(),
+                    detail: "".into(),
+                    section: if i == 0 { section } else { "" }.into(),
+                });
+            }
+        }
+        let current = usb.chosen.as_deref().unwrap_or_default();
+        let choice = choices
+            .iter()
+            .position(|c| c.id == current)
+            .map_or(-1, |i| i as i32);
+        (choices, choice)
+    }
+
+    /// Why the plugin a USB device was last given to did not take it.
+    fn refused(&self, usb: &UsbView) -> String {
+        match self.flows.refused.get(&usb.key) {
+            Some((plugin, reason)) if reason.is_empty() => {
+                format!("Not taken by the {} plugin.", self.plugin_name(plugin))
+            }
+            Some((plugin, reason)) => {
+                format!(
+                    "Not taken by the {} plugin: {reason}.",
+                    self.plugin_name(plugin)
+                )
+            }
+            None => String::new(),
+        }
     }
 
     fn plugin_name(&self, id: &str) -> String {

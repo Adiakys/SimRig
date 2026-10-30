@@ -615,6 +615,192 @@ export component Picker {
     }
 }
 
+/// A plugin a device can be given to, in a [`PluginMenu`].
+export struct PluginChoice {
+    /// The plugin's id; empty for "Automatic".
+    id: string,
+    label: string,
+    detail: string,
+    /// A heading drawn above this choice, starting a group.
+    section: string,
+}
+
+/// Which plugin handles a device: an inline "Change" link or a quiet button, opening the
+/// plugins grouped, the current one marked.
+export component PluginMenu {
+    in property <[PluginChoice]> choices;
+    /// -1 when none of the choices is the current one.
+    in property <int> selected: -1;
+    in property <string> text;
+    /// Drawn as an underlined link inside a line of text, else as a quiet button.
+    in property <bool> link: false;
+    /// The header of the menu, e.g. "Plugin of PXN VD4".
+    in property <string> label;
+    in property <string> note;
+    in property <bool> enabled: true;
+    callback picked(string);
+
+    height: link ? t.preferred-height : 40px;
+    min-width: l.min-width;
+    preferred-width: l.preferred-width;
+    horizontal-stretch: 0;
+    forward-focus: fs;
+    accessible-role: AccessibleRole.combobox;
+    accessible-label: text + " · " + label;
+    accessible-enabled: enabled;
+    accessible-action-default => { menu.show(); }
+
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == " " || e.text == "\n" || e.text == Key.DownArrow {
+                menu.show();
+                return accept;
+            }
+            reject
+        }
+    }
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: root.link ? 6px : 9px;
+        border-width: fs.has-focus ? 2px : 0px;
+        border-color: Theme.focus;
+    }
+    Rectangle {
+        border-radius: 6px;
+        background: !root.link && ta.has-hover && root.enabled ? Theme.raised : transparent;
+        l := HorizontalLayout {
+            padding-left: root.link ? 0px : 12px;
+            padding-right: root.link ? 0px : 10px;
+            spacing: 6px;
+            t := Text {
+                text: root.text;
+                font-family: Theme.sans;
+                font-size: root.link ? 14px : 16px;
+                font-weight: root.link ? 600 : 400;
+                color: root.enabled ? Theme.ink : Theme.ink3;
+                vertical-alignment: center;
+                Rectangle {
+                    visible: root.link;
+                    y: parent.height - 1px;
+                    height: 1px;
+                    background: ta.has-hover ? Theme.ink : Theme.ink2;
+                }
+            }
+            if !root.link: Image {
+                source: Icons.down;
+                colorize: root.enabled ? Theme.ink : Theme.ink3;
+                width: 16px;
+                height: 16px;
+                y: (parent.height - 16px) / 2;
+            }
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            fs.focus();
+            menu.show();
+        }
+    }
+    menu := PopupWindow {
+        x: 0;
+        y: root.height + 6px;
+        width: 340px;
+        Rectangle {
+            border-radius: 10px;
+            background: Theme.dark ? Theme.raised : Theme.surface;
+            border-width: Theme.dark ? 1px : 0px;
+            border-color: Theme.rule;
+            drop-shadow-blur: Theme.float-blur;
+            drop-shadow-offset-y: 12px;
+            drop-shadow-color: Theme.float-shadow;
+            VerticalLayout {
+                padding: 8px;
+                spacing: 2px;
+                if root.label != "": HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    padding-top: 6px;
+                    padding-bottom: 6px;
+                    Small { text: root.label; }
+                }
+                for choice[i] in root.choices: VerticalLayout {
+                    if choice.section != "": HorizontalLayout {
+                        padding-left: 30px;
+                        padding-top: 10px;
+                        padding-bottom: 4px;
+                        Eyebrow { text: choice.section; }
+                    }
+                    Rectangle {
+                        border-radius: 6px;
+                        background: i == root.selected ? Theme.line : ot.has-hover ? Theme.raised : transparent;
+                        accessible-role: AccessibleRole.button;
+                        accessible-label: choice.detail != "" ? choice.label + " · " + choice.detail : choice.label;
+                        accessible-checked: i == root.selected;
+                        accessible-action-default => { root.picked(choice.id); menu.close(); }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            padding-top: 6px;
+                            padding-bottom: 6px;
+                            spacing: 10px;
+                            Rectangle {
+                                width: 10px;
+                                VerticalLayout {
+                                    alignment: start;
+                                    padding-top: 7px;
+                                    Rectangle {
+                                        height: 10px;
+                                        border-radius: 5px;
+                                        background: i == root.selected ? Theme.accent : transparent;
+                                    }
+                                }
+                            }
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: choice.label;
+                                    font-family: Theme.sans;
+                                    font-size: 16px;
+                                    font-weight: i == root.selected ? 600 : 400;
+                                    color: Theme.ink;
+                                    overflow: elide;
+                                }
+                                if choice.detail != "": Small { text: choice.detail; }
+                            }
+                        }
+                        ot := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                if i != root.selected { root.picked(choice.id); }
+                            }
+                        }
+                    }
+                }
+                if root.note != "": VerticalLayout {
+                    padding-top: 6px;
+                    spacing: 8px;
+                    Rectangle {
+                        height: 1px;
+                        background: Theme.line;
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        padding-bottom: 4px;
+                        Small { text: root.note; color: Theme.ink3; }
+                    }
+                }
+            }
+        }
+    }
+}
+
 export component Toggle {
     in property <bool> checked;
     in property <bool> enabled: true;
