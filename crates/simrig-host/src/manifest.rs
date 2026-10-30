@@ -83,6 +83,11 @@ impl UsbMatch {
 }
 
 impl Match {
+    /// The manifest lists products of this vendor, or all of them.
+    pub fn lists_vendor(&self, vid: u16) -> bool {
+        self.usb.iter().any(|m| m.vid == vid)
+    }
+
     /// Best specificity with which this plugin claims a USB device, if at all.
     pub fn usb_claim(&self, vid: u16, pid: u16) -> Option<u8> {
         self.usb
@@ -100,6 +105,19 @@ impl Match {
             .max_by_key(|m| m.specificity())
             .and_then(|m| m.kernel_driver.as_deref())
             .or(self.kernel_driver.as_deref())
+    }
+}
+
+/// The plugin of a vendor's devices: the only brand plugin (not a generic one) whose manifest
+/// lists the vendor. None when no plugin does, or several do (a chip maker's id, which many
+/// brands use).
+pub fn maker<'a>(manifests: &[&'a Manifest], vid: u16) -> Option<&'a str> {
+    let mut makers = manifests
+        .iter()
+        .filter(|m| !m.matching.on_request && m.matching.lists_vendor(vid));
+    match (makers.next(), makers.next()) {
+        (Some(m), None) => Some(&m.id),
+        _ => None,
     }
 }
 
@@ -335,8 +353,29 @@ mod tests {
             sysfs: PathBuf::from(format!("/sys/bus/usb/devices/{vid:04x}-{pid:04x}")),
             name: format!("{vid:04x}:{pid:04x}"),
             serial: None,
+            boot_input: false,
             id: format!("usb-{vid:04x}-{pid:04x}"),
         }
+    }
+
+    #[test]
+    fn the_maker_is_the_only_brand_plugin_listing_the_vendor() {
+        let entry = |vid, pid| UsbMatch {
+            vid,
+            pid,
+            kernel_driver: None,
+        };
+        let pxn = manifest("pxn", vec![entry(0x36e6, Some(0x400f))]);
+        let simagic = manifest("simagic", vec![entry(0x0483, Some(0x0522))]);
+        let pidff = manifest("pidff", vec![entry(0x0483, Some(0xa355))]);
+        let mut generic = manifest("generic-usb", vec![entry(0x36e6, None)]);
+        generic.matching.on_request = true;
+        let all = [&pxn, &simagic, &pidff, &generic];
+        // A model the plugin does not list still has its maker.
+        assert_eq!(maker(&all, 0x36e6), Some("pxn"));
+        // A chip maker's id, used by several brands: no maker.
+        assert_eq!(maker(&all, 0x0483), None);
+        assert_eq!(maker(&all, 0x046d), None);
     }
 
     #[test]

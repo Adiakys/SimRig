@@ -68,7 +68,11 @@ From **Add device** in the top bar, or when an unknown device is plugged in whil
 ```mermaid
 flowchart LR
   C[Connect<br/>devices found live] -->|recognized| N{Driver needed?}
-  C -->|not recognized| G[Choose a plugin<br/>or set up as generic]
+  C -->|Change| G
+  C -->|maker known,<br/>model not listed| M[Try the maker's plugin]
+  M -->|takes it| N
+  M -->|says why not| G
+  C -->|not recognized| G[Other plugin<br/>or set up as generic]
   G --> N
   N -->|no| S
   N -->|yes| D[Driver<br/>why, then one password]
@@ -79,7 +83,7 @@ flowchart LR
 
 | Step | Screen | Notes |
 |---|---|---|
-| Connect | `add-1-connect` | Listening state; devices appear as they are plugged in. Unknown devices offer **Choose a plugin** (a brand plugin, which takes the device or says why not) and **Set up as generic** (the generic USB plugin), never automatically. |
+| Connect | `add-1-connect` | Listening state; devices appear as they are plugged in. A recognized device says which plugin handles it, with **Change**; a device no plugin handles offers **Other plugin**. Both are the same underlined link opening the same menu: **Automatic** (the plugin that knows the model) when there is one, the other plugins, then the generic ones; the menu opens where it fits in the window. A model no plugin lists, of a maker a plugin knows (its vendor id), offers **Try the <maker> plugin** as its button; keyboards and mice are never offered their maker's plugin. Other unknown devices offer **Set up as generic** (the generic USB plugin), never automatically. A plugin that does not take a device says why under its row, and the device goes back to the plugin that handles it by itself, if any. |
 | Driver | `add-2-driver` | What will be installed and the three promises (works with the app closed, starts only with the device, removable). The password line sits right above **Install the driver**. Skipped when the driver is already there or provided by the system. |
 | Set up | `add-3-setup` | A procedure defined by the plugin, rendered generically: here mapping the gears of a 6+R shifter, advancing by itself as each gear is detected. The drawing follows the configuration (6+R or 7+R). |
 | Done | `add-4-done` | The device moving live, the state saved in the driver, **Back to the rig** (primary) and **Open settings**. |

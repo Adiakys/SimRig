@@ -14,6 +14,9 @@ pub struct UsbDevice {
     pub sysfs: PathBuf,
     pub name: String,
     pub serial: Option<String>,
+    /// It offers a keyboard or a mouse (a HID interface with the boot protocol): a desktop
+    /// device, never offered to the plugin of its maker by itself.
+    pub boot_input: bool,
     /// The device's id for plugins, in component addresses: the same on any port (see
     /// [`stable_id`]).
     pub id: String,
@@ -60,6 +63,24 @@ impl UsbDevice {
 pub const DEFAULT_ROOT: &str = SYSFS_USB;
 const HUB_CLASS: &str = "09";
 
+/// Whether an interface of the device is a HID keyboard or mouse with the boot protocol
+/// (class 03, subclass 01, protocol 01 or 02).
+fn has_boot_input(device: &Path) -> bool {
+    let Ok(entries) = fs::read_dir(device) else {
+        return false;
+    };
+    entries.filter_map(|e| e.ok()).any(|e| {
+        let read = |file: &str| {
+            fs::read_to_string(e.path().join(file))
+                .ok()
+                .map(|s| s.trim().to_string())
+        };
+        read("bInterfaceClass").as_deref() == Some("03")
+            && read("bInterfaceSubClass").as_deref() == Some("01")
+            && matches!(read("bInterfaceProtocol").as_deref(), Some("01" | "02"))
+    })
+}
+
 /// Connected USB devices (not interfaces, not hubs' ports).
 pub fn scan() -> Vec<UsbDevice> {
     scan_dir(Path::new(SYSFS_USB))
@@ -92,12 +113,14 @@ pub fn scan_dir(root: &Path) -> Vec<UsbDevice> {
                 (None, None) => format!("USB {vid:04x}:{pid:04x}"),
             };
             let serial = read("serial");
+            let boot_input = has_boot_input(&path);
             Some(UsbDevice {
                 vid,
                 pid,
                 sysfs: path,
                 name,
                 serial,
+                boot_input,
                 id: String::new(),
             })
         })
@@ -160,6 +183,29 @@ mod tests {
         assert_eq!((devices[0].vid, devices[0].pid), (0x0eb7, 0x0020));
         assert_eq!(devices[0].device_info().id, "usb-0eb7-0020");
         assert_eq!(devices[0].legacy_id(), "usb-1-2");
+        assert!(!devices[0].boot_input);
+    }
+
+    #[test]
+    fn keyboards_and_mice_are_told_apart() {
+        let root =
+            std::env::temp_dir().join(format!("simrig-usb-boot-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        plug(&root, "1-2", "c52b", None);
+        let receiver = root.join("1-2/1-2:1.1");
+        fs::create_dir_all(&receiver).unwrap();
+        fs::write(receiver.join("bInterfaceClass"), "03\n").unwrap();
+        fs::write(receiver.join("bInterfaceSubClass"), "01\n").unwrap();
+        fs::write(receiver.join("bInterfaceProtocol"), "02\n").unwrap();
+        plug(&root, "1-3", "c24f", None);
+        let wheel = root.join("1-3/1-3:1.0");
+        fs::create_dir_all(&wheel).unwrap();
+        fs::write(wheel.join("bInterfaceClass"), "03\n").unwrap();
+        fs::write(wheel.join("bInterfaceSubClass"), "00\n").unwrap();
+        fs::write(wheel.join("bInterfaceProtocol"), "00\n").unwrap();
+        let boot: Vec<bool> = scan_dir(&root).iter().map(|d| d.boot_input).collect();
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(boot, [true, false]);
     }
 
     fn plug(root: &Path, port: &str, pid: &str, serial: Option<&str>) {
