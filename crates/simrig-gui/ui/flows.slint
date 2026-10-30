@@ -53,7 +53,6 @@ component FoundLine inherits VerticalLayout {
                 alignment: start;
                 Small { text: root.found.detail + " ·"; wrap: no-wrap; }
                 PluginMenu {
-                    link: true;
                     text: @tr("Change");
                     label: @tr("Plugin of {}", root.found.name);
                     note: @tr("The chosen plugin takes the device or says why not.");
@@ -79,7 +78,7 @@ component FoundLine inherits VerticalLayout {
                 tone: ChipTone.warning;
             }
             if root.found.state == "setup" && !root.actions: Chip { text: @tr("To set up"); }
-            if root.found.state == "unsupported" && (!root.actions || root.found.plugins.length == 0): Chip { text: @tr("Not supported"); }
+            if root.found.state == "unsupported" && (!root.actions || root.found.choices.length == 0): Chip { text: @tr("Not supported"); }
             // Only a device just plugged in gets the accent: one signal per screen.
             if root.actions && (root.found.state == "driver" || root.found.state == "setup"): Button {
                 kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
@@ -87,35 +86,29 @@ component FoundLine inherits VerticalLayout {
                 enabled: !Rig.add-busy;
                 clicked => { Api.add-choose(root.found.key); }
             }
-            // A model its maker's plugin does not list: that plugin first, the others in a menu.
-            if root.actions && root.found.maker != "": HorizontalLayout {
-                spacing: 10px;
-                PluginMenu {
-                    text: @tr("Other plugin");
-                    label: @tr("Plugin of {}", root.found.name);
-                    note: @tr("The chosen plugin takes the device or says why not.");
-                    choices: root.found.choices;
-                    selected: root.found.choice;
-                    enabled: !Rig.add-busy;
-                    picked(id) => { Api.add-pick(root.found.usb, id); }
+            // A device no plugin handles: the other plugins in a menu, and the maker's plugin
+            // first when its maker is known, else the generic setup.
+            if root.actions && (root.found.state == "unknown" || root.found.state == "unsupported"): HorizontalLayout {
+                spacing: 16px;
+                if root.found.choices.length > 0: VerticalLayout {
+                    alignment: center;
+                    PluginMenu {
+                        text: @tr("Other plugin");
+                        label: @tr("Plugin of {}", root.found.name);
+                        note: @tr("The chosen plugin takes the device or says why not.");
+                        choices: root.found.choices;
+                        selected: root.found.choice;
+                        enabled: !Rig.add-busy;
+                        picked(id) => { Api.add-pick(root.found.usb, id); }
+                    }
                 }
-                Button {
+                if root.found.maker != "": Button {
                     kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
                     text: @tr("Try the {} plugin", root.found.maker-name);
                     enabled: !Rig.add-busy;
                     clicked => { Api.add-pick(root.found.usb, root.found.maker); }
                 }
-            }
-            if root.actions && root.found.maker == "" && (root.found.state == "unknown" || root.found.state == "unsupported"): HorizontalLayout {
-                spacing: 10px;
-                if root.found.plugins.length > 0: Picker {
-                    options: root.found.plugins;
-                    placeholder: root.found.refused != "" ? @tr("Other plugin") : @tr("Choose a plugin");
-                    label: @tr("Plugin of {}", root.found.name);
-                    enabled: !Rig.add-busy;
-                    picked(i) => { Api.add-assign(root.found.key, i); }
-                }
-                if root.found.state == "unknown": Button {
+                if root.found.maker == "" && root.found.state == "unknown": Button {
                     kind: root.found.is-new ? ButtonKind.primary : ButtonKind.secondary;
                     text: @tr("Set up as generic");
                     enabled: !Rig.add-busy;

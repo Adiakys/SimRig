@@ -625,24 +625,28 @@ export struct PluginChoice {
     section: string,
 }
 
-/// Which plugin handles a device: an inline "Change" link or a quiet button, opening the
-/// plugins grouped, the current one marked.
+/// Which plugin handles a device: an underlined link ("Change", "Other plugin") opening the
+/// plugins grouped, the current one marked. The menu opens below the link, or above it when
+/// there is more room there, and scrolls when it fits neither way: it never leaves the window.
 export component PluginMenu {
     in property <[PluginChoice]> choices;
     /// -1 when none of the choices is the current one.
     in property <int> selected: -1;
     in property <string> text;
-    /// Drawn as an underlined link inside a line of text, else as a quiet button.
-    in property <bool> link: false;
     /// The header of the menu, e.g. "Plugin of PXN VD4".
     in property <string> label;
     in property <string> note;
     in property <bool> enabled: true;
     callback picked(string);
 
-    height: link ? t.preferred-height : 40px;
-    min-width: l.min-width;
-    preferred-width: l.preferred-width;
+    /// Room for the menu under and over the link, keeping 8 px from the window's edges.
+    property <length> below: Theme.window-height - root.absolute-position.y - root.height - 14px;
+    property <length> above: root.absolute-position.y - 14px;
+    property <length> menu-width: 340px;
+
+    height: t.preferred-height;
+    min-width: t.preferred-width;
+    preferred-width: t.preferred-width;
     horizontal-stretch: 0;
     forward-focus: fs;
     accessible-role: AccessibleRole.combobox;
@@ -665,38 +669,21 @@ export component PluginMenu {
         y: -4px;
         width: parent.width + 8px;
         height: parent.height + 8px;
-        border-radius: root.link ? 6px : 9px;
+        border-radius: 6px;
         border-width: fs.has-focus ? 2px : 0px;
         border-color: Theme.focus;
     }
-    Rectangle {
-        border-radius: 6px;
-        background: !root.link && ta.has-hover && root.enabled ? Theme.raised : transparent;
-        l := HorizontalLayout {
-            padding-left: root.link ? 0px : 12px;
-            padding-right: root.link ? 0px : 10px;
-            spacing: 6px;
-            t := Text {
-                text: root.text;
-                font-family: Theme.sans;
-                font-size: root.link ? 14px : 16px;
-                font-weight: root.link ? 600 : 400;
-                color: root.enabled ? Theme.ink : Theme.ink3;
-                vertical-alignment: center;
-                Rectangle {
-                    visible: root.link;
-                    y: parent.height - 1px;
-                    height: 1px;
-                    background: ta.has-hover ? Theme.ink : Theme.ink2;
-                }
-            }
-            if !root.link: Image {
-                source: Icons.down;
-                colorize: root.enabled ? Theme.ink : Theme.ink3;
-                width: 16px;
-                height: 16px;
-                y: (parent.height - 16px) / 2;
-            }
+    t := Text {
+        text: root.text;
+        font-family: Theme.sans;
+        font-size: 14px;
+        font-weight: 600;
+        color: root.enabled ? Theme.ink : Theme.ink3;
+        vertical-alignment: center;
+        Rectangle {
+            y: parent.height - 1px;
+            height: 1px;
+            background: !root.enabled ? Theme.ink3 : ta.has-hover ? Theme.ink : Theme.ink2;
         }
     }
     ta := TouchArea {
@@ -708,9 +695,14 @@ export component PluginMenu {
         }
     }
     menu := PopupWindow {
-        x: 0;
-        y: root.height + 6px;
-        width: 340px;
+        // Only the list scrolls: the header and the note stay in view.
+        property <length> full: 20px + head.preferred-height + list.preferred-height + foot.preferred-height;
+        property <bool> down: self.full <= root.below || root.below >= root.above;
+        width: root.menu-width;
+        height: min(self.full, self.down ? root.below : root.above);
+        // Shifted left when it would pass the right edge of the window.
+        x: max(8px - root.absolute-position.x, min(0px, Theme.window-width - 8px - root.menu-width - root.absolute-position.x));
+        y: self.down ? root.height + 6px : -self.height - 6px;
         Rectangle {
             border-radius: 10px;
             background: Theme.dark ? Theme.raised : Theme.surface;
@@ -719,70 +711,82 @@ export component PluginMenu {
             drop-shadow-blur: Theme.float-blur;
             drop-shadow-offset-y: 12px;
             drop-shadow-color: Theme.float-shadow;
+            clip: true;
             VerticalLayout {
                 padding: 8px;
                 spacing: 2px;
-                if root.label != "": HorizontalLayout {
+                head := HorizontalLayout {
                     padding-left: 10px;
                     padding-right: 10px;
                     padding-top: 6px;
                     padding-bottom: 6px;
                     Small { text: root.label; }
                 }
-                for choice[i] in root.choices: VerticalLayout {
-                    if choice.section != "": HorizontalLayout {
-                        padding-left: 30px;
-                        padding-top: 10px;
-                        padding-bottom: 4px;
-                        Eyebrow { text: choice.section; }
-                    }
-                    Rectangle {
-                        border-radius: 6px;
-                        background: i == root.selected ? Theme.line : ot.has-hover ? Theme.raised : transparent;
-                        accessible-role: AccessibleRole.button;
-                        accessible-label: choice.detail != "" ? choice.label + " · " + choice.detail : choice.label;
-                        accessible-checked: i == root.selected;
-                        accessible-action-default => { root.picked(choice.id); menu.close(); }
-                        HorizontalLayout {
-                            padding-left: 10px;
-                            padding-right: 10px;
-                            padding-top: 6px;
-                            padding-bottom: 6px;
-                            spacing: 10px;
+                Flickable {
+                    min-height: 0px;
+                    preferred-height: list.preferred-height;
+                    vertical-stretch: 1;
+                    content-height: list.preferred-height;
+                    interactive: menu.full > menu.height;
+                    list := VerticalLayout {
+                        width: parent.width;
+                        spacing: 2px;
+                        for choice[i] in root.choices: VerticalLayout {
+                            if choice.section != "": HorizontalLayout {
+                                padding-left: 30px;
+                                padding-top: 10px;
+                                padding-bottom: 4px;
+                                Eyebrow { text: choice.section; }
+                            }
                             Rectangle {
-                                width: 10px;
-                                VerticalLayout {
-                                    alignment: start;
-                                    padding-top: 7px;
+                                border-radius: 6px;
+                                background: i == root.selected ? Theme.line : ot.has-hover ? Theme.raised : transparent;
+                                accessible-role: AccessibleRole.button;
+                                accessible-label: choice.detail != "" ? choice.label + " · " + choice.detail : choice.label;
+                                accessible-checked: i == root.selected;
+                                accessible-action-default => { root.picked(choice.id); menu.close(); }
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    padding-top: 6px;
+                                    padding-bottom: 6px;
+                                    spacing: 10px;
                                     Rectangle {
-                                        height: 10px;
-                                        border-radius: 5px;
-                                        background: i == root.selected ? Theme.accent : transparent;
+                                        width: 10px;
+                                        VerticalLayout {
+                                            alignment: start;
+                                            padding-top: 7px;
+                                            Rectangle {
+                                                height: 10px;
+                                                border-radius: 5px;
+                                                background: i == root.selected ? Theme.accent : transparent;
+                                            }
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        Text {
+                                            text: choice.label;
+                                            font-family: Theme.sans;
+                                            font-size: 16px;
+                                            font-weight: i == root.selected ? 600 : 400;
+                                            color: Theme.ink;
+                                            overflow: elide;
+                                        }
+                                        if choice.detail != "": Small { text: choice.detail; }
                                     }
                                 }
-                            }
-                            VerticalLayout {
-                                horizontal-stretch: 1;
-                                Text {
-                                    text: choice.label;
-                                    font-family: Theme.sans;
-                                    font-size: 16px;
-                                    font-weight: i == root.selected ? 600 : 400;
-                                    color: Theme.ink;
-                                    overflow: elide;
+                                ot := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        if i != root.selected { root.picked(choice.id); }
+                                    }
                                 }
-                                if choice.detail != "": Small { text: choice.detail; }
-                            }
-                        }
-                        ot := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => {
-                                if i != root.selected { root.picked(choice.id); }
                             }
                         }
                     }
                 }
-                if root.note != "": VerticalLayout {
+                foot := VerticalLayout {
                     padding-top: 6px;
                     spacing: 8px;
                     Rectangle {

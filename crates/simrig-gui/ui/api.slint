@@ -193,8 +193,6 @@ export struct FoundDevice {
     is-new: bool,
     /// The device drawn live, when it has components.
     preview: Device,
-    /// For a device no plugin handles: the brand plugins it can be given to.
-    plugins: [string],
     /// The USB device (`usb:vvvv:pppp`), for the plugin choices.
     usb: string,
     /// For a model no plugin lists: the plugin of its maker, to try first.
@@ -408,8 +406,6 @@ export global Api {
     callback start-add();
     callback add-choose(string);
     callback add-generic(string);
-    /// A device no plugin handles is given to a brand plugin (index in its `plugins`).
-    callback add-assign(string, int);
     /// A USB device is given to a plugin (by id), or back to the automatic one (empty).
     callback add-pick(string, string);
     callback add-install-driver();

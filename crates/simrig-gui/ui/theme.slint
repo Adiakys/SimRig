@@ -13,6 +13,9 @@ export global Theme {
     out property <bool> dark: mode == 2 || (mode == 0 && Palette.color-scheme == ColorScheme.dark);
     /// Interface transitions become instant (live devices keep moving).
     in-out property <bool> reduced-motion: false;
+    /// The window's size, so popups can stay inside it.
+    in-out property <length> window-width: 1440px;
+    in-out property <length> window-height: 900px;
 
     // Neutrals
     out property <brush> bg: dark ? #151411 : #f7f6f3;

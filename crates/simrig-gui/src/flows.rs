@@ -177,12 +177,6 @@ impl App {
                     choice,
                     refused: self.refused(usb).into(),
                     is_new: new,
-                    plugins: ModelRc::new(VecModel::from(
-                        self.brand_candidates(&usb.key)
-                            .iter()
-                            .map(|c| self.plugin_name(c).into())
-                            .collect::<Vec<slint::SharedString>>(),
-                    )),
                     ..Default::default()
                 });
             }
@@ -341,17 +335,6 @@ impl App {
         self.assign(usb_key, plugin);
     }
 
-    /// An unknown USB device is given to a brand plugin, which accepts it or says why not.
-    pub fn add_assign(&mut self, usb_key: &str, index: i32) {
-        let Some(plugin) = usize::try_from(index)
-            .ok()
-            .and_then(|i| self.brand_candidates(usb_key).into_iter().nth(i))
-        else {
-            return;
-        };
-        self.assign(usb_key, plugin);
-    }
-
     /// A USB device is given to a plugin of its menu, or back to the automatic one (empty).
     pub fn add_pick(&mut self, usb_key: &str, plugin: &str) {
         if plugin.is_empty() {
@@ -374,26 +357,6 @@ impl App {
             plugin: Some(plugin),
         });
         self.refresh_flows();
-    }
-
-    /// The plugins a USB device can be given to, generic ones aside, by name.
-    fn brand_candidates(&self, usb_key: &str) -> Vec<String> {
-        let Some(usb) = self.snapshot.usb.iter().find(|u| u.key == usb_key) else {
-            return Vec::new();
-        };
-        let mut brands: Vec<String> = usb
-            .candidates
-            .iter()
-            .filter(|c| {
-                self.snapshot
-                    .plugins
-                    .iter()
-                    .any(|p| &&p.id == c && !p.on_request)
-            })
-            .cloned()
-            .collect();
-        brands.sort_by_key(|c| self.plugin_name(c));
-        brands
     }
 
     /// The plugins of a device's menu: "Automatic" when a plugin knows the model, then the

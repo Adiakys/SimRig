@@ -35,7 +35,9 @@ Everything lives under `target/dev`: your real configuration is not touched. Wit
 ```
 
 `--screen` takes `home`, `component:<component>`, `procedure:<component>/<id>`, `plugins`,
-`settings`, `add`, `first:<step>`, and can chain actions with `;` (see `src/main.rs`). Device
+`settings`, `add`, `first:<step>`, and can chain actions with `;` (see `src/main.rs`), e.g.
+`click:<x>,<y>` to click a point of the window (a menu then shows open) or
+`pick:<usb key>=<plugin>` to give a device to a plugin in the add flow. Device
 checks can be shown on the simulated rig with made-up findings on the open device, e.g.
 `component:base;findings:driver,!steam` (`!` marks one ignored; `;ignored` shows those again).
 

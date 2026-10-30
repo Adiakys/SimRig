@@ -268,8 +268,6 @@ mod callbacks {
         let a = app.clone();
         api.on_add_generic(move |key| a.borrow_mut().add_generic(&key));
         let a = app.clone();
-        api.on_add_assign(move |key, i| a.borrow_mut().add_assign(&key, i));
-        let a = app.clone();
         api.on_add_pick(move |key, plugin| a.borrow_mut().add_pick(&key, &plugin));
         let a = app.clone();
         api.on_add_show_all(move |on| a.borrow_mut().add_show_all(on));
@@ -382,6 +380,29 @@ mod callbacks {
             "ignored" => a.open_ignored(true),
             "driver" => a.install_driver(arg),
             "generic" => a.add_generic(arg),
+            // click:<x>,<y>, a left click at that point of the window (to open a menu)
+            "click" => {
+                if let Some((x, y)) = arg.split_once(',') {
+                    let position = slint::LogicalPosition::new(
+                        x.parse().unwrap_or(0.0),
+                        y.parse().unwrap_or(0.0),
+                    );
+                    let window = a.window();
+                    // The click may reach the app's own callbacks.
+                    drop(a);
+                    let window = window.window();
+                    let button = slint::platform::PointerEventButton::Left;
+                    window.dispatch_event(slint::platform::WindowEvent::PointerMoved { position });
+                    window.dispatch_event(slint::platform::WindowEvent::PointerPressed {
+                        position,
+                        button,
+                    });
+                    window.dispatch_event(slint::platform::WindowEvent::PointerReleased {
+                        position,
+                        button,
+                    });
+                }
+            }
             // pick:<usb key>=<plugin>, e.g. pick:usb:36e6:400d=pxn (empty: automatic)
             "pick" => {
                 let (key, plugin) = arg.split_once('=').unwrap_or((arg, ""));
