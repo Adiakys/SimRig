@@ -1016,8 +1016,9 @@ or one installed by other means, is used as it is.
 
 **The adapter** claims every device of the vendor (Moza does not publish its product ids) and
 tells them apart by USB product name, like Boxflat: bases, SR-P/CRP pedal sets, the HBP
-handbrake. Shifters, hubs and the like are attached without components for now (they can be
-given to the generic USB plugin). Settings are read and written over the serial port: rotation
+handbrake, the SGP sequential shifter (its lever two buttons, the 14th and 13th, as Boxflat
+reads them). H-pattern shifters, hubs and the like are attached without components for now
+(they can be given to the generic USB plugin). Settings are read and written over the serial port: rotation
 (stored as half the angle, with the games' maximum kept equal), force feedback strength, natural
 damper and friction, the games' spring and damper gains as standard parameters; torque, maximum
 speed, natural inertia, centering spring, road sensitivity, the games' friction and inertia
@@ -1026,7 +1027,8 @@ cached (the base answers in milliseconds, not microseconds); a port that fails i
 Force feedback (test, stop) needs `hid-universal-pidff` bound to the base; without it the base
 still has inputs and settings, and says why forces are missing. The SR-P's axes are known (no
 mapping); pedals plugged into a base are mapped by pressing them. Tested end to end on a fake R9
-whose fake serial port decodes requests and answers like the real one.
+whose fake serial port decodes requests and answers like the real one, and a fake SGP. Confirmed
+on real hardware: CRP2 pedals (live inputs).
 
 ### 11.2 Logitech
 

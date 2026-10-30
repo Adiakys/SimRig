@@ -1,5 +1,5 @@
 //! End to end through the host: a fake R9 base (inputs, force feedback driver, serial port
-//! answering like the real one), SR-P pedals and an HBP handbrake.
+//! answering like the real one), SR-P pedals, an HBP handbrake and an SGP shifter.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -161,4 +161,53 @@ fn pedals_handbrake_and_pedals_on_the_base() {
         panic!("{inputs:?}")
     };
     assert!(brake.value > 0.99);
+}
+
+#[test]
+fn an_sgp_sequential_shifter() {
+    let env = env("sgp");
+    let sgp = env.plug(
+        "1-6",
+        0x346e,
+        0x0023,
+        "Gudsen SGP Shifter",
+        "1-6:1.0/0003:346E:0023.0004",
+        Some("hid-generic"),
+    );
+    // 16 joystick buttons (BTN_TRIGGER to BTN_DEAD), the lever pushed: its 14th.
+    let keys: String = (0x120..=0x12f)
+        .map(|code| format!("key {code} {}\n", u8::from(code == 0x12d)))
+        .collect();
+    env.input(&sgp, &keys);
+    let mut host = env.start();
+    until(&mut host, "shifter", |h| h.components().len() == 1);
+
+    let shifter = "moza/usb-346e-0023/shifter";
+    assert_eq!(
+        host.find(shifter).unwrap().description.name,
+        "MOZA SGP Shifter"
+    );
+    assert_eq!(
+        host.param(shifter, "mode").unwrap().value,
+        Value::Choice("sequential".into())
+    );
+    let inputs = host.read_inputs(shifter).unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![true, false]))
+    );
+    assert!(reason(&mut host, shifter, "gear").contains("no gear positions"));
+
+    // Pulled: its 13th.
+    env.input(
+        &sgp,
+        &keys
+            .replace("key 301 1", "key 301 0")
+            .replace("key 300 0", "key 300 1"),
+    );
+    let inputs = host.read_inputs(shifter).unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![false, true]))
+    );
 }

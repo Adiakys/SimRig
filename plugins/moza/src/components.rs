@@ -5,7 +5,7 @@ use simrig_plugin_kit::input::FfControl;
 use simrig_plugin_kit::pedals::{self, PedalNotes, PedalSet};
 use simrig_plugin_sdk::prelude::*;
 
-use crate::device::{MozaDevice, Shared, axes};
+use crate::device::{MozaDevice, Shared, axes, buttons};
 use crate::models;
 use crate::settings::{self, Place, Setting};
 
@@ -260,6 +260,62 @@ impl simrig_plugin_sdk::Handbrake for Handbrake {
 
     fn pressed(&mut self) -> Support<bool> {
         Support::not_in_driver()
+    }
+}
+
+/// The SGP: a sequential shifter only, its lever two buttons.
+pub struct Sequential {
+    pub device: Shared,
+}
+
+impl Component for Sequential {
+    fn id(&self) -> String {
+        format!("{}/shifter", self.device.borrow().hid.id)
+    }
+
+    fn name(&self) -> String {
+        self.device.borrow().name()
+    }
+
+    fn model(&self) -> Option<String> {
+        Some(models::model_id(&self.device.borrow().product))
+    }
+}
+
+impl Shifter for Sequential {
+    fn gear(&mut self) -> Support<Gear> {
+        Support::not_in_hardware("A sequential shifter has no gear positions.")
+    }
+
+    fn position_xy(&mut self) -> Support<[f64; 2]> {
+        Support::not_in_hardware("The lever is two buttons, not a position.")
+    }
+
+    fn sequential(&mut self) -> Support<[bool; 2]> {
+        let d = self.device.borrow();
+        if let Some(u) = d.hid.unbound() {
+            return Support::Unsupported(u);
+        }
+        let pressed: Vec<bool> = d.hid.inputs.buttons().into_iter().map(|(_, p)| p).collect();
+        match (
+            pressed.get(buttons::GEAR_UP),
+            pressed.get(buttons::GEAR_DOWN),
+        ) {
+            (Some(up), Some(down)) => Support::Supported([*up, *down]),
+            _ => Support::Unsupported(
+                Unsupported::new(Reason::Unavailable)
+                    .with_detail(d.hid.inputs.error().unwrap_or("No shift buttons.")),
+            ),
+        }
+    }
+
+    fn param(&mut self, param: ShifterParam) -> Support<ParamSpec> {
+        match param {
+            ShifterParam::Mode => Support::Supported(
+                ParamSpec::choice("sequential", &[("sequential", "Sequential")]).persistent(),
+            ),
+            _ => Support::not_in_hardware("A sequential shifter has no gear positions."),
+        }
     }
 }
 

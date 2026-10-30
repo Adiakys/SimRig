@@ -38,6 +38,13 @@ pub mod axes {
     pub const BASE_CLUTCH: u16 = 0x06; // ABS_THROTTLE
 }
 
+/// Buttons of the SGP shifter, in the order games number them (Boxflat's 14 and 13). Reversing
+/// the shift direction in the shifter's own settings swaps them.
+pub mod buttons {
+    pub const GEAR_UP: usize = 13;
+    pub const GEAR_DOWN: usize = 12;
+}
+
 pub struct MozaDevice {
     pub hid: HidDevice,
     pub kind: Kind,

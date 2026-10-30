@@ -1,5 +1,6 @@
 //! The adapter: Moza devices as components. A base gives a wheel base and the pedals plugged
-//! into it (once mapped); pedal sets and handbrakes on their own USB give theirs.
+//! into it (once mapped); pedal sets, handbrakes and sequential shifters on their own USB give
+//! theirs.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -10,7 +11,7 @@ use simrig_plugin_kit::pedals;
 use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
-use crate::components::{Base, Handbrake};
+use crate::components::{Base, Handbrake, Sequential};
 use crate::device::{MozaDevice, Shared};
 use crate::models::{self, Kind};
 
@@ -67,6 +68,9 @@ impl MozaAdapter {
             }
             Kind::Pedals => vec![pedals()],
             Kind::Handbrake => vec![AnyComponent::Handbrake(Box::new(Handbrake {
+                device: device.clone(),
+            }))],
+            Kind::Sequential => vec![AnyComponent::Shifter(Box::new(Sequential {
                 device: device.clone(),
             }))],
             Kind::Other => Vec::new(),
@@ -141,7 +145,7 @@ impl Adapter for MozaAdapter {
             if now == *shape {
                 continue;
             }
-            for kind in ["base", "pedals", "handbrake"] {
+            for kind in ["base", "pedals", "handbrake", "shifter"] {
                 changes.push(Change::ComponentRemoved {
                     component: format!("{id}/{kind}"),
                 });
