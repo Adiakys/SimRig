@@ -1102,7 +1102,9 @@ V12 and GT987 (Lite Star's vendor id) are driven by `hid-universal-pidff`, in Li
 the VD6 (PXN's own vendor id) by the kernel's generic PID force feedback from 6.15 too, and by
 the bundled universal-pidff on older kernels. The VD4 is not in universal-pidff: it has force
 feedback from 6.15 only. Another base of these vendors, given to the plugin by the user, gets a
-generic model: a VD base for PXN's vendor id, a V-series base for Lite Star's. The driver is Moza's, with SimRig's udev rules for
+generic model: a VD base for PXN's vendor id, a V-series base for Lite Star's. It is taken only
+if its report descriptor declares force feedback (the PID usage page), whatever the kernel:
+pedals and handbrakes on their own USB share the vendor id, and are refused with that reason. The driver is Moza's, with SimRig's udev rules for
 PXN; both bundle the same universal-pidff, and a module one of them built is used as it is by
 the other.
 
