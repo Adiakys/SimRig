@@ -176,7 +176,7 @@ button.ui-button:active { transform: translateY(1px); }
   transform: translateY(calc(var(--i) * -1 * (var(--fh) + var(--reel-gap))));
   transition: transform 700ms var(--ease-expo);
 }
-.hero__foot { position: absolute; left: var(--margin); bottom: 32px; width: min(30vw, 420px); }
+.hero__foot { position: absolute; left: var(--margin); bottom: 32px; width: min(420px, calc((100vw - var(--fw)) / 2 - var(--margin) - 32px)); }
 .hero__lede { font-size: var(--step-body); margin-bottom: 20px; }
 
 /* A device card, as on the app's rig. */
@@ -199,7 +199,7 @@ button.ui-button:active { transform: translateY(1px); }
 
 .pedals { aspect-ratio: 600 / 380; height: auto; width: 100%; }
 .pedals .pedals__frame { inset: 0; }
-.pedals .pedals__pedal { left: calc(var(--x) / 600 * 100%); top: 0; width: 20%; height: 78.9%; inset: auto; }
+.pedals .pedals__pedal { inset: auto; left: calc(var(--x) / 600 * 100%); top: 0; width: 20%; height: 78.9%; }
 .bars { flex-direction: row; gap: 18px; align-items: flex-end; }
 .bar { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .bar__track { position: relative; width: 8px; height: 96px; border-radius: 4px; background: var(--line); overflow: hidden; }
@@ -244,8 +244,12 @@ button.ui-button:active { transform: translateY(1px); }
   display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 16px;
   padding: 12px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
 }
-.device-row__thumb { width: 76px; height: 56px; border-radius: 6px; background: var(--raised); display: grid; place-items: center; padding: 4px; }
+.device-row__thumb { width: 76px; height: 56px; border-radius: 6px; background: var(--raised); display: flex; padding: 4px; overflow: hidden; flex: none; }
 .device-row__thumb img { width: 100%; height: 100%; object-fit: contain; }
+/* The plate and its knob in neutral, as the app draws a shifter. */
+.thumb-shifter { position: relative; height: 100%; aspect-ratio: 1; margin: 0 auto; }
+.thumb-shifter img { position: absolute; inset: 0; }
+.thumb-shifter .thumb-shifter__knob { inset: auto; left: 34.4%; top: 34.4%; width: 31.25%; height: 31.25%; }
 .device-row__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .device-row__name { font-weight: 500; font-size: 16px; }
 .device-row__sub { font-size: 14px; color: var(--muted); }
