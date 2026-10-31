@@ -158,7 +158,8 @@ The fonts, the mark and the device drawings are copied from the repository at bu
 `simrig --screenshot` on the simulated rig, and `site/assets/video/simrig.mp4` from
 `docs/images/simrig.gif`: run `shots` again when the screens change. The preview image shown by
 search engines and in shared links is drawn from `site/_social/card.html` in three formats (1:1,
-4:3, 16:9), all named in the home's structured data.
+4:3, 16:9), all named in the home's structured data, and as the repository's social preview
+(`docs/images/social-preview.png`, 1280x640, uploaded by hand in GitHub's Settings, Social preview).
 
 What the site says about devices follows the README's table: when support changes, update the
 brand's page (`site/_brands/`), the home's list (`site/_data/models.yml`) and, for a new brand, its

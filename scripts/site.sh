@@ -86,13 +86,21 @@ social() {
         chrome=$(command -v "$c" || true)
     done
     [ -n "$chrome" ] || { echo "no Chromium found: set CHROME_PATH" >&2; exit 1; }
-    for format in wide:1200,630 four:1200,900 square:1200,1200; do
+    # The site's three formats, and the repository's social preview (uploaded by hand: GitHub,
+    # Settings, Social preview).
+    for format in wide:1200,630:site/assets/images/preview-wide.png \
+        four:1200,900:site/assets/images/preview-four.png \
+        square:1200,1200:site/assets/images/preview-square.png \
+        github:1280,640:docs/images/social-preview.png; do
+        local name=${format%%:*} rest=${format#*:}
+        local size=${rest%%:*} file=${rest#*:}
+        # A taller window than the image: the headless frame takes its share, the card keeps its size.
         "$chrome" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
-            --virtual-time-budget=2000 --window-size="${format#*:}" \
-            --screenshot="site/assets/images/preview-${format%%:*}.png" \
-            "file://$PWD/site/_social/card.html#${format%%:*}" 2>/dev/null
+            --virtual-time-budget=2000 --window-size="${size%,*},$((${size#*,} + 200))" \
+            --screenshot="$file" "file://$PWD/site/_social/card.html#$name" 2>/dev/null
+        python3 -I -c "import sys; from PIL import Image; Image.open(sys.argv[1]).crop((0, 0, $size)).save(sys.argv[1], optimize=True)" "$file"
     done
-    ls -l site/assets/images/preview-*.png
+    ls -l site/assets/images/preview-*.png docs/images/social-preview.png
 }
 
 case "${1:-}" in

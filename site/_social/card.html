@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- The preview image of the site (search results, link previews), drawn by
-     scripts/site.sh social in three formats: #wide (1200x630), #four (1200x900), #square (1200x1200).
+     scripts/site.sh social in three formats: #wide (1200x630), #four (1200x900), #square (1200x1200),
+     and #github (1280x640), the repository's social preview, with the site's address.
      Colours, fonts and drawings are the app's (DESIGN.md). Not part of the published site. -->
 <html>
 <head>
@@ -41,6 +42,19 @@
   .wide .chip { margin-top: 16px; }
   .wide .readout { text-align: center; }
 
+  /* 1280x640, the repository's social preview: the wide layout and the site's address. */
+  .github { grid-template-columns: 1fr 470px; grid-template-rows: auto 1fr auto auto; column-gap: 64px; row-gap: 14px; }
+  .github .brand { grid-column: 1; }
+  .github h1 { grid-column: 1; grid-row: 2; align-self: center; font-size: 74px; }
+  .github .brands { grid-column: 1; grid-row: 3; }
+  .github .url { display: block; grid-column: 1; grid-row: 4; color: #efc63a; font-size: 26px; font-weight: 600; }
+  .github .card { grid-column: 2; grid-row: 1 / -1; align-self: center; grid-template-columns: 1fr; justify-items: center; gap: 0; padding: 22px 26px 28px; }
+  .github .card img { width: 200px; height: 200px; }
+  .github .value { font-size: 80px; }
+  .github .chip { margin-top: 16px; }
+  .github .readout { text-align: center; }
+  .url { display: none; }
+
   /* 1200x900 and 1200x1200: stacked. */
   .four, .square { grid-template-rows: auto 1fr auto auto; row-gap: 40px; }
   .four .card, .square .card { align-self: center; }
@@ -62,6 +76,17 @@
   </div>
   <h1>Your sim rig, set up on Linux.</h1>
   <p class="brands">Fanatec · Moza · Logitech · Thrustmaster · PXN · Simagic · any USB shifter</p>
-  <script>document.body.className = (location.hash || "#wide").slice(1);</script>
+  <p class="url">adiakys.github.io/SimRig</p>
+  <script>
+    // Each format at its exact size: a headless window's own frame would cut the page short.
+    const sizes = { wide: [1200, 630], four: [1200, 900], square: [1200, 1200], github: [1280, 640] };
+    const format = (location.hash || "#wide").slice(1);
+    const [w, h] = sizes[format];
+    document.body.className = format;
+    for (const el of [document.documentElement, document.body]) {
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
+    }
+  </script>
 </body>
 </html>
