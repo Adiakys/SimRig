@@ -5,14 +5,21 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
 use simrig_plugin_kit::shifter::Gate;
 use simrig_plugin_sdk::prelude::*;
 
 use crate::models::{self, Kind};
-use crate::protocol;
+use crate::protocol::{self, Command, Target};
 use crate::serial::{self, Link};
+
+/// Why the rim's settings are unavailable when no rim answers.
+const NO_RIM: &str = "No steering wheel answers on the base's serial port.";
+
+/// How long what is known of the rim holds: rims are taken off and swapped.
+const RIM_RECHECK: Duration = Duration::from_secs(5);
 
 /// The kernel driver of force feedback on Moza bases.
 pub const FFB_DRIVER: &str = "hid-universal-pidff";
@@ -31,11 +38,14 @@ pub mod axes {
     pub const THROTTLE: u16 = 0x03; // ABS_RX
     pub const BRAKE: u16 = 0x04; // ABS_RY
     pub const CLUTCH: u16 = 0x05; // ABS_RZ
-    pub const HANDBRAKE: u16 = 0x07; // ABS_RUDDER
+    pub const HANDBRAKE: u16 = 0x07; // ABS_RUDDER, on its own USB and on a base
     // Pedals plugged into a base.
     pub const BASE_THROTTLE: u16 = 0x02; // ABS_Z
     pub const BASE_BRAKE: u16 = 0x05; // ABS_RZ
     pub const BASE_CLUTCH: u16 = 0x06; // ABS_THROTTLE
+    // The analog paddles of the rim mounted on a base.
+    pub const LEFT_PADDLE: u16 = 0x04; // ABS_RY
+    pub const RIGHT_PADDLE: u16 = 0x03; // ABS_RX
 }
 
 /// Moza shifters and the buttons they are read on, as Boxflat numbers them: the first 16 are
@@ -50,15 +60,18 @@ pub mod shifters {
         gears: 7,
         reverse_position: "right_down",
     };
-    /// The SGP on its own USB: up on button 14, down on 13. Reversing the shift direction in
-    /// the shifter's own settings swaps them: mapping by hand puts that right.
-    pub const SGP_BUTTONS: [u16; 2] = [0x12d, 0x12c];
+    /// The SGP on its own USB: up on button 13, down on 14 (checked on an SGP; Boxflat has them
+    /// the other way). Reversing the shift direction in the shifter's own settings swaps them:
+    /// mapping by hand puts that right.
+    pub const SGP_BUTTONS: [u16; 2] = [0x12c, 0x12d];
     /// The HGP on its own USB: gears 1 to 7 on buttons 6 to 12, reverse on 5.
     pub const HGP_BUTTONS: [u16; 8] = [0x125, 0x126, 0x127, 0x128, 0x129, 0x12a, 0x12b, 0x124];
-    /// The HGP plugged into a base: gears 1 to 7 on buttons 114 to 120, reverse on 113. Only
-    /// the HGP uses them, so one of them pressed says it is there.
+    /// The SGP plugged into a base, without paddle synchronization: up on button 113, down on
+    /// 114 (checked on an SGP). With it, its buttons are the paddles': mapped by hand.
+    pub const SGP_ON_BASE: [u16; 2] = [0x2d0, 0x2d1];
+    /// The HGP plugged into a base: gears 1 to 7 on buttons 114 to 120, reverse on 113.
     pub const HGP_ON_BASE: [u16; 8] = [0x2d1, 0x2d2, 0x2d3, 0x2d4, 0x2d5, 0x2d6, 0x2d7, 0x2d0];
-    /// What can be plugged into a base. Which buttons a base gives the SGP is not known.
+    /// What can be plugged into a base.
     pub const ON_BASE: &[Gate] = &[SGP, HGP];
 }
 
@@ -71,6 +84,23 @@ pub struct MozaDevice {
     serial_error: Option<String>,
     /// Values read or written, by command: the base answers slowly.
     cache: BTreeMap<&'static str, u64>,
+    rim: Rim,
+    /// A handbrake plugged into the base was seen pulled.
+    pub handbrake: bool,
+}
+
+/// The rim mounted on the base, as last checked.
+enum Rim {
+    Unknown,
+    /// Answering at a device id; its answers since, missing ones too.
+    At {
+        id: u8,
+        checked: Instant,
+        answers: BTreeMap<&'static str, Option<u64>>,
+    },
+    Absent {
+        checked: Instant,
+    },
 }
 
 pub type Shared = Rc<RefCell<MozaDevice>>;
@@ -122,6 +152,8 @@ impl MozaDevice {
             serial: None,
             serial_error: None,
             cache: BTreeMap::new(),
+            rim: Rim::Unknown,
+            handbrake: false,
         };
         device.refresh();
         device
@@ -129,6 +161,21 @@ impl MozaDevice {
 
     pub fn name(&self) -> String {
         models::display_name(&self.product)
+    }
+
+    /// A part's name: the device's own on its own USB, "<part> on the <base>" plugged into a
+    /// base.
+    pub fn part_name(&self, part: &str) -> String {
+        if self.kind == Kind::Base {
+            format!("{part} on the {}", self.name())
+        } else {
+            self.name()
+        }
+    }
+
+    /// A part's model: the device's on its own USB; plugged into a base, the base does not say.
+    pub fn part_model(&self) -> Option<String> {
+        (self.kind != Kind::Base).then(|| models::model_id(&self.product))
     }
 
     /// The kinds of shifter the device is or can have plugged in.
@@ -141,20 +188,36 @@ impl MozaDevice {
         }
     }
 
-    /// An HGP plugged into a base shows itself as soon as a gear is engaged.
+    /// A shifter plugged into a base shows itself when it is moved. Buttons 113 and 114 are
+    /// both the SGP's and the HGP's reverse and first gear: an SGP until a gear only the HGP has
+    /// (115 to 120) is engaged.
     fn notice_shifter(&mut self) {
-        if self.kind != Kind::Base || self.hid.shifter_layout.is_some() {
+        let hgp = shifters::HGP.layout(&shifters::HGP_ON_BASE);
+        if self.kind != Kind::Base || self.hid.shifter_layout.as_ref() == Some(&hgp) {
             return;
         }
-        let engaged = self
-            .hid
-            .inputs
-            .buttons()
-            .into_iter()
-            .any(|(code, pressed)| pressed && shifters::HGP_ON_BASE.contains(&code));
-        if engaged {
-            self.hid.shifter_layout = Some(shifters::HGP.layout(&shifters::HGP_ON_BASE));
+        let pressed = |codes: &[u16]| {
+            self.hid
+                .inputs
+                .buttons()
+                .into_iter()
+                .any(|(code, pressed)| pressed && codes.contains(&code))
+        };
+        if pressed(&shifters::HGP_ON_BASE[1..7]) {
+            self.hid.shifter_layout = Some(hgp);
+        } else if self.hid.shifter_layout.is_none() && pressed(&shifters::SGP_ON_BASE) {
+            self.hid.shifter_layout = Some(shifters::SGP.layout(&shifters::SGP_ON_BASE));
         }
+    }
+
+    /// A handbrake plugged into a base shows itself when it is pulled past half its travel:
+    /// the base has the axis whether one is plugged in or not.
+    fn notice_handbrake(&mut self) {
+        if self.kind != Kind::Base || self.handbrake {
+            return;
+        }
+        let now = self.hid.inputs.axes();
+        self.handbrake = now.get(&axes::HANDBRAKE).is_some_and(|a| a.unit() > 0.5);
     }
 
     /// Looks for the HID driver and the serial port again; true when the HID binding changed.
@@ -175,6 +238,7 @@ impl MozaDevice {
         }
         let changed = self.hid.refresh();
         self.notice_shifter();
+        self.notice_handbrake();
         changed
     }
 
@@ -190,21 +254,104 @@ impl MozaDevice {
         Some(Unsupported::new(reason).with_detail(error))
     }
 
-    /// A setting's value on the device.
-    pub fn get(&mut self, name: &'static str) -> Option<u64> {
-        if let Some(v) = self.cache.get(name) {
-            return Some(*v);
+    /// The device id the rim mounted on the base answers at, if one does: checked again when
+    /// what is known of it is a few seconds old, at the id found last first.
+    fn rim(&mut self) -> Option<u8> {
+        let last = match &self.rim {
+            Rim::At { id, checked, .. } if checked.elapsed() < RIM_RECHECK => return Some(*id),
+            Rim::Absent { checked } if checked.elapsed() < RIM_RECHECK => return None,
+            Rim::At { id, .. } => Some(*id),
+            _ => None,
+        };
+        // Without the port nothing can be told: checked once it is open.
+        self.serial.as_ref()?;
+        let probe = protocol::command("wheel-telemetry-mode")?;
+        let others = Target::Wheel.ids().iter().copied();
+        let found = last
+            .into_iter()
+            .chain(others.filter(|id| Some(*id) != last))
+            .find(|id| self.read(probe, *id).is_some());
+        let checked = Instant::now();
+        self.rim = match found {
+            Some(id) => Rim::At {
+                id,
+                checked,
+                answers: BTreeMap::new(),
+            },
+            None => Rim::Absent { checked },
+        };
+        found
+    }
+
+    /// The device id a target answers at, or why it cannot be reached.
+    fn reach(&mut self, target: Target) -> std::result::Result<u8, Unsupported> {
+        if let Some(u) = self.no_settings() {
+            return Err(u);
         }
-        let command = protocol::command(name)?;
+        let id = match target {
+            Target::Wheel => self.rim(),
+            other => other.ids().first().copied(),
+        };
+        id.ok_or_else(|| Unsupported::new(Reason::Unavailable).with_detail(NO_RIM))
+    }
+
+    /// What the device answered to a command, when it is kept: the base's values until the
+    /// port fails, the rim's answers until it is checked again.
+    fn kept(&self, command: &Command) -> Option<Option<u64>> {
+        match (command.target, &self.rim) {
+            (Target::Wheel, Rim::At { answers, .. }) => answers.get(command.name).copied(),
+            (Target::Wheel, _) => None,
+            _ => self.cache.get(command.name).map(|v| Some(*v)),
+        }
+    }
+
+    fn keep(&mut self, command: &Command, value: Option<u64>) {
+        match (command.target, &mut self.rim) {
+            (Target::Wheel, Rim::At { answers, .. }) => {
+                answers.insert(command.name, value);
+            }
+            (Target::Wheel, _) => {}
+            // A base that did not answer is asked again.
+            _ => {
+                if let Some(v) = value {
+                    self.cache.insert(command.name, v);
+                }
+            }
+        }
+    }
+
+    /// A command's value at a device id; `None` when it does not answer.
+    fn read(&mut self, command: &Command, device: u8) -> Option<u64> {
         let (group, id) = command.read?;
-        let frame = protocol::read_frame(command)?;
-        let value = self
-            .serial
+        let frame = protocol::read_frame(command, device)?;
+        self.serial
             .as_mut()?
-            .exchange(&frame, group, command.target, id)
-            .ok()??;
-        self.cache.insert(command.name, value);
-        Some(value)
+            .exchange(&frame, group, device, id)
+            .ok()?
+    }
+
+    /// A setting's value on the device, or why it cannot be had.
+    pub fn value(&mut self, name: &'static str) -> std::result::Result<u64, Unsupported> {
+        let command = protocol::command(name).ok_or_else(Unsupported::not_in_driver)?;
+        let device = self.reach(command.target)?;
+        let value = match self.kept(command) {
+            Some(value) => value,
+            None => {
+                let value = self.read(command, device);
+                self.keep(command, value);
+                value
+            }
+        };
+        value.ok_or_else(|| {
+            Unsupported::new(Reason::Unavailable).with_detail(format!(
+                "The {} does not answer for this setting.",
+                command.target.noun()
+            ))
+        })
+    }
+
+    pub fn get(&mut self, name: &'static str) -> Option<u64> {
+        self.value(name).ok()
     }
 
     pub fn set(&mut self, name: &'static str, value: u64) -> Result<()> {
@@ -213,24 +360,28 @@ impl MozaDevice {
         let (group, id) = command
             .write
             .ok_or_else(|| Error::failed(format!("'{name}' cannot be written")))?;
-        let frame = protocol::write_frame(command, value).ok_or_else(Error::unsupported)?;
-        let link = self.serial.as_mut().ok_or_else(|| {
-            Error::failed(
-                self.serial_error
-                    .clone()
-                    .unwrap_or_else(|| "No serial port.".into()),
-            )
-        })?;
-        match link.exchange(&frame, group, command.target, id) {
+        let device = self
+            .reach(command.target)
+            .map_err(|u| Error::failed(u.explain()))?;
+        let frame = protocol::write_frame(command, device, value).ok_or_else(Error::unsupported)?;
+        let link = self
+            .serial
+            .as_mut()
+            .ok_or_else(|| Error::failed("No serial port."))?;
+        match link.exchange(&frame, group, device, id) {
             Ok(Some(_)) => {
-                self.cache.insert(command.name, value);
+                self.keep(command, Some(value));
                 Ok(())
             }
-            Ok(None) => Err(Error::failed("The base did not answer.")),
+            Ok(None) => Err(Error::failed(format!(
+                "The {} did not answer.",
+                command.target.noun()
+            ))),
             Err(e) => {
                 // A port that fails (unplugged, replaced) is opened again at the next refresh.
                 self.serial = None;
                 self.cache.clear();
+                self.rim = Rim::Unknown;
                 Err(Error::failed(e.to_string()))
             }
         }

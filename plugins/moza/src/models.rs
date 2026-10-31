@@ -82,5 +82,11 @@ mod tests {
         // As in the manifest's `tested`.
         assert_eq!(model_id("Gudsen MOZA CRP2 pedals"), "moza/crp2-pedals");
         assert_eq!(model_id("Gudsen SGP Shifter"), "moza/sgp-shifter");
+        assert_eq!(
+            model_id("Gudsen MOZA R21 Ultra Base"),
+            "moza/r21-ultra-base"
+        );
+        assert_eq!(kind("Gudsen MOZA R21 Ultra Base"), Kind::Base);
+        assert_eq!(model_id("Gudsen HBP Handbrake"), "moza/hbp-handbrake");
     }
 }

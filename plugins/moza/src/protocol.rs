@@ -13,10 +13,30 @@ const MAGIC: u32 = 13;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
     /// The base's main controller (game effect gains).
-    Main = 18,
-    Base = 19,
-    Pedals = 25,
-    Handbrake = 27,
+    Main,
+    Base,
+    /// The rim mounted on the base.
+    Wheel,
+}
+
+impl Target {
+    /// The device ids it answers at, the usual one first: most rims answer at 23, older ones at
+    /// 21 (Boxflat tries one, then the other).
+    pub fn ids(self) -> &'static [u8] {
+        match self {
+            Target::Main => &[18],
+            Target::Base => &[19],
+            Target::Wheel => &[23, 21],
+        }
+    }
+
+    /// What answers, for messages.
+    pub fn noun(self) -> &'static str {
+        match self {
+            Target::Main | Target::Base => "base",
+            Target::Wheel => "steering wheel",
+        }
+    }
 }
 
 /// One setting: how to read it and how to write it.
@@ -58,6 +78,14 @@ const fn gain(name: &'static str, read: &'static [u8], write: &'static [u8]) -> 
     }
 }
 
+/// Settings stored by the rim (read group 64, write group 63), one byte.
+const fn wheel(name: &'static str, id: &'static [u8]) -> Command {
+    Command {
+        bytes: 1,
+        ..rw(name, Target::Wheel, 64, 63, id)
+    }
+}
+
 pub const COMMANDS: &[Command] = &[
     // Half the rotation in degrees: the limit applied, and the widest the base allows games.
     base("limit", &[1]),
@@ -89,6 +117,17 @@ pub const COMMANDS: &[Command] = &[
     gain("damper-gain", &[79, 9], &[78, 9]),
     gain("inertia-gain", &[79, 10], &[78, 10]),
     gain("friction-gain", &[79, 11], &[78, 11]),
+    // Answered by every rim: Boxflat reads it to know one is mounted.
+    wheel("wheel-telemetry-mode", &[28, 0]),
+    wheel("wheel-paddles-mode", &[3]),
+    // Percent of the combined axis given to the left paddle.
+    wheel("wheel-clutch-point", &[9]),
+    wheel("wheel-knob-mode", &[10]),
+    Command {
+        bytes: 2,
+        ..wheel("wheel-stick-mode", &[5])
+    },
+    wheel("wheel-rpm-brightness", &[27, 0, 255]),
 ];
 
 pub fn command(name: &str) -> Option<&'static Command> {
@@ -99,23 +138,23 @@ fn checksum(bytes: &[u8]) -> u8 {
     ((bytes.iter().map(|b| u32::from(*b)).sum::<u32>() + MAGIC) % 256) as u8
 }
 
-/// A request frame. Reads carry the value 1.
-pub fn frame(group: u8, target: Target, id: &[u8], value: u64, bytes: usize) -> Vec<u8> {
-    let mut out = vec![START, (id.len() + bytes) as u8, group, target as u8];
+/// A request frame to the device id `device`. Reads carry the value 1.
+pub fn frame(group: u8, device: u8, id: &[u8], value: u64, bytes: usize) -> Vec<u8> {
+    let mut out = vec![START, (id.len() + bytes) as u8, group, device];
     out.extend_from_slice(id);
     out.extend_from_slice(&value.to_be_bytes()[8 - bytes..]);
     out.push(checksum(&out));
     out
 }
 
-pub fn read_frame(cmd: &Command) -> Option<Vec<u8>> {
+pub fn read_frame(cmd: &Command, device: u8) -> Option<Vec<u8>> {
     let (group, id) = cmd.read?;
-    Some(frame(group, cmd.target, id, 1, cmd.bytes))
+    Some(frame(group, device, id, 1, cmd.bytes))
 }
 
-pub fn write_frame(cmd: &Command, value: u64) -> Option<Vec<u8>> {
+pub fn write_frame(cmd: &Command, device: u8, value: u64) -> Option<Vec<u8>> {
     let (group, id) = cmd.write?;
-    Some(frame(group, cmd.target, id, value, cmd.bytes))
+    Some(frame(group, device, id, value, cmd.bytes))
 }
 
 /// A frame received: group, device and payload (command id and value), checksum checked.
@@ -171,9 +210,9 @@ fn swap_nibbles(b: u8) -> u8 {
     b.rotate_left(4)
 }
 
-/// The value a response carries for a request of (group, id) to `target`, if it is one.
-pub fn answer(frame: &Frame, group: u8, target: Target, id: &[u8]) -> Option<u64> {
-    if frame.group != group | 0x80 || frame.device != swap_nibbles(target as u8) {
+/// The value a response carries for a request of (group, id) to `device`, if it is one.
+pub fn answer(frame: &Frame, group: u8, device: u8, id: &[u8]) -> Option<u64> {
+    if frame.group != group | 0x80 || frame.device != swap_nibbles(device) {
         return None;
     }
     let value = frame.payload.strip_prefix(id)?;
@@ -207,18 +246,21 @@ mod tests {
     #[test]
     fn frames_like_boxflat() {
         // Rotation 900°: limit 450 to the base.
-        let f = write_frame(command("limit").unwrap(), 450).unwrap();
+        let f = write_frame(command("limit").unwrap(), 19, 450).unwrap();
         assert_eq!(f[..7], [0x7e, 3, 41, 19, 1, 0x01, 0xc2]);
         let sum: u32 = f[..7].iter().map(|b| u32::from(*b)).sum::<u32>() + 13;
         assert_eq!(f[7], (sum % 256) as u8);
         // A game gain: one byte, a two-byte command id.
-        let f = read_frame(command("damper-gain").unwrap()).unwrap();
+        let f = read_frame(command("damper-gain").unwrap(), 18).unwrap();
         assert_eq!(f[..7], [0x7e, 3, 31, 18, 79, 9, 1]);
+        // A rim setting, to the rim's device id.
+        let f = read_frame(command("wheel-paddles-mode").unwrap(), 23).unwrap();
+        assert_eq!(f[..6], [0x7e, 2, 64, 23, 3, 1]);
     }
 
     #[test]
     fn answers_are_matched_and_decoded() {
-        let request = write_frame(command("limit").unwrap(), 1).unwrap();
+        let request = write_frame(command("limit").unwrap(), 19, 1).unwrap();
         let req = parse_request(&request).unwrap();
         // Noise first, with a stray start byte.
         let mut stream = vec![0x00, 0x7e, 0x01];
@@ -226,9 +268,10 @@ mod tests {
         let frame = take_frame(&mut stream).unwrap();
         assert_eq!(frame.group, 41 | 0x80);
         assert_eq!(frame.device, 0x31);
-        assert_eq!(answer(&frame, 41, Target::Base, &[1]), Some(540));
-        assert_eq!(answer(&frame, 40, Target::Base, &[1]), None);
-        assert_eq!(answer(&frame, 41, Target::Base, &[2]), None);
+        assert_eq!(answer(&frame, 41, 19, &[1]), Some(540));
+        assert_eq!(answer(&frame, 40, 19, &[1]), None);
+        assert_eq!(answer(&frame, 41, 19, &[2]), None);
+        assert_eq!(answer(&frame, 41, 23, &[1]), None);
         assert!(stream.is_empty());
     }
 }

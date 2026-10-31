@@ -7,7 +7,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use crate::protocol::{self, Target};
+use crate::protocol;
 
 /// The fake port of tests: a file of `<command> <value>` lines in a USB device directory outside
 /// `/sys`, standing for the settings the device stores.
@@ -17,13 +17,13 @@ pub const FAKE_SERIAL: &str = "simrig-fake-serial";
 const TIMEOUT: Duration = Duration::from_millis(250);
 
 pub trait Link {
-    /// Sends a request and waits for the answer to (group, target, id): the value it carries.
-    /// `None` when the device does not answer.
+    /// Sends a request and waits for the answer to (group, device id, id): the value it
+    /// carries. `None` when the device does not answer.
     fn exchange(
         &mut self,
         request: &[u8],
         group: u8,
-        target: Target,
+        device: u8,
         id: &[u8],
     ) -> io::Result<Option<u64>>;
 }
@@ -85,7 +85,7 @@ impl Link for Tty {
         &mut self,
         request: &[u8],
         group: u8,
-        target: Target,
+        device: u8,
         id: &[u8],
     ) -> io::Result<Option<u64>> {
         self.file.write_all(request)?;
@@ -93,7 +93,7 @@ impl Link for Tty {
         let mut chunk = [0u8; 64];
         while Instant::now() < deadline {
             while let Some(frame) = protocol::take_frame(&mut self.buf) {
-                if let Some(value) = protocol::answer(&frame, group, target, id) {
+                if let Some(value) = protocol::answer(&frame, group, device, id) {
                     return Ok(Some(value));
                 }
             }
@@ -126,13 +126,13 @@ impl Link for Fake {
         &mut self,
         request: &[u8],
         group: u8,
-        target: Target,
+        device: u8,
         id: &[u8],
     ) -> io::Result<Option<u64>> {
         let frame = protocol::parse_request(request)
             .ok_or_else(|| io::Error::other(format!("malformed request {request:02x?}")))?;
         let found = protocol::COMMANDS.iter().find_map(|c| {
-            if c.target as u8 != frame.device {
+            if !c.target.ids().contains(&frame.device) {
                 return None;
             }
             [(c.read, false), (c.write, true)]
@@ -166,6 +166,6 @@ impl Link for Fake {
         };
         let mut answer = protocol::respond(&frame, id_len, value);
         let frame = protocol::take_frame(&mut answer).expect("an answer frame");
-        Ok(protocol::answer(&frame, group, target, id))
+        Ok(protocol::answer(&frame, group, device, id))
     }
 }

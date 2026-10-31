@@ -1,5 +1,6 @@
-//! The adapter: Moza devices as components. A base gives a wheel base, the pedals plugged into
-//! it and a shifter plugged into it (an HGP once a gear is engaged, any once mapped by hand);
+//! The adapter: Moza devices as components. A base gives a wheel base, the rim mounted on it,
+//! the pedals plugged into it, a handbrake plugged into it once pulled, and a shifter plugged
+//! into it (an HGP once a gear is engaged, any once mapped by hand);
 //! pedal sets, handbrakes and shifters on their own USB give theirs.
 
 use std::cell::RefCell;
@@ -11,7 +12,7 @@ use simrig_plugin_kit::shifter::ShifterMap;
 use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
-use crate::components::{self, Base, Handbrake};
+use crate::components::{self, Base, Handbrake, Wheel};
 use crate::device::{MozaDevice, Shared};
 use crate::models::{self, Kind};
 
@@ -22,6 +23,7 @@ struct Shape {
     settings: bool,
     pedals: Vec<PedalRole>,
     shifter: Option<ShifterMap>,
+    handbrake: bool,
     /// The inputs can be read (the event node is given to the user a moment after binding).
     inputs: bool,
 }
@@ -50,6 +52,7 @@ impl MozaAdapter {
             settings: d.no_settings().is_none(),
             pedals: d.hid.pedal_map.roles(),
             shifter: d.hid.shifter(),
+            handbrake: d.handbrake,
             inputs: d.hid.inputs_ready(),
         }
     }
@@ -59,11 +62,21 @@ impl MozaAdapter {
         let mapped = !d.hid.pedal_map.pedals.is_empty();
         let pedals = || AnyComponent::Pedals(Box::new(components::pedals(device)));
         let shifter = || AnyComponent::Shifter(Box::new(components::shifter(device)));
+        let handbrake = || {
+            AnyComponent::Handbrake(Box::new(Handbrake {
+                device: device.clone(),
+            }))
+        };
         match d.kind {
             Kind::Base => {
-                let mut list = vec![AnyComponent::WheelBase(Box::new(Base {
-                    device: device.clone(),
-                }))];
+                let mut list = vec![
+                    AnyComponent::WheelBase(Box::new(Base {
+                        device: device.clone(),
+                    })),
+                    AnyComponent::SteeringWheel(Box::new(Wheel {
+                        device: device.clone(),
+                    })),
+                ];
                 if mapped {
                     list.push(pedals());
                 }
@@ -71,12 +84,13 @@ impl MozaAdapter {
                 if d.hid.shifter().is_some() {
                     list.push(shifter());
                 }
+                if d.handbrake {
+                    list.push(handbrake());
+                }
                 list
             }
             Kind::Pedals => vec![pedals()],
-            Kind::Handbrake => vec![AnyComponent::Handbrake(Box::new(Handbrake {
-                device: device.clone(),
-            }))],
+            Kind::Handbrake => vec![handbrake()],
             Kind::Sequential | Kind::HPattern => vec![shifter()],
             Kind::Other => Vec::new(),
         }
@@ -150,7 +164,7 @@ impl Adapter for MozaAdapter {
             if now == *shape {
                 continue;
             }
-            for kind in ["base", "pedals", "handbrake", "shifter"] {
+            for kind in ["base", "wheel", "pedals", "handbrake", "shifter"] {
                 changes.push(Change::ComponentRemoved {
                     component: format!("{id}/{kind}"),
                 });

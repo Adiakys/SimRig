@@ -1026,15 +1026,19 @@ or one installed by other means, is used as it is.
 
 **The adapter** claims every device of the vendor (Moza does not publish its product ids) and
 tells them apart by USB product name, like Boxflat: bases, SR-P/CRP pedal sets, the HBP
-handbrake, the SGP sequential and HGP H-pattern shifters. Their positions are buttons, read as
-Boxflat numbers them: the SGP's lever on its 14th and 13th, the HGP's seven gears on its 6th to
-12th and reverse on its 5th. Plugged into a base instead, a shifter becomes buttons of the base:
-the HGP its 113th to 120th, which only it uses, so it shows up as soon as a gear is engaged (the
-base's buttons past the 80th exist only with hid-universal-pidff, which maps them from
-`KEY_NEXT_FAVORITE`); which buttons a base gives the SGP is not known, so the base offers to map
-it ("Map a sequential shifter connected to the base") and shows it once mapped. Every shifter
-can be mapped by hand too, never required (a direction reversed in the shifter's own settings,
-another firmware). The HGP's reverse is drawn right and down, not checked on the device. Hubs
+handbrake, the SGP sequential and HGP H-pattern shifters. Their positions are buttons: the SGP
+shifts up on its 13th and down on its 14th (checked on an SGP; Boxflat has them the other way),
+the HGP's seven gears are its 6th to 12th and reverse its 5th (Boxflat's table). Plugged into a
+base instead, a shifter becomes buttons of the base, and shows up when it is moved: the SGP its
+113th (up) and 114th (down, checked), the HGP its 113th to 120th (reverse, then the gears). The
+two share 113 and 114, so a shifter seen only there is taken for an SGP until a gear only the
+HGP has is engaged. The base's buttons past the 80th exist only with hid-universal-pidff, which
+maps them from `KEY_NEXT_FAVORITE`. With paddle synchronization on, the SGP uses the paddles'
+buttons instead, which do not say it is there: the base offers to map it ("Map a sequential
+shifter connected to the base"). Every shifter can be mapped by hand too, never required (a
+direction reversed in the shifter's own settings, another firmware). The HGP's reverse is drawn right and down, not checked on the device. The HBP is read on
+`ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table); the base has that
+axis with nothing plugged in, so a handbrake on it shows up once pulled past half its travel. Hubs
 and the like are attached without components for now (they can be given to the generic USB
 plugin). Settings are read and written over the serial port: rotation
 (stored as half the angle, with the games' maximum kept equal), force feedback strength, natural
@@ -1042,11 +1046,23 @@ damper and friction, the games' spring and damper gains as standard parameters; 
 speed, natural inertia, centering spring, road sensitivity, the games' friction and inertia
 gains and the protection settings as custom ones. The base keeps them in its memory. Values are
 cached (the base answers in milliseconds, not microseconds); a port that fails is reopened.
+**The rim** mounted on a base has no USB of its own: a base always gives a steering wheel
+component, whose buttons, hat switches and analog paddles (the base's `ABS_RY` and `ABS_RX`,
+Boxflat's table) come through the base's inputs. Its settings go over the base's serial port to
+the rim's device id: 23 on most rims, 21 on older ones, found by asking both, like Boxflat.
+Analog paddle mode and LED brightness are standard parameters; the combined axis split, the
+rotary encoders' and the left stick's modes custom ones. The rim keeps them in its memory. Its
+answers, missing ones too, are kept only until it is checked again, a few seconds later at the
+id found last: rims are taken off and swapped. Which rim is mounted is not known: the base does
+not say.
 Force feedback (test, stop) needs `hid-universal-pidff` bound to the base; without it the base
 still has inputs and settings, and says why forces are missing. The SR-P's and CRP's axes are known,
 and so are those of pedals plugged into a base (Boxflat's table): no mapping, unless by hand. Tested end to end on a fake R9
 whose fake serial port decodes requests and answers like the real one, a fake SGP and HGP, an
-HGP engaged on a base and an SGP mapped on one. Confirmed on real hardware: CRP2 pedals (live inputs).
+HGP and an SGP moved on a base, and an SGP mapped on one, a handbrake pulled on one, and a fake
+rim answering on the base's port. Confirmed on real hardware: an R21 Ultra base (live inputs,
+rotation, force feedback test, settings), CRP2 pedals (live inputs), the HBP on its own USB (live
+inputs), the SGP on its own USB and on a base (live inputs, its buttons).
 
 ### 11.2 Logitech
 
