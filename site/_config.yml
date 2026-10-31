@@ -46,6 +46,9 @@ collections:
 defaults:
   - scope: { path: "" }
     values: { layout: page, image: /assets/images/social.png }
+  # Google Search Console's ownership file: served, not listed.
+  - scope: { path: "googled3f59b32110c1e22.html" }
+    values: { sitemap: false }
   - scope: { type: brands }
     values: { layout: brand, seo: { type: WebPage } }
 
