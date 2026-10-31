@@ -1036,7 +1036,9 @@ HGP has is engaged. The base's buttons past the 80th exist only with hid-univers
 maps them from `KEY_NEXT_FAVORITE`. With paddle synchronization on, the SGP uses the paddles'
 buttons instead, which do not say it is there: the base offers to map it ("Map a sequential
 shifter connected to the base"). Every shifter can be mapped by hand too, never required (a
-direction reversed in the shifter's own settings, another firmware). The HGP's reverse is drawn right and down, not checked on the device. Hubs
+direction reversed in the shifter's own settings, another firmware). The HGP's reverse is drawn right and down, not checked on the device. The HBP is read on
+`ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table); the base has that
+axis with nothing plugged in, so a handbrake on it shows up once pulled past half its travel. Hubs
 and the like are attached without components for now (they can be given to the generic USB
 plugin). Settings are read and written over the serial port: rotation
 (stored as half the angle, with the games' maximum kept equal), force feedback strength, natural
@@ -1057,8 +1059,10 @@ Force feedback (test, stop) needs `hid-universal-pidff` bound to the base; witho
 still has inputs and settings, and says why forces are missing. The SR-P's and CRP's axes are known,
 and so are those of pedals plugged into a base (Boxflat's table): no mapping, unless by hand. Tested end to end on a fake R9
 whose fake serial port decodes requests and answers like the real one, a fake SGP and HGP, an
-HGP and an SGP moved on a base, and an SGP mapped on one, and a fake rim answering on the base's port. Confirmed on real hardware: CRP2 pedals
-(live inputs), the SGP on its own USB and on a base (live inputs, its buttons).
+HGP and an SGP moved on a base, and an SGP mapped on one, a handbrake pulled on one, and a fake
+rim answering on the base's port. Confirmed on real hardware: an R21 Ultra base (live inputs,
+rotation, force feedback test, settings), CRP2 pedals (live inputs), the HBP on its own USB (live
+inputs), the SGP on its own USB and on a base (live inputs, its buttons).
 
 ### 11.2 Logitech
 

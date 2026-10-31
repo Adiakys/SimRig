@@ -1,6 +1,6 @@
 //! End to end through the host: a fake R9 base (inputs, force feedback driver, serial port
 //! answering like the real one) and the rim mounted on it, SR-P pedals, an HBP handbrake, SGP
-//! and HGP shifters on their own USB and plugged into the base.
+//! and HGP shifters, on their own USB and plugged into the base.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -450,6 +450,8 @@ fn an_hgp_plugged_into_a_base_shows_itself_when_a_gear_is_engaged() {
     // Back in neutral, it stays.
     env.input(&base, &base_buttons(&[]));
     assert_eq!(gear(&mut host, shifter), Some(Value::Gear(Gear::Neutral)));
+    gear(&mut host, shifter);
+    host.poll();
     assert_eq!(host.components().len(), 4);
 
     let device = Target::Device {
@@ -460,6 +462,40 @@ fn an_hgp_plugged_into_a_base_shows_itself_when_a_gear_is_engaged() {
     let map = procedures.iter().find(|p| p.id == "map-h-shifter").unwrap();
     assert_eq!(map.label, "Map an H-pattern shifter connected to the base");
     assert!(!map.setup);
+}
+
+#[test]
+fn an_hbp_plugged_into_a_base_shows_itself_when_pulled() {
+    let env = env("base-hbp");
+    let base = r9(&env, "limit 450\n");
+    let at = |pull: u32| format!("abs 0 32767 0 65535\nabs 7 {pull} 0 65535\n");
+    env.input(&base, &at(0));
+    let mut host = env.start();
+    base_ready(&mut host);
+
+    // A touch is not enough: the base has the axis with nothing plugged in. Two requests make
+    // the plugin look at it and report what changed.
+    env.input(&base, &at(10000));
+    let base_component = "moza/usb-346e-0002/base";
+    host.read_inputs(base_component).unwrap();
+    host.read_inputs(base_component).unwrap();
+    host.poll();
+    assert_eq!(host.components().len(), 3);
+    // Pulled: the base's handbrake axis, as on the HBP's own USB.
+    env.input(&base, &at(65535));
+    until(&mut host, "the handbrake", |h| h.components().len() == 4);
+    let handbrake = "moza/usb-346e-0002/handbrake";
+    let found = host.find(handbrake).unwrap();
+    assert_eq!(found.description.name, "Handbrake on the MOZA R9 Base");
+    let inputs = host.read_inputs(handbrake).unwrap();
+    assert!(matches!(inputs.get("position"), Some(Value::Axis(a)) if a.value == 1.0));
+    // Released, it stays.
+    env.input(&base, &at(0));
+    let inputs = host.read_inputs(handbrake).unwrap();
+    assert!(matches!(inputs.get("position"), Some(Value::Axis(a)) if a.value == 0.0));
+    host.read_inputs(handbrake).unwrap();
+    host.poll();
+    assert_eq!(host.components().len(), 4);
 }
 
 #[test]

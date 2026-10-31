@@ -271,7 +271,7 @@ impl Component for Wheel {
     }
 
     fn name(&self) -> String {
-        format!("Steering wheel on the {}", self.device.borrow().name())
+        self.device.borrow().part_name("Steering wheel")
     }
 
     fn controls(&mut self) -> Vec<Control> {
@@ -345,11 +345,11 @@ impl Component for Handbrake {
     }
 
     fn name(&self) -> String {
-        self.device.borrow().name()
+        self.device.borrow().part_name("Handbrake")
     }
 
     fn model(&self) -> Option<String> {
-        Some(models::model_id(&self.device.borrow().product))
+        self.device.borrow().part_model()
     }
 }
 
@@ -380,15 +380,10 @@ impl simrig_plugin_sdk::Handbrake for Handbrake {
 /// gear is engaged, any once mapped by hand).
 pub fn shifter(device: &Shared) -> ButtonShifter<MozaDevice> {
     let d = device.borrow();
-    let on_base = d.kind == models::Kind::Base;
     ButtonShifter {
         device: device.clone(),
-        name: if on_base {
-            format!("Shifter on the {}", d.name())
-        } else {
-            d.name()
-        },
-        model: (!on_base).then(|| models::model_id(&d.product)),
+        name: d.part_name("Shifter"),
+        model: d.part_model(),
         gates: d.gates(),
     }
 }
@@ -396,15 +391,10 @@ pub fn shifter(device: &Shared) -> ButtonShifter<MozaDevice> {
 /// Moza pedals: plugged into a base, or a pedal set on its own USB.
 pub fn pedals(device: &Shared) -> PedalSet<MozaDevice> {
     let d = device.borrow();
-    let on_base = d.kind == models::Kind::Base;
     PedalSet {
         device: device.clone(),
-        name: if on_base {
-            format!("Pedals on the {}", d.name())
-        } else {
-            d.name()
-        },
-        model: (!on_base).then(|| models::model_id(&d.product)),
+        name: d.part_name("Pedals"),
+        model: d.part_model(),
         notes: PedalNotes {
             calibration: "Not available through SimRig yet: the pedals keep their own calibration.",
             shaping: "Not available through SimRig yet: set dead zones and curves in the game.",

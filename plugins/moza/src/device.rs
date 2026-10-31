@@ -38,7 +38,7 @@ pub mod axes {
     pub const THROTTLE: u16 = 0x03; // ABS_RX
     pub const BRAKE: u16 = 0x04; // ABS_RY
     pub const CLUTCH: u16 = 0x05; // ABS_RZ
-    pub const HANDBRAKE: u16 = 0x07; // ABS_RUDDER
+    pub const HANDBRAKE: u16 = 0x07; // ABS_RUDDER, on its own USB and on a base
     // Pedals plugged into a base.
     pub const BASE_THROTTLE: u16 = 0x02; // ABS_Z
     pub const BASE_BRAKE: u16 = 0x05; // ABS_RZ
@@ -85,6 +85,8 @@ pub struct MozaDevice {
     /// Values read or written, by command: the base answers slowly.
     cache: BTreeMap<&'static str, u64>,
     rim: Rim,
+    /// A handbrake plugged into the base was seen pulled.
+    pub handbrake: bool,
 }
 
 /// The rim mounted on the base, as last checked.
@@ -151,6 +153,7 @@ impl MozaDevice {
             serial_error: None,
             cache: BTreeMap::new(),
             rim: Rim::Unknown,
+            handbrake: false,
         };
         device.refresh();
         device
@@ -158,6 +161,21 @@ impl MozaDevice {
 
     pub fn name(&self) -> String {
         models::display_name(&self.product)
+    }
+
+    /// A part's name: the device's own on its own USB, "<part> on the <base>" plugged into a
+    /// base.
+    pub fn part_name(&self, part: &str) -> String {
+        if self.kind == Kind::Base {
+            format!("{part} on the {}", self.name())
+        } else {
+            self.name()
+        }
+    }
+
+    /// A part's model: the device's on its own USB; plugged into a base, the base does not say.
+    pub fn part_model(&self) -> Option<String> {
+        (self.kind != Kind::Base).then(|| models::model_id(&self.product))
     }
 
     /// The kinds of shifter the device is or can have plugged in.
@@ -192,6 +210,16 @@ impl MozaDevice {
         }
     }
 
+    /// A handbrake plugged into a base shows itself when it is pulled past half its travel:
+    /// the base has the axis whether one is plugged in or not.
+    fn notice_handbrake(&mut self) {
+        if self.kind != Kind::Base || self.handbrake {
+            return;
+        }
+        let now = self.hid.inputs.axes();
+        self.handbrake = now.get(&axes::HANDBRAKE).is_some_and(|a| a.unit() > 0.5);
+    }
+
     /// Looks for the HID driver and the serial port again; true when the HID binding changed.
     pub fn refresh(&mut self) -> bool {
         if self.kind == Kind::Base && self.serial.is_none() {
@@ -210,6 +238,7 @@ impl MozaDevice {
         }
         let changed = self.hid.refresh();
         self.notice_shifter();
+        self.notice_handbrake();
         changed
     }
 
