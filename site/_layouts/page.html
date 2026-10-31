@@ -1,0 +1,13 @@
+---
+layout: default
+---
+<header class="page-head" data-reveal>
+  <h1>{{ page.heading | default: page.title }}</h1>
+  {% if page.lede %}<p class="lede">{{ page.lede }}</p>{% endif %}
+</header>
+<div class="page-body">
+  {% include aside.html %}
+  <div class="prose" data-reveal>
+    {{ content }}
+  </div>
+</div>

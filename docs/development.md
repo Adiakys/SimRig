@@ -113,6 +113,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `assets/devices` | The core's device drawings and how they move (`devices.toml`) |
 | `docs/design` | Design: flows; the style guide and product context are `DESIGN.md` and `PRODUCT.md` at the root |
 | `scripts` | Development helpers |
+| `site` | The public site, on GitHub Pages (see [The website](#the-website)) |
 | `packaging/polkit` | polkit action of the helper |
 
 ## Checks
@@ -136,6 +137,28 @@ matter to new installations. Then record the files:
 SIMRIG_UPDATE_FINGERPRINTS=1 cargo test -p simrig-driver --test fingerprints
 ```
 
+
+## The website
+
+`site/` is the public site, <https://adiakys.github.io/SimRig/>: Jekyll as GitHub Pages builds it
+(`github-pages` gem, no plugins beyond `jekyll-seo-tag` and `jekyll-sitemap`), published by
+`.github/workflows/pages.yml` on every push to `main` that touches it (Settings → Pages → Source:
+GitHub Actions, once). It follows `DESIGN.md`: the app's colours, fonts and device drawings, and
+pieces of the app rebuilt in HTML (marked `data-ui`) that move like the real ones.
+
+```sh
+scripts/site.sh serve      # build as GitHub Pages does (Docker) and serve it on localhost:4000/SimRig/
+scripts/site.sh shots      # redraw the app's screenshots, the demo video and the link preview
+```
+
+The fonts, the mark and the device drawings are copied from the repository at build time
+(`scripts/site.sh stage`), not kept twice. The screenshots under `site/assets/images` come from
+`simrig --screenshot` on the simulated rig, and `site/assets/video/simrig.mp4` from
+`docs/images/simrig.gif`: run `shots` again when the screens change.
+
+What the site says about devices follows the README's table: when support changes, update the
+brand's page (`site/_brands/`), the home's list (`site/_data/models.yml`) and, for a new brand, its
+row in the README too.
 
 ## Releases
 

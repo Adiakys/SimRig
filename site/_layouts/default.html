@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="{{ site.lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151411" media="(prefers-color-scheme: dark)">
+  <script>document.documentElement.classList.add("js")</script>
+  {% seo %}
+  <link rel="icon" href="{{ '/assets/images/mark.svg' | relative_url }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ '/assets/images/mark.png' | relative_url }}">
+  <link rel="preload" href="{{ '/assets/fonts/Barlow-Medium.ttf' | relative_url }}" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="{{ '/assets/fonts/Barlow-Regular.ttf' | relative_url }}" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}">
+  {% if page.url == "/" %}{% include software.json.html %}{% endif %}
+  <script src="{{ '/assets/js/site.js' | relative_url }}" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="{{ '/' | relative_url }}">
+      <img src="{{ '/assets/images/mark.svg' | relative_url }}" alt="" width="24" height="24">
+      <span>SimRig</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="{{ '/#devices' | relative_url }}">Devices</a>
+      <a href="{{ '/faq/' | relative_url }}">Questions</a>
+      <a href="{{ site.repo }}">GitHub</a>
+      <a class="button button--small" href="{{ '/install/' | relative_url }}">Install</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    {{ content }}
+  </main>
+
+  <footer class="footer">
+    <p class="footer__what">SimRig, a sim-racing rig on Linux</p>
+    <ul class="footer__links">
+      <li><a href="{{ '/#devices' | relative_url }}">Devices</a></li>
+      <li><a href="{{ '/install/' | relative_url }}">Install</a></li>
+      <li><a href="{{ '/faq/' | relative_url }}">Questions</a></li>
+      <li><a href="{{ '/alternatives/' | relative_url }}">Other tools</a></li>
+      <li><a href="{{ site.repo }}">Source</a></li>
+    </ul>
+    <p class="footer__legal">{{ site.time | date: "%Y" }} · GPL-3.0 · <a href="{{ site.repo }}/blob/main/THIRD-PARTY.md">Credits</a></p>
+    <p class="footer__marks">Fanatec, Moza, Logitech, Thrustmaster, PXN, Simagic and the other names belong to their owners and only say which hardware SimRig works with. SimRig is not affiliated with, endorsed or sponsored by any of them.</p>
+  </footer>
+</body>
+</html>

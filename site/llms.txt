@@ -1,0 +1,25 @@
+---
+layout: null
+permalink: /llms.txt
+---
+# SimRig
+
+> {{ site.description | strip_newlines }}
+
+SimRig is a desktop app for Linux (x86-64), written in Rust, licensed GPL-3.0-or-later. Each brand is supported by a plugin that knows its devices and, when needed, bundles the open source kernel driver they use (hid-fanatecff, hid-universal-pidff, new-lg4ff, the Logitech TrueForce driver, hid-tmff2, hid-t150, simagic-ff), built with DKMS. It needs root only to install a driver, through polkit, and leaves nothing running when closed. It is in early development: most models work on simulated devices but are not yet tested on real hardware; each page says what was tested.
+
+## Devices
+{% assign brands = site.brands | sort: "order" %}{% for b in brands %}
+- [{{ b.title }}]({{ b.url | absolute_url }}): {{ b.summary }}{% endfor %}
+
+## Using it
+
+- [Install]({{ '/install/' | absolute_url }}): .deb, .rpm, Arch package and tarball, from {{ site.download }}
+- [FAQ]({{ '/faq/' | absolute_url }}): drivers, Secure Boot, games that do not see the wheel, root
+- [Other Linux tools]({{ '/alternatives/' | absolute_url }}): SimRig compared with Oversteer, Boxflat and Pitwall
+
+## Project
+
+- [Source code]({{ site.repo }})
+- [Call for testers]({{ site.testers }})
+- [Third-party components and credits]({{ site.repo }}/blob/main/THIRD-PARTY.md)

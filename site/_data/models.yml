@@ -1,0 +1,57 @@
+# The home's list of supported devices, by brand page. Keep it in step with the README's table
+# and the brand pages (_brands/). "tested": tried on real hardware.
+
+- page: fanatec-linux
+  name: Fanatec
+  rows:
+    - { name: "CSL DD", tested: true }
+    - { name: "GT DD Pro and ClubSport DD" }
+    - { name: "Podium DD1 and DD2" }
+    - { name: "CSL Elite, ClubSport V2 and V2.5" }
+    - { name: "CSR Elite, Porsche 911 Turbo S" }
+    - { name: "Their steering wheels, CSL and ClubSport pedals" }
+- page: moza-linux
+  name: Moza
+  rows:
+    - { name: "CRP2 pedals", tested: true }
+    - { name: "R3, R5, R9, R12, R16 and R21 bases" }
+    - { name: "SR-P and CRP pedals, HBP handbrake" }
+    - { name: "SGP and HGP shifters" }
+- page: logitech-linux
+  name: Logitech
+  rows:
+    - { name: "G29, G923, G27, G25" }
+    - { name: "G920 and G923 for Xbox" }
+    - { name: "G PRO and RS50, with TrueForce" }
+    - { name: "Driving Force GT and Pro, MOMO, WingMan" }
+- page: thrustmaster-linux
+  name: Thrustmaster
+  rows:
+    - { name: "T300 RS, T-GT II, T248, T128" }
+    - { name: "TX, TS-PC Racer, TS-XW" }
+    - { name: "T150 and TMX" }
+    - { name: "T500 RS and T80, inputs only" }
+- page: simagic-linux
+  name: Simagic
+  rows:
+    - { name: "Alpha, Alpha Mini, Alpha U" }
+    - { name: "EVO Sport, EVO, EVO Pro" }
+- page: pxn-linux
+  name: PXN
+  rows:
+    - { name: "VD4", tested: true }
+    - { name: "VD6" }
+    - { name: "V10, V12, V12 Lite, Lite Star GT987" }
+- page: direct-drive-linux
+  name: Other wheel bases
+  rows:
+    - { name: "Cammus C5 and C12" }
+    - { name: "Asetek Invicta, Forte, La Prima" }
+    - { name: "VRS DirectForce Pro, FFBeast, OpenFFBoard" }
+    - { name: "Turtle Beach VelocityOne Race" }
+- page: usb-shifter-handbrake-linux
+  name: Any USB device
+  rows:
+    - { name: "H-pattern shifters", tested: true }
+    - { name: "Handbrakes", tested: true }
+    - { name: "Sequential shifters" }

@@ -1,0 +1,45 @@
+---
+layout: default
+---
+{%- assign rel = '/assets/devices/' | relative_url -%}
+<header class="page-head page-head--brand">
+  <div class="page-head__text" data-reveal>
+    <h1>{{ page.title }}</h1>
+    <p class="lede">{{ page.lede }}</p>
+  </div>
+  <div class="ui brand-card" data-ui data-reveal>
+    <div class="brand-card__art">
+      {% for layer in page.card.art %}<img src="{{ rel }}{{ layer }}" alt="" width="320" height="320"{% if forloop.index > 1 %} class="brand-card__knob"{% endif %}>{% endfor %}
+    </div>
+    <dl class="brand-card__facts">
+      <div><dt class="ui-label">{{ page.card.label }}</dt><dd>{{ page.nav }}</dd></div>
+      <div><dt class="ui-label">Driver</dt><dd>{{ page.card.driver }}</dd></div>
+      <div><dt class="ui-label">Tested on hardware</dt><dd>{{ page.card.tested }}</dd></div>
+    </dl>
+  </div>
+</header>
+<div class="page-body">
+  {% include aside.html %}
+  {% if page.status == "untested" %}
+  <div class="callout" role="note" data-reveal>
+    {% include icon.html name="warn" color="var(--warning)" %}
+    <div>
+      <p><strong>Untested on real hardware.</strong> These models work in SimRig's tests on simulated devices; nobody has tried them on the real thing yet.</p>
+      <p>Have one? <a href="{{ site.testers }}">Try it</a> and <a href="{{ site.report }}">tell how it went</a>: about 15 minutes, and it moves your model to tested for everyone.</p>
+    </div>
+  </div>
+  {% elsif page.status == "partial" %}
+  <div class="callout" role="note" data-reveal>
+    {% include icon.html name="info" %}
+    <div>
+      <p><strong>Tested on {{ page.tested }}.</strong> Other models work in SimRig's tests on simulated devices, not yet tried on real hardware.</p>
+      <p>Have another one? <a href="{{ site.testers }}">Try it</a> and <a href="{{ site.report }}">tell how it went</a>: about 15 minutes.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="prose" data-reveal>
+    {{ content }}
+    {% include get-started.html %}
+  </div>
+</div>
