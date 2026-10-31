@@ -1,0 +1,67 @@
+<!doctype html>
+<!-- The preview image of the site (search results, link previews), drawn by
+     scripts/site.sh social in three formats: #wide (1200x630), #four (1200x900), #square (1200x1200).
+     Colours, fonts and drawings are the app's (DESIGN.md). Not part of the published site. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Barlow; src: url("../../assets/fonts/Barlow-Medium.ttf"); font-weight: 500; }
+  @font-face { font-family: Barlow; src: url("../../assets/fonts/Barlow-SemiBold.ttf"); font-weight: 600; }
+  @font-face { font-family: Mono; src: url("../../assets/fonts/MartianMono-Variable.ttf"); font-weight: 100 800; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; }
+  body {
+    background: #151411; color: #eeede8; font-family: Barlow, sans-serif;
+    display: grid; overflow: hidden; padding: 72px;
+  }
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .brand img { width: 76px; height: 76px; }
+  .brand span { font-weight: 600; font-size: 60px; letter-spacing: -0.01em; }
+  h1 { font-weight: 500; font-size: 76px; line-height: 1.02; letter-spacing: -0.025em; }
+  .brands { color: #b0aea7; font-size: 26px; font-weight: 500; }
+  .card {
+    background: #1d1c18; border: 2px solid #34332e; border-radius: 28px; padding: 30px 34px;
+    display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 30px;
+  }
+  .card img { width: 300px; height: 300px; transform: rotate(-14deg); }
+  .label { font-weight: 600; font-size: 20px; letter-spacing: 0.09em; color: #b0aea7; text-transform: uppercase; }
+  .value { font-family: Mono; font-variation-settings: "wdth" 87.5; font-weight: 600; font-size: 92px; letter-spacing: -0.03em; line-height: 1; margin-top: 10px; }
+  .of { color: #b0aea7; font-size: 22px; margin-top: 14px; }
+  .chip { display: inline-block; margin-top: 22px; background: #efc63a; color: #231e0d; font-weight: 600; font-size: 22px; padding: 8px 16px; border-radius: 8px; }
+
+  /* 1200x630: words on the left, the live wheel on the right. */
+  .wide { grid-template-columns: 1fr 470px; grid-template-rows: auto 1fr auto; column-gap: 56px; }
+  .wide .brand { grid-column: 1; }
+  .wide h1 { grid-column: 1; grid-row: 2; align-self: center; font-size: 72px; }
+  .wide .brands { grid-column: 1; grid-row: 3; }
+  .wide .card { grid-column: 2; grid-row: 1 / -1; align-self: center; grid-template-columns: 1fr; justify-items: center; gap: 0; padding: 22px 26px 28px; }
+  .wide .card img { width: 200px; height: 200px; }
+  .wide .value { font-size: 80px; }
+  .wide .chip { margin-top: 16px; }
+  .wide .readout { text-align: center; }
+
+  /* 1200x900 and 1200x1200: stacked. */
+  .four, .square { grid-template-rows: auto 1fr auto auto; row-gap: 40px; }
+  .four .card, .square .card { align-self: center; }
+  .square h1 { font-size: 88px; }
+  .square .card img { width: 380px; height: 380px; }
+  .square .value { font-size: 120px; }
+</style>
+</head>
+<body>
+  <div class="brand"><img src="../../crates/simrig-gui/ui/icons/mark.svg" alt=""><span>SimRig</span></div>
+  <div class="card">
+    <img src="../../assets/devices/wheel-formula.svg" alt="">
+    <div class="readout">
+      <p class="label">Steering</p>
+      <p class="value">196°</p>
+      <p class="of">of 900° rotation</p>
+      <p class="chip">Free and open source</p>
+    </div>
+  </div>
+  <h1>Your sim rig, set up on Linux.</h1>
+  <p class="brands">Fanatec · Moza · Logitech · Thrustmaster · PXN · Simagic · any USB shifter</p>
+  <script>document.body.className = (location.hash || "#wide").slice(1);</script>
+</body>
+</html>

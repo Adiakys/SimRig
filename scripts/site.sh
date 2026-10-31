@@ -4,8 +4,9 @@
 #   scripts/site.sh stage   copy the shared assets (fonts, the mark, device drawings) into site/
 #   scripts/site.sh build   stage, then build into target/site as GitHub Pages does (Docker)
 #   scripts/site.sh serve   build, then serve it at http://localhost:4000/SimRig/
-#   scripts/site.sh shots   redraw the app's screenshots, the demo video and the link preview
-#                           (Pillow, ffmpeg)
+#   scripts/site.sh shots   redraw the app's screenshots and the demo video (Pillow, ffmpeg)
+#   scripts/site.sh social  redraw the preview image (search results, link previews) from
+#                           site/_social/card.html, in three formats (Chromium)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -63,10 +64,6 @@ for name in ("home", "base", "pedals", "shifter"):
         Image.open(f"{src}/{name}-{theme}.png").convert("RGB").save(
             f"{out}/{name}-{theme}.webp", quality=88, method=6)
 
-# Link previews: the rig, 1200x630.
-home = Image.open(f"{src}/home-dark.png").convert("RGB")
-home.resize((1200, 750), Image.LANCZOS).crop((0, 0, 1200, 630)).save(f"{out}/social.png", optimize=True)
-
 # The mark (crates/simrig-gui/ui/icons/mark.svg) as a PNG, for search engines' logos.
 s = 512 / 22
 mark = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
@@ -82,6 +79,22 @@ mark.save(f"{out}/mark.png", optimize=True)
 EOF
 }
 
+social() {
+    local chrome=${CHROME_PATH:-}
+    for c in chromium chromium-browser google-chrome google-chrome-stable; do
+        [ -n "$chrome" ] && break
+        chrome=$(command -v "$c" || true)
+    done
+    [ -n "$chrome" ] || { echo "no Chromium found: set CHROME_PATH" >&2; exit 1; }
+    for format in wide:1200,630 four:1200,900 square:1200,1200; do
+        "$chrome" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+            --virtual-time-budget=2000 --window-size="${format#*:}" \
+            --screenshot="site/assets/images/preview-${format%%:*}.png" \
+            "file://$PWD/site/_social/card.html#${format%%:*}" 2>/dev/null
+    done
+    ls -l site/assets/images/preview-*.png
+}
+
 case "${1:-}" in
     stage) stage ;;
     build) build ;;
@@ -91,8 +104,9 @@ case "${1:-}" in
         python3 -m http.server --directory target/site 4000
         ;;
     shots) shots ;;
+    social) social ;;
     *)
-        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
         exit 1
         ;;
 esac

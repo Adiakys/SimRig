@@ -149,13 +149,16 @@ pieces of the app rebuilt in HTML (marked `data-ui`) that move like the real one
 
 ```sh
 scripts/site.sh serve      # build as GitHub Pages does (Docker) and serve it on localhost:4000/SimRig/
-scripts/site.sh shots      # redraw the app's screenshots, the demo video and the link preview
+scripts/site.sh shots      # redraw the app's screenshots and the demo video
+scripts/site.sh social     # redraw the preview image of search results and link previews
 ```
 
 The fonts, the mark and the device drawings are copied from the repository at build time
 (`scripts/site.sh stage`), not kept twice. The screenshots under `site/assets/images` come from
 `simrig --screenshot` on the simulated rig, and `site/assets/video/simrig.mp4` from
-`docs/images/simrig.gif`: run `shots` again when the screens change.
+`docs/images/simrig.gif`: run `shots` again when the screens change. The preview image shown by
+search engines and in shared links is drawn from `site/_social/card.html` in three formats (1:1,
+4:3, 16:9), all named in the home's structured data.
 
 What the site says about devices follows the README's table: when support changes, update the
 brand's page (`site/_brands/`), the home's list (`site/_data/models.yml`) and, for a new brand, its

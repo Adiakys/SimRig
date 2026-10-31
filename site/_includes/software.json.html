@@ -8,7 +8,11 @@
   "operatingSystem": "Linux",
   "url": {{ '/' | absolute_url | jsonify }},
   "downloadUrl": {{ site.download | jsonify }},
-  "image": {{ site.image | absolute_url | jsonify }},
+  "image": [
+    {{ '/assets/images/preview-square.png' | absolute_url | jsonify }},
+    {{ '/assets/images/preview-four.png' | absolute_url | jsonify }},
+    {{ '/assets/images/preview-wide.png' | absolute_url | jsonify }}
+  ],
   "screenshot": {{ '/assets/images/home-light.webp' | absolute_url | jsonify }},
   "license": "https://www.gnu.org/licenses/gpl-3.0.html",
   "isAccessibleForFree": true,

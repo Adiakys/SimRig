@@ -13,7 +13,7 @@ url: https://adiakys.github.io
 baseurl: /SimRig
 lang: en
 logo: /assets/images/mark.png
-image: /assets/images/social.png
+image: /assets/images/preview-wide.png
 author: Adiakys
 social:
   name: SimRig
@@ -45,7 +45,7 @@ collections:
 
 defaults:
   - scope: { path: "" }
-    values: { layout: page, image: /assets/images/social.png }
+    values: { layout: page, image: /assets/images/preview-wide.png }
   # Google Search Console's ownership file: served, not listed.
   - scope: { path: "googled3f59b32110c1e22.html" }
     values: { sitemap: false }

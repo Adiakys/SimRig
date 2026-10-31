@@ -195,7 +195,8 @@ button.ui-button:active { transform: translateY(1px); }
 
 .wheel { cursor: grab; touch-action: pan-y; user-select: none; }
 .wheel.is-grabbed { cursor: grabbing; }
-.wheel img { transform: rotate(calc(var(--a, 0) * 1deg)); }
+/* A background, not an img: search engines take the site's preview images, not this drawing. */
+.wheel__rim { position: absolute; inset: 0; background: center / contain no-repeat; transform: rotate(calc(var(--a, 0) * 1deg)); }
 
 .pedals { aspect-ratio: 600 / 380; height: auto; width: 100%; }
 .pedals .pedals__frame { inset: 0; }
