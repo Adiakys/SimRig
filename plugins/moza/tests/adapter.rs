@@ -234,8 +234,8 @@ fn an_sgp_sequential_shifter() {
         "1-6:1.0/0003:346E:0023.0004",
         Some("hid-generic"),
     );
-    // Pushed: its 14th button.
-    env.input(&sgp, &buttons(&[0x12d]));
+    // Pushed: its 13th button.
+    env.input(&sgp, &buttons(&[0x12c]));
     let mut host = env.start();
     until(&mut host, "shifter", |h| h.components().len() == 1);
 
@@ -269,18 +269,18 @@ fn an_sgp_sequential_shifter() {
         buttons,
         &target,
         "map-sequential-shifter",
-        &[(0x12c, "Shift down"), (0x12d, "Check the mapping")],
+        &[(0x12d, "Shift down"), (0x12c, "Check the mapping")],
     );
     let saved = fs::read_to_string(env.config()).unwrap();
     assert!(
-        saved.contains("[shifters.\"moza/sgp-shifter\"]\n\"+\" = 300\n- = 301"),
+        saved.contains("[shifters.\"moza/sgp-shifter\"]\n\"+\" = 301\n- = 300"),
         "{saved}"
     );
     env.input(&sgp, &buttons(&[0x12d]));
     let inputs = host.read_inputs(shifter).unwrap();
     assert_eq!(
         inputs.get("sequential"),
-        Some(&Value::Buttons(vec![false, true]))
+        Some(&Value::Buttons(vec![true, false]))
     );
 }
 
@@ -335,14 +335,20 @@ fn an_hgp_plugged_into_a_base_shows_itself_when_a_gear_is_engaged() {
         h.components().len() == 2
     });
 
-    // Third gear: the base's button 116.
-    env.input(&base, &base_buttons(&[0x2d3]));
+    // First gear, the base's button 114, is the SGP's shift down too: taken for an SGP.
+    env.input(&base, &base_buttons(&[0x2d1]));
     until(&mut host, "the shifter", |h| h.components().len() == 3);
     let shifter = "moza/usb-346e-0002/shifter";
     assert_eq!(
-        host.find(shifter).unwrap().description.name,
-        "Shifter on the MOZA R9 Base"
+        host.param(shifter, "mode").unwrap().value,
+        Value::Choice("sequential".into())
     );
+    // Third gear, button 116, only the HGP has.
+    env.input(&base, &base_buttons(&[0x2d3]));
+    until(&mut host, "an H-pattern shifter", |h| {
+        h.param(shifter, "mode")
+            .is_ok_and(|p| p.value == Value::Choice("h_pattern".into()))
+    });
     assert_eq!(
         gear(&mut host, shifter),
         Some(Value::Gear(Gear::Forward(3)))
@@ -363,7 +369,7 @@ fn an_hgp_plugged_into_a_base_shows_itself_when_a_gear_is_engaged() {
 }
 
 #[test]
-fn a_sequential_shifter_plugged_into_a_base_once_mapped() {
+fn an_sgp_plugged_into_a_base_shows_itself_when_shifted() {
     let env = env("base-sgp");
     let base = r9(&env, "limit 450\n");
     env.input(&base, &base_buttons(&[]));
@@ -372,7 +378,33 @@ fn a_sequential_shifter_plugged_into_a_base_once_mapped() {
         h.components().len() == 2
     });
 
-    // Which buttons the base gives an SGP is not known: offered, never required.
+    // Shifted up: the base's button 113.
+    env.input(&base, &base_buttons(&[0x2d0]));
+    until(&mut host, "the shifter", |h| h.components().len() == 3);
+    let shifter = "moza/usb-346e-0002/shifter";
+    assert_eq!(
+        host.find(shifter).unwrap().description.name,
+        "Shifter on the MOZA R9 Base"
+    );
+    let inputs = host.read_inputs(shifter).unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![true, false]))
+    );
+}
+
+#[test]
+fn with_paddle_sync_an_sgp_on_a_base_is_mapped_by_hand() {
+    let env = env("base-sgp-paddles");
+    let base = r9(&env, "limit 450\n");
+    env.input(&base, &base_buttons(&[]));
+    let mut host = env.start();
+    until(&mut host, "base and its pedals", |h| {
+        h.components().len() == 2
+    });
+
+    // Its buttons are the paddles' (13 and 14), which do not say it is there: mapped by hand,
+    // offered, never required.
     let device = Target::Device {
         plugin: "moza".into(),
         device: "usb-346e-0002".into(),

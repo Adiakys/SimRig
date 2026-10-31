@@ -50,15 +50,18 @@ pub mod shifters {
         gears: 7,
         reverse_position: "right_down",
     };
-    /// The SGP on its own USB: up on button 14, down on 13. Reversing the shift direction in
-    /// the shifter's own settings swaps them: mapping by hand puts that right.
-    pub const SGP_BUTTONS: [u16; 2] = [0x12d, 0x12c];
+    /// The SGP on its own USB: up on button 13, down on 14 (checked on an SGP; Boxflat has them
+    /// the other way). Reversing the shift direction in the shifter's own settings swaps them:
+    /// mapping by hand puts that right.
+    pub const SGP_BUTTONS: [u16; 2] = [0x12c, 0x12d];
     /// The HGP on its own USB: gears 1 to 7 on buttons 6 to 12, reverse on 5.
     pub const HGP_BUTTONS: [u16; 8] = [0x125, 0x126, 0x127, 0x128, 0x129, 0x12a, 0x12b, 0x124];
-    /// The HGP plugged into a base: gears 1 to 7 on buttons 114 to 120, reverse on 113. Only
-    /// the HGP uses them, so one of them pressed says it is there.
+    /// The SGP plugged into a base, without paddle synchronization: up on button 113, down on
+    /// 114 (checked on an SGP). With it, its buttons are the paddles': mapped by hand.
+    pub const SGP_ON_BASE: [u16; 2] = [0x2d0, 0x2d1];
+    /// The HGP plugged into a base: gears 1 to 7 on buttons 114 to 120, reverse on 113.
     pub const HGP_ON_BASE: [u16; 8] = [0x2d1, 0x2d2, 0x2d3, 0x2d4, 0x2d5, 0x2d6, 0x2d7, 0x2d0];
-    /// What can be plugged into a base. Which buttons a base gives the SGP is not known.
+    /// What can be plugged into a base.
     pub const ON_BASE: &[Gate] = &[SGP, HGP];
 }
 
@@ -141,19 +144,25 @@ impl MozaDevice {
         }
     }
 
-    /// An HGP plugged into a base shows itself as soon as a gear is engaged.
+    /// A shifter plugged into a base shows itself when it is moved. Buttons 113 and 114 are
+    /// both the SGP's and the HGP's reverse and first gear: an SGP until a gear only the HGP has
+    /// (115 to 120) is engaged.
     fn notice_shifter(&mut self) {
-        if self.kind != Kind::Base || self.hid.shifter_layout.is_some() {
+        let hgp = shifters::HGP.layout(&shifters::HGP_ON_BASE);
+        if self.kind != Kind::Base || self.hid.shifter_layout.as_ref() == Some(&hgp) {
             return;
         }
-        let engaged = self
-            .hid
-            .inputs
-            .buttons()
-            .into_iter()
-            .any(|(code, pressed)| pressed && shifters::HGP_ON_BASE.contains(&code));
-        if engaged {
-            self.hid.shifter_layout = Some(shifters::HGP.layout(&shifters::HGP_ON_BASE));
+        let pressed = |codes: &[u16]| {
+            self.hid
+                .inputs
+                .buttons()
+                .into_iter()
+                .any(|(code, pressed)| pressed && codes.contains(&code))
+        };
+        if pressed(&shifters::HGP_ON_BASE[1..7]) {
+            self.hid.shifter_layout = Some(hgp);
+        } else if self.hid.shifter_layout.is_none() && pressed(&shifters::SGP_ON_BASE) {
+            self.hid.shifter_layout = Some(shifters::SGP.layout(&shifters::SGP_ON_BASE));
         }
     }
 

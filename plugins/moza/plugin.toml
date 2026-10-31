@@ -5,7 +5,7 @@ api = 1
 exec = "simrig-plugin-moza"
 driver = "driver/driver.toml"
 # Confirmed on real hardware; the app marks the other models as untested.
-tested = ["moza/crp2-pedals"]
+tested = ["moza/crp2-pedals", "moza/sgp-shifter"]
 description = "Moza wheel bases, pedals, handbrakes and shifters: force feedback through the kernel, settings over their serial port."
 
 # Moza does not publish its product ids: every device of the vendor, told apart by its name.
