@@ -1,0 +1,8 @@
+# After SimRig is removed, as packaging/postremove.sh says it: the drivers are kept, so the
+# devices keep working.
+post_remove() {
+    if [ -x /var/lib/simrig/remove-drivers ]; then
+        echo "SimRig was removed; the drivers it installed were kept, so your devices keep working."
+        echo "To remove them too: sudo /var/lib/simrig/remove-drivers --all"
+    fi
+}

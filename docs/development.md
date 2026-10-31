@@ -115,6 +115,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `scripts` | Development helpers |
 | `site` | The public site, on GitHub Pages (see [The website](#the-website)) |
 | `packaging/polkit` | polkit action of the helper |
+| `packaging/aur` | The AUR package (`simrig-bin`), from the release archive |
 
 ## Checks
 
@@ -171,3 +172,16 @@ Locally, with
 cargo build --release
 packaging/build-packages.sh 1.2.3       # → dist/packages
 ```
+
+### The AUR package
+
+`packaging/aur` is `simrig-bin`, the AUR package made from a release's `.tar.gz`. It follows stable
+releases only, and leaves out `lib/simrig/package-format`, so the app leaves its updates to the
+AUR helper. After each stable release:
+
+```sh
+packaging/aur/update.sh 1.2.3           # version, checksum, .SRCINFO (an Arch container without makepkg)
+```
+
+Then copy `PKGBUILD`, `simrig.install` and `.SRCINFO` into a clone of
+`ssh://aur@aur.archlinux.org/simrig-bin.git` (an AUR account with an SSH key), commit and push.

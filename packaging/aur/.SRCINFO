@@ -1,0 +1,23 @@
+pkgbase = simrig-bin
+	pkgdesc = Configure a sim-racing rig of any brand: wheel bases, steering wheels, pedals, shifters, handbrakes
+	pkgver = 0.1.1
+	pkgrel = 1
+	url = https://adiakys.github.io/SimRig/
+	install = simrig.install
+	arch = x86_64
+	license = GPL-3.0-or-later
+	depends = polkit
+	depends = fontconfig
+	depends = libxkbcommon
+	optdepends = dkms: build the kernel drivers some devices need (Fanatec, Thrustmaster, Simagic...)
+	optdepends = base-devel: compiler for the drivers built by DKMS
+	optdepends = linux-headers: headers for the drivers built by DKMS (or those of your kernel)
+	optdepends = usb_modeswitch: switch the Logitech G923 and RS50 Xbox editions to PC mode
+	provides = simrig
+	conflicts = simrig
+	options = !strip
+	options = !debug
+	source = https://github.com/Adiakys/SimRig/releases/download/v0.1.1/simrig-0.1.1-x86_64-linux.tar.gz
+	sha256sums = 236fe6e59a76e2ca7a384c6a061e851ef2c316592bc78a8ff66f11d669afc77a
+
+pkgname = simrig-bin

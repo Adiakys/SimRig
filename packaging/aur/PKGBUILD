@@ -1,0 +1,30 @@
+# Maintainer: Adiakys <adiakys@users.noreply.github.com>
+#
+# SimRig from its release archive, for the AUR. Updated by packaging/aur/update.sh at each
+# stable release (see docs/development.md).
+pkgname=simrig-bin
+pkgver=0.1.1
+pkgrel=1
+pkgdesc="Configure a sim-racing rig of any brand: wheel bases, steering wheels, pedals, shifters, handbrakes"
+arch=('x86_64')
+url="https://adiakys.github.io/SimRig/"
+license=('GPL-3.0-or-later')
+depends=('polkit' 'fontconfig' 'libxkbcommon')
+optdepends=(
+    'dkms: build the kernel drivers some devices need (Fanatec, Thrustmaster, Simagic...)'
+    'base-devel: compiler for the drivers built by DKMS'
+    'linux-headers: headers for the drivers built by DKMS (or those of your kernel)'
+    'usb_modeswitch: switch the Logitech G923 and RS50 Xbox editions to PC mode'
+)
+provides=('simrig')
+conflicts=('simrig')
+options=('!strip' '!debug')
+install=simrig.install
+source=("https://github.com/Adiakys/SimRig/releases/download/v${pkgver}/simrig-${pkgver}-${CARCH}-linux.tar.gz")
+sha256sums=('236fe6e59a76e2ca7a384c6a061e851ef2c316592bc78a8ff66f11d669afc77a')
+
+package() {
+    cp -a "simrig-${pkgver}-${CARCH}-linux/root/." "${pkgdir}/"
+    # Updates come from the AUR: without this file the app leaves them to the package manager.
+    rm "${pkgdir}/usr/lib/simrig/package-format"
+}
