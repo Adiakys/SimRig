@@ -5,6 +5,9 @@ shifter and handbrake in one app: SimRig installs the drivers your devices need,
 device moving live, lets you tune and calibrate them and save presets, then gets out of the way.
 Your devices keep working in every game with SimRig closed.
 
+**Website: [adiakys.github.io/SimRig](https://adiakys.github.io/SimRig/)**, with every supported
+device brand by brand, how to install, and the questions people ask.
+
 ![SimRig: the rig live, a wheel base's settings, setting up a shifter, adding a device, plugins and drivers, first run](docs/images/simrig.gif)
 
 - **Plug in, see it move.** Every device is drawn as it stands on your rig and moves as you
@@ -59,8 +62,11 @@ Download the package for your distribution from the
 # Debian, Ubuntu, Linux Mint, Pop!_OS
 sudo apt install ./simrig_*_amd64.deb
 
-# Fedora, openSUSE
+# Fedora
 sudo dnf install ./simrig-*.x86_64.rpm
+
+# openSUSE
+sudo zypper install ./simrig-*.x86_64.rpm
 
 # Arch, Manjaro, EndeavourOS
 sudo pacman -U ./simrig-*-x86_64.pkg.tar.zst
