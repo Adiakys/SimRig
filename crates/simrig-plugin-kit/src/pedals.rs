@@ -3,8 +3,6 @@
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
 use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
@@ -58,36 +56,6 @@ impl PedalMap {
             .filter(|r| self.pedals.contains_key(r.key()))
             .collect()
     }
-}
-
-/// The mappings of every model, in a plugin's configuration file.
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct Config {
-    #[serde(default)]
-    models: BTreeMap<String, PedalMap>,
-}
-
-pub fn load_map(config: &Path, key: &str) -> PedalMap {
-    fs::read_to_string(config)
-        .ok()
-        .and_then(|t| toml::from_str::<Config>(&t).ok())
-        .and_then(|c| c.models.get(key).cloned())
-        .unwrap_or_default()
-}
-
-pub fn save_map(config: &Path, key: &str, map: &PedalMap) -> std::io::Result<()> {
-    let mut all: Config = fs::read_to_string(config)
-        .ok()
-        .and_then(|t| toml::from_str(&t).ok())
-        .unwrap_or_default();
-    all.models.insert(key.into(), map.clone());
-    if let Some(dir) = config.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    fs::write(
-        config,
-        toml::to_string_pretty(&all).map_err(std::io::Error::other)?,
-    )
 }
 
 /// What a brand's pedals cannot do through its driver, said on the parameters.

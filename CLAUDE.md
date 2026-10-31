@@ -22,8 +22,15 @@ plugins (each an adapter plus a driver).
   - What several plugins share goes in `crates/simrig-plugin-kit`.
   - The GUI only presents.
   - A feature lives in its own module, wired in like the others.
+- **Reuse before adding.** Before adding a function, a procedure, a flag, a screen or a model
+  field, look for one that already does it or nearly does: reuse it, or extend it, as far as
+  possible. Something new only when nothing existing can carry it.
 - **No root at runtime.** The password is asked only when something touches the system. Prefer an
   app's own setting to custom daemons or scripts added to the system.
+- **Recognised by itself, mapped by hand only as a fallback.** Where the plugin can know which
+  input is which (a table, the device's protocol), the device works with nothing to do. Mapping
+  by hand is never required then, but always offered, so a device that responds wrong can be
+  put right by the user.
 - **Unsupported items stay visible**, disabled with their reason. Items that work only in part
   carry a caveat (a yellow sign with a tooltip).
 - **Third-party drivers are pinned git submodules**, used unmodified and credited in

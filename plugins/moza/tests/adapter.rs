@@ -1,11 +1,14 @@
 //! End to end through the host: a fake R9 base (inputs, force feedback driver, serial port
-//! answering like the real one), SR-P pedals, an HBP handbrake and an SGP shifter.
+//! answering like the real one), SR-P pedals, an HBP handbrake, SGP and HGP shifters on their
+//! own USB and plugged into the base.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use simrig_host::testing::{PluginEnv, reason, until};
-use simrig_model::Value;
+use simrig_host::Target;
+use simrig_host::testing::{PluginEnv, reason, step, until};
+use simrig_model::{Gear, ProcedureState, Value};
 
 fn env(name: &str) -> PluginEnv {
     PluginEnv::new(
@@ -137,9 +140,12 @@ fn pedals_handbrake_and_pedals_on_the_base() {
     let mut host = env.start();
     until(&mut host, "components", |h| h.components().len() == 4);
 
-    // The SR-P's axes are known: no mapping.
+    // The SR-P's axes are known: no mapping, unless by hand.
     let srp = "moza/usb-346e-0003/pedals";
     assert_eq!(host.find(srp).unwrap().description.pedals.len(), 3);
+    let procedures = host.procedures(&Target::Component(srp.into())).unwrap();
+    assert_eq!(procedures[0].label, "Map the pedals by hand");
+    assert!(!procedures[0].setup);
     let inputs = host.read_inputs(srp).unwrap();
     let Some(Value::Axis(throttle)) = inputs.get("throttle.position") else {
         panic!("{inputs:?}")
@@ -163,6 +169,60 @@ fn pedals_handbrake_and_pedals_on_the_base() {
     assert!(brake.value > 0.99);
 }
 
+/// The 16 joystick buttons of a device of its own (BTN_TRIGGER to BTN_DEAD), the ones in
+/// `pressed` held.
+fn buttons(pressed: &[u16]) -> String {
+    keys(0x120..=0x12f, pressed)
+}
+
+/// A base's 128 buttons as hid-universal-pidff maps them: 16 from BTN_JOYSTICK, the rest from
+/// KEY_NEXT_FAVORITE.
+fn base_buttons(pressed: &[u16]) -> String {
+    format!(
+        "abs 0 32767 0 65535\n{}",
+        keys((0x120..=0x12f).chain(0x270..=0x2df), pressed)
+    )
+}
+
+fn keys(codes: impl Iterator<Item = u16>, pressed: &[u16]) -> String {
+    codes
+        .map(|code| format!("key {code} {}\n", u8::from(pressed.contains(&code))))
+        .collect()
+}
+
+/// Runs a "Map the shifter" procedure: each button of `presses` pressed in turn, then the step
+/// that follows waited for.
+fn map_shifter(
+    host: &mut simrig_host::Host,
+    env: &PluginEnv,
+    hid: &Path,
+    input: fn(&[u16]) -> String,
+    target: &Target,
+    id: &str,
+    presses: &[(u16, &str)],
+) {
+    let (session, _) = host.start_procedure(target, id).unwrap();
+    env.input(hid, &input(&[]));
+    host.submit_procedure(&session, "next", BTreeMap::new())
+        .unwrap();
+    for (code, next) in presses {
+        env.input(hid, &input(&[*code]));
+        step(host, next);
+    }
+    env.input(hid, &input(&[]));
+    let state = host
+        .submit_procedure(&session, "save", BTreeMap::new())
+        .unwrap();
+    assert!(
+        matches!(state, ProcedureState::Finished { .. }),
+        "{state:?}"
+    );
+}
+
+fn gear(host: &mut simrig_host::Host, shifter: &str) -> Option<Value> {
+    host.read_inputs(shifter).unwrap().get("gear").cloned()
+}
+
 #[test]
 fn an_sgp_sequential_shifter() {
     let env = env("sgp");
@@ -174,11 +234,8 @@ fn an_sgp_sequential_shifter() {
         "1-6:1.0/0003:346E:0023.0004",
         Some("hid-generic"),
     );
-    // 16 joystick buttons (BTN_TRIGGER to BTN_DEAD), the lever pushed: its 14th.
-    let keys: String = (0x120..=0x12f)
-        .map(|code| format!("key {code} {}\n", u8::from(code == 0x12d)))
-        .collect();
-    env.input(&sgp, &keys);
+    // Pushed: its 14th button.
+    env.input(&sgp, &buttons(&[0x12d]));
     let mut host = env.start();
     until(&mut host, "shifter", |h| h.components().len() == 1);
 
@@ -198,13 +255,152 @@ fn an_sgp_sequential_shifter() {
     );
     assert!(reason(&mut host, shifter, "gear").contains("no gear positions"));
 
-    // Pulled: its 13th.
-    env.input(
+    // Recognised, mapped by hand only to put it right: here, the direction reversed in the
+    // shifter's own settings.
+    let target = Target::Component(shifter.into());
+    let procedures = host.procedures(&target).unwrap();
+    assert_eq!(procedures.len(), 1);
+    assert_eq!(procedures[0].label, "Map the shifter by hand");
+    assert!(!procedures[0].setup);
+    map_shifter(
+        &mut host,
+        &env,
         &sgp,
-        &keys
-            .replace("key 301 1", "key 301 0")
-            .replace("key 300 0", "key 300 1"),
+        buttons,
+        &target,
+        "map-sequential-shifter",
+        &[(0x12c, "Shift down"), (0x12d, "Check the mapping")],
     );
+    let saved = fs::read_to_string(env.config()).unwrap();
+    assert!(
+        saved.contains("[shifters.\"moza/sgp-shifter\"]\n\"+\" = 300\n- = 301"),
+        "{saved}"
+    );
+    env.input(&sgp, &buttons(&[0x12d]));
+    let inputs = host.read_inputs(shifter).unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![false, true]))
+    );
+}
+
+#[test]
+fn an_hgp_h_pattern_shifter() {
+    let env = env("hgp");
+    let hgp = env.plug(
+        "1-7",
+        0x346e,
+        0x0021,
+        "HGP Shifter",
+        "1-7:1.0/0003:346E:0021.0005",
+        Some("hid-generic"),
+    );
+    // Second gear: its 7th button.
+    env.input(&hgp, &buttons(&[0x126]));
+    let mut host = env.start();
+    until(&mut host, "shifter", |h| h.components().len() == 1);
+
+    let shifter = "moza/usb-346e-0021/shifter";
+    assert_eq!(
+        host.find(shifter).unwrap().description.name,
+        "MOZA HGP Shifter"
+    );
+    assert_eq!(
+        host.param(shifter, "mode").unwrap().value,
+        Value::Choice("h_pattern".into())
+    );
+    assert_eq!(host.param(shifter, "gears").unwrap().value, Value::Int(7));
+    assert_eq!(
+        gear(&mut host, shifter),
+        Some(Value::Gear(Gear::Forward(2)))
+    );
+    // Reverse on its 5th button, neutral on none.
+    env.input(&hgp, &buttons(&[0x124]));
+    assert_eq!(gear(&mut host, shifter), Some(Value::Gear(Gear::Reverse)));
+    env.input(&hgp, &buttons(&[]));
+    assert_eq!(gear(&mut host, shifter), Some(Value::Gear(Gear::Neutral)));
+    assert!(reason(&mut host, shifter, "sequential").contains("no sequential mode"));
+    let procedures = host.procedures(&Target::Component(shifter.into())).unwrap();
+    assert_eq!(procedures[0].id, "map-h-shifter");
+    assert_eq!(procedures[0].label, "Map the shifter by hand");
+}
+
+#[test]
+fn an_hgp_plugged_into_a_base_shows_itself_when_a_gear_is_engaged() {
+    let env = env("base-hgp");
+    let base = r9(&env, "limit 450\n");
+    env.input(&base, &base_buttons(&[]));
+    let mut host = env.start();
+    until(&mut host, "base and its pedals", |h| {
+        h.components().len() == 2
+    });
+
+    // Third gear: the base's button 116.
+    env.input(&base, &base_buttons(&[0x2d3]));
+    until(&mut host, "the shifter", |h| h.components().len() == 3);
+    let shifter = "moza/usb-346e-0002/shifter";
+    assert_eq!(
+        host.find(shifter).unwrap().description.name,
+        "Shifter on the MOZA R9 Base"
+    );
+    assert_eq!(
+        gear(&mut host, shifter),
+        Some(Value::Gear(Gear::Forward(3)))
+    );
+    // Back in neutral, it stays.
+    env.input(&base, &base_buttons(&[]));
+    assert_eq!(gear(&mut host, shifter), Some(Value::Gear(Gear::Neutral)));
+    assert_eq!(host.components().len(), 3);
+
+    let device = Target::Device {
+        plugin: "moza".into(),
+        device: "usb-346e-0002".into(),
+    };
+    let procedures = host.procedures(&device).unwrap();
+    let map = procedures.iter().find(|p| p.id == "map-h-shifter").unwrap();
+    assert_eq!(map.label, "Map an H-pattern shifter connected to the base");
+    assert!(!map.setup);
+}
+
+#[test]
+fn a_sequential_shifter_plugged_into_a_base_once_mapped() {
+    let env = env("base-sgp");
+    let base = r9(&env, "limit 450\n");
+    env.input(&base, &base_buttons(&[]));
+    let mut host = env.start();
+    until(&mut host, "base and its pedals", |h| {
+        h.components().len() == 2
+    });
+
+    // Which buttons the base gives an SGP is not known: offered, never required.
+    let device = Target::Device {
+        plugin: "moza".into(),
+        device: "usb-346e-0002".into(),
+    };
+    let procedures = host.procedures(&device).unwrap();
+    let map = procedures
+        .iter()
+        .find(|p| p.id == "map-sequential-shifter")
+        .unwrap();
+    assert_eq!(map.label, "Map a sequential shifter connected to the base");
+    assert!(!map.setup);
+
+    map_shifter(
+        &mut host,
+        &env,
+        &base,
+        base_buttons,
+        &device,
+        "map-sequential-shifter",
+        &[(0x12d, "Shift down"), (0x12c, "Check the mapping")],
+    );
+    until(&mut host, "the shifter", |h| h.components().len() == 3);
+    let shifter = "moza/usb-346e-0002/shifter";
+    assert_eq!(
+        host.find(shifter).unwrap().description.name,
+        "Shifter on the MOZA R9 Base"
+    );
+    env.input(&base, &base_buttons(&[0x12c]));
     let inputs = host.read_inputs(shifter).unwrap();
     assert_eq!(
         inputs.get("sequential"),

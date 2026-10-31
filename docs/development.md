@@ -102,7 +102,7 @@ To experiment without touching your real configuration, set `XDG_CONFIG_HOME` an
 | `crates/simrig-gui` | The desktop app (`simrig`, Slint) |
 | `plugins/sim` | Simulated rig plugin with a fake driver, and end-to-end tests |
 | `plugins/generic-usb` | Generic USB plugin: any USB device as a shifter or a handbrake, with its driver service |
-| `crates/simrig-plugin-kit` | Shared by brand plugins: the HID device a kernel driver is bound to, sysfs, evdev inputs and force feedback, pedal mapping |
+| `crates/simrig-plugin-kit` | Shared by brand plugins: the HID device a kernel driver is bound to, sysfs, evdev inputs and force feedback, pedal and shifter mapping |
 | `plugins/fanatec` | Fanatec plugin: bases, rims and pedals; bundles [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) as a submodule, built with DKMS |
 | `plugins/moza` | Moza plugin: bases, pedals, handbrake, sequential shifter; settings over the serial port ([Boxflat](https://github.com/Lawstorant/boxflat)'s protocol); bundles [universal-pidff](https://github.com/JacKeTUs/universal-pidff) for kernels older than 6.15 |
 | `plugins/logitech` | Logitech plugin: G29 and G920 families, G PRO, RS50, WingMan; bundles [new-lg4ff](https://github.com/berarma/new-lg4ff) and the [TrueForce driver](https://github.com/mescon/logitech-trueforce-linux-driver), built with DKMS for the wheels that need them |

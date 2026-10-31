@@ -1,13 +1,16 @@
 //! One device handled by a kernel driver: the HID device the driver is bound to, its inputs,
-//! and the pedal mapping kept in the user's configuration.
+//! and the pedal and shifter mappings kept in the user's configuration.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
 use simrig_plugin_sdk::prelude::*;
 
 use crate::input::{self, FfControl, Inputs};
-use crate::pedals::{self, Layout, PedalMap};
+use crate::pedals::{Layout, PedalMap};
+use crate::shifter::ShifterMap;
 use crate::sysfs;
 use simrig_plugin_sdk::model::{Control, ControlKind};
 
@@ -37,6 +40,10 @@ pub struct HidDevice {
     pub pedal_map: PedalMap,
     /// Where the plugin knows the pedals to be (they need no mapping), if it does.
     pub layout: Option<PedalMap>,
+    /// A shifter's buttons as mapped by hand, if they were.
+    pub shifter_map: Option<ShifterMap>,
+    /// Where the plugin knows a shifter's buttons to be, if it does (and the shifter is there).
+    pub shifter_layout: Option<ShifterMap>,
     /// The steering axis of a wheel base (not a pedal); `None` for a pedal set.
     pub steering: Option<u16>,
     /// Force feedback controls set through the input interface, in percent, as last set: they
@@ -53,7 +60,9 @@ impl HidDevice {
         map_key: &str,
         steering: Option<u16>,
     ) -> Self {
-        let pedal_map = pedals::load_map(&config, map_key);
+        let mut saved = Mappings::load(&config);
+        let pedal_map = saved.models.remove(map_key).unwrap_or_default();
+        let shifter_map = saved.shifters.remove(map_key);
         let mut device = Self {
             id: id.into(),
             usb,
@@ -64,6 +73,8 @@ impl HidDevice {
             map_key: map_key.into(),
             pedal_map,
             layout: None,
+            shifter_map,
+            shifter_layout: None,
             steering,
             ff_levels: BTreeMap::new(),
         };
@@ -80,6 +91,20 @@ impl HidDevice {
         }
         self.layout = Some(map);
         self
+    }
+
+    /// A shifter's buttons are where `layout` says: no mapping needed, unless the user mapped
+    /// them by hand (that mapping wins).
+    pub fn with_shifter(mut self, layout: ShifterMap) -> Self {
+        self.shifter_layout = Some(layout);
+        self
+    }
+
+    /// A shifter's buttons: mapped by hand, else known, else not known.
+    pub fn shifter(&self) -> Option<ShifterMap> {
+        self.shifter_map
+            .clone()
+            .or_else(|| self.shifter_layout.clone())
     }
 
     /// Looks for the driver again (installed or bound later), and opens the inputs if they
@@ -306,9 +331,48 @@ impl HidDevice {
     }
 
     pub fn save_map(&mut self, map: PedalMap) -> std::io::Result<()> {
-        pedals::save_map(&self.config, &self.map_key, &map)?;
+        let mut saved = Mappings::load(&self.config);
+        saved.models.insert(self.map_key.clone(), map.clone());
+        saved.save(&self.config)?;
         self.pedal_map = map;
         Ok(())
+    }
+
+    pub fn save_shifter(&mut self, map: ShifterMap) -> std::io::Result<()> {
+        let mut saved = Mappings::load(&self.config);
+        saved.shifters.insert(self.map_key.clone(), map.clone());
+        saved.save(&self.config)?;
+        self.shifter_map = Some(map);
+        Ok(())
+    }
+}
+
+/// The mappings made by hand, by model, in the plugin's configuration file.
+#[derive(Default, Serialize, Deserialize)]
+struct Mappings {
+    /// Pedals.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    models: BTreeMap<String, PedalMap>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    shifters: BTreeMap<String, ShifterMap>,
+}
+
+impl Mappings {
+    fn load(path: &Path) -> Self {
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|t| toml::from_str(&t).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self, path: &Path) -> std::io::Result<()> {
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir)?;
+        }
+        fs::write(
+            path,
+            toml::to_string_pretty(self).map_err(std::io::Error::other)?,
+        )
     }
 }
 

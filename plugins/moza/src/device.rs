@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
-use simrig_plugin_kit::pedals::{MappedAxis, PedalMap};
+use simrig_plugin_kit::shifter::Gate;
 use simrig_plugin_sdk::prelude::*;
 
 use crate::models::{self, Kind};
@@ -38,11 +38,28 @@ pub mod axes {
     pub const BASE_CLUTCH: u16 = 0x06; // ABS_THROTTLE
 }
 
-/// Buttons of the SGP shifter, in the order games number them (Boxflat's 14 and 13). Reversing
-/// the shift direction in the shifter's own settings swaps them.
-pub mod buttons {
-    pub const GEAR_UP: usize = 13;
-    pub const GEAR_DOWN: usize = 12;
+/// Moza shifters and the buttons they are read on, as Boxflat numbers them: the first 16 are
+/// `BTN_JOYSTICK` onwards, the rest of a base's 128 from `KEY_NEXT_FAVORITE` (0x270), as
+/// hid-universal-pidff maps them (the kernel's limit of 80 would lose them).
+pub mod shifters {
+    use simrig_plugin_kit::shifter::Gate;
+
+    pub const SGP: Gate = Gate::Sequential;
+    /// Seven gears and reverse, below the seventh.
+    pub const HGP: Gate = Gate::HPattern {
+        gears: 7,
+        reverse_position: "right_down",
+    };
+    /// The SGP on its own USB: up on button 14, down on 13. Reversing the shift direction in
+    /// the shifter's own settings swaps them: mapping by hand puts that right.
+    pub const SGP_BUTTONS: [u16; 2] = [0x12d, 0x12c];
+    /// The HGP on its own USB: gears 1 to 7 on buttons 6 to 12, reverse on 5.
+    pub const HGP_BUTTONS: [u16; 8] = [0x125, 0x126, 0x127, 0x128, 0x129, 0x12a, 0x12b, 0x124];
+    /// The HGP plugged into a base: gears 1 to 7 on buttons 114 to 120, reverse on 113. Only
+    /// the HGP uses them, so one of them pressed says it is there.
+    pub const HGP_ON_BASE: [u16; 8] = [0x2d1, 0x2d2, 0x2d3, 0x2d4, 0x2d5, 0x2d6, 0x2d7, 0x2d0];
+    /// What can be plugged into a base. Which buttons a base gives the SGP is not known.
+    pub const ON_BASE: &[Gate] = &[SGP, HGP];
 }
 
 pub struct MozaDevice {
@@ -81,26 +98,22 @@ impl MozaDevice {
                 (PedalRole::Clutch, axes::BASE_CLUTCH, false),
             ]);
         }
-        // A pedal set on its own USB has fixed axes: no mapping needed.
-        if kind == Kind::Pedals && hid.pedal_map.pedals.is_empty() {
-            hid.pedal_map = PedalMap {
-                pedals: [
-                    (PedalRole::Throttle, axes::THROTTLE),
-                    (PedalRole::Brake, axes::BRAKE),
-                    (PedalRole::Clutch, axes::CLUTCH),
-                ]
-                .into_iter()
-                .map(|(role, code)| {
-                    (
-                        role.key().to_string(),
-                        MappedAxis {
-                            code,
-                            inverted: false,
-                        },
-                    )
-                })
-                .collect(),
-            };
+        // A pedal set on its own USB has fixed axes (Boxflat's table).
+        if kind == Kind::Pedals {
+            hid = hid.with_layout(&[
+                (PedalRole::Throttle, axes::THROTTLE, false),
+                (PedalRole::Brake, axes::BRAKE, false),
+                (PedalRole::Clutch, axes::CLUTCH, false),
+            ]);
+        }
+        match kind {
+            Kind::Sequential => {
+                hid = hid.with_shifter(shifters::SGP.layout(&shifters::SGP_BUTTONS));
+            }
+            Kind::HPattern => {
+                hid = hid.with_shifter(shifters::HGP.layout(&shifters::HGP_BUTTONS));
+            }
+            _ => {}
         }
         let mut device = Self {
             hid,
@@ -116,6 +129,32 @@ impl MozaDevice {
 
     pub fn name(&self) -> String {
         models::display_name(&self.product)
+    }
+
+    /// The kinds of shifter the device is or can have plugged in.
+    pub fn gates(&self) -> &'static [Gate] {
+        match self.kind {
+            Kind::Base => shifters::ON_BASE,
+            Kind::Sequential => &[shifters::SGP],
+            Kind::HPattern => &[shifters::HGP],
+            _ => &[],
+        }
+    }
+
+    /// An HGP plugged into a base shows itself as soon as a gear is engaged.
+    fn notice_shifter(&mut self) {
+        if self.kind != Kind::Base || self.hid.shifter_layout.is_some() {
+            return;
+        }
+        let engaged = self
+            .hid
+            .inputs
+            .buttons()
+            .into_iter()
+            .any(|(code, pressed)| pressed && shifters::HGP_ON_BASE.contains(&code));
+        if engaged {
+            self.hid.shifter_layout = Some(shifters::HGP.layout(&shifters::HGP_ON_BASE));
+        }
     }
 
     /// Looks for the HID driver and the serial port again; true when the HID binding changed.
@@ -134,7 +173,9 @@ impl MozaDevice {
                 },
             }
         }
-        self.hid.refresh()
+        let changed = self.hid.refresh();
+        self.notice_shifter();
+        changed
     }
 
     /// Why settings are unavailable, if they are.

@@ -27,6 +27,12 @@
    something touches the system: installing or removing a driver, and saving a setting when the
    driver persists it in a system file. Drivers must therefore grant the user access to their
    devices at install (e.g. udev `uaccess` rules bound to `bind`).
+8. **Recognised by itself, mapped by hand only as a fallback.** Where a plugin can know which
+   input is which (a table of the model, the device's own protocol), the component works as soon
+   as it is plugged in, with no procedure to go through. A mapping by hand is still offered on
+   it, never required, so that a device that responds wrong (another firmware, a setting changed
+   in the brand's software) can be put right by the user instead of leaving them stuck. Only
+   what the plugin cannot know is mapped while the device is added.
 
 ## 2. Two worlds: system and app
 
@@ -695,7 +701,11 @@ On the adapter side, `crates/simrig-plugin-kit` holds what plugins of kernel-dri
 pedals share: the HID device a driver is bound to and its sysfs attributes (or the USB interface
 a wheel's own USB driver is bound to, like the WingMan Formula Force's `iforce`), the event node
 (axes, buttons, force feedback test), settings that are sysfs attributes (numbers, switches,
-choices), and pedals: a standard pedals component over evdev axes.
+choices), pedals: a standard pedals component over evdev axes, and shifters whose positions are
+buttons (a sequential lever, an H-pattern gate): a standard shifter. Both are recognised from a
+layout the plugin gives, or mapped by hand (the "Map the pedals" and "Map the shifter"
+procedures), the mapping kept in the plugin's configuration file; a layout never takes the
+mapping by hand away (principle 8).
 
 **Force feedback strength and centering without an attribute.** Most force feedback drivers take
 two device-wide controls through the kernel's input interface, as games set them: `FF_GAIN` and
@@ -1016,19 +1026,27 @@ or one installed by other means, is used as it is.
 
 **The adapter** claims every device of the vendor (Moza does not publish its product ids) and
 tells them apart by USB product name, like Boxflat: bases, SR-P/CRP pedal sets, the HBP
-handbrake, the SGP sequential shifter (its lever two buttons, the 14th and 13th, as Boxflat
-reads them). H-pattern shifters, hubs and the like are attached without components for now
-(they can be given to the generic USB plugin). Settings are read and written over the serial port: rotation
+handbrake, the SGP sequential and HGP H-pattern shifters. Their positions are buttons, read as
+Boxflat numbers them: the SGP's lever on its 14th and 13th, the HGP's seven gears on its 6th to
+12th and reverse on its 5th. Plugged into a base instead, a shifter becomes buttons of the base:
+the HGP its 113th to 120th, which only it uses, so it shows up as soon as a gear is engaged (the
+base's buttons past the 80th exist only with hid-universal-pidff, which maps them from
+`KEY_NEXT_FAVORITE`); which buttons a base gives the SGP is not known, so the base offers to map
+it ("Map a sequential shifter connected to the base") and shows it once mapped. Every shifter
+can be mapped by hand too, never required (a direction reversed in the shifter's own settings,
+another firmware). The HGP's reverse is drawn right and down, not checked on the device. Hubs
+and the like are attached without components for now (they can be given to the generic USB
+plugin). Settings are read and written over the serial port: rotation
 (stored as half the angle, with the games' maximum kept equal), force feedback strength, natural
 damper and friction, the games' spring and damper gains as standard parameters; torque, maximum
 speed, natural inertia, centering spring, road sensitivity, the games' friction and inertia
 gains and the protection settings as custom ones. The base keeps them in its memory. Values are
 cached (the base answers in milliseconds, not microseconds); a port that fails is reopened.
 Force feedback (test, stop) needs `hid-universal-pidff` bound to the base; without it the base
-still has inputs and settings, and says why forces are missing. The SR-P's axes are known (no
-mapping); pedals plugged into a base are mapped by pressing them. Tested end to end on a fake R9
-whose fake serial port decodes requests and answers like the real one, and a fake SGP. Confirmed
-on real hardware: CRP2 pedals (live inputs).
+still has inputs and settings, and says why forces are missing. The SR-P's and CRP's axes are known,
+and so are those of pedals plugged into a base (Boxflat's table): no mapping, unless by hand. Tested end to end on a fake R9
+whose fake serial port decodes requests and answers like the real one, a fake SGP and HGP, an
+HGP engaged on a base and an SGP mapped on one. Confirmed on real hardware: CRP2 pedals (live inputs).
 
 ### 11.2 Logitech
 
@@ -1184,6 +1202,7 @@ Tested end to end on a fake EVO Pro and fake Alphas with either firmware.
 | D17 | The core ships generic layered drawings per component type; plugins give appearance hints (rim shape) or their own pictures | every device looks right without a single brand asset; brand-agnostic by construction |
 | D18 | The generic USB plugin's driver is a userspace service started by udev with each set-up device (hidraw in, or the USB interrupt endpoint for devices the kernel's HID driver rejects; uinput out), not HID-BPF or a kernel module | works on any kernel with free-form mappings; nothing runs while no set-up device is connected; HID-BPF stays an option for later |
 | D19 | Parameters that work only in part carry a caveat, reported by plugins like an unsupported reason and shown with a yellow sign and a tooltip | the user can use them, knowing their limits (e.g. values the device cannot report back) |
+| D20 | Inputs a plugin can know are recognised by itself; a mapping by hand is always offered as a fallback, and required only for what the plugin cannot know | nothing to do when everything is right, and never stuck when something is not |
 
 ## 13. Risks
 

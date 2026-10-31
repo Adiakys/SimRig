@@ -11,7 +11,9 @@ pub enum Kind {
     Handbrake,
     /// The SGP sequential shifter on its own USB.
     Sequential,
-    /// H-pattern shifters, hubs, stalks, dashboards: not supported yet.
+    /// The HGP H-pattern shifter on its own USB.
+    HPattern,
+    /// Hubs, stalks, dashboards: not supported yet.
     Other,
 }
 
@@ -32,6 +34,8 @@ pub fn kind(product: &str) -> Kind {
         Kind::Handbrake
     } else if p.contains("sgp shifter") {
         Kind::Sequential
+    } else if p.contains("hgp shifter") {
+        Kind::HPattern
     } else {
         Kind::Other
     }
@@ -70,7 +74,8 @@ mod tests {
         assert_eq!(kind("Gudsen MOZA CRP2 pedals"), Kind::Pedals);
         assert_eq!(kind("HBP Handbrake"), Kind::Handbrake);
         assert_eq!(kind("Gudsen SGP Shifter"), Kind::Sequential);
-        assert_eq!(kind("HGP Shifter"), Kind::Other);
+        assert_eq!(kind("HGP Shifter"), Kind::HPattern);
+        assert_eq!(kind("Gudsen Universal Hub"), Kind::Other);
         assert_eq!(display_name("Gudsen MOZA R9 Base"), "MOZA R9 Base");
         assert_eq!(display_name("HBP Handbrake"), "MOZA HBP Handbrake");
         assert_eq!(model_id("Gudsen MOZA R9 Base"), "moza/r9-base");

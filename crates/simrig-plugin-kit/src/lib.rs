@@ -5,12 +5,15 @@
 //! - [`sysfs`]: the HID device a driver is bound to, and its attributes;
 //! - [`settings`]: settings that are sysfs attributes, as parameters;
 //! - [`pedals`]: which axis is which pedal, learned by a guided procedure, and pedals as a
-//!   standard component.
+//!   standard component;
+//! - [`shifter`]: which button is which position of a sequential or H-pattern shifter, known
+//!   or learned by a guided procedure, and the shifter as a standard component.
 
 pub mod device;
 pub mod input;
 pub mod pedals;
 pub mod settings;
+pub mod shifter;
 pub mod sysfs;
 
 use simrig_plugin_sdk::prelude::PedalRole;

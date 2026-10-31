@@ -1,4 +1,4 @@
-//! The Moza plugin: Moza wheel bases, pedals, handbrakes and sequential shifters. Force feedback and inputs go
+//! The Moza plugin: Moza wheel bases, pedals, handbrakes and shifters. Force feedback and inputs go
 //! through the kernel (hid-universal-pidff, in Linux from 6.15; the driver builds it for older
 //! kernels); settings through the devices' serial port, with the protocol Boxflat
 //! (<https://github.com/Lawstorant/boxflat>) worked out.

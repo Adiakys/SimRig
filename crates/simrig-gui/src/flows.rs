@@ -40,6 +40,8 @@ pub struct Flows {
     error: String,
     /// What the plugin said when the setup finished.
     pub done_message: String,
+    /// The device went through a setup procedure: it is set up, Done offers nothing more.
+    set_up: bool,
     /// Drivers installed in this session: the result can arrive before the rig is sent again.
     installed: BTreeSet<String>,
     /// The first run: 0 welcome, 1 devices, 2 your rig.
@@ -221,6 +223,7 @@ impl App {
                 key: format!("{}/{}", adding.plugin, adding.device).into(),
                 name: adding.name.clone().into(),
                 plugin: adding.plugin.clone().into(),
+                device: adding.device.clone().into(),
                 plugin_name: plugin
                     .as_ref()
                     .map(|p| p.name.clone())
@@ -253,6 +256,27 @@ impl App {
                 .map(|a| self.device(&a))
                 .collect();
             rig.set_add_done(ModelRc::new(VecModel::from(done)));
+            // Nothing to set up: what the plugin offers on the device, the same procedures as
+            // in Settings (e.g. a shifter plugged into a base), for the user to run or not.
+            let optional: Vec<ui::DeviceProcedure> = if self.flows.set_up {
+                Vec::new()
+            } else {
+                self.snapshot
+                    .usb
+                    .iter()
+                    .filter(|u| {
+                        u.plugin.as_deref() == Some(adding.plugin.as_str())
+                            && u.device == adding.device
+                    })
+                    .flat_map(|u| &u.procedures)
+                    .filter(|p| p.availability.is_supported() && !p.setup)
+                    .map(|p| ui::DeviceProcedure {
+                        id: p.id.clone().into(),
+                        label: p.label.clone().into(),
+                    })
+                    .collect()
+            };
+            rig.set_add_procedures(ModelRc::new(VecModel::from(optional)));
         }
 
         self.refresh_plugins();
@@ -378,6 +402,7 @@ impl App {
             // Its setup, if it has one: devices without components yet always do; others may
             // (pedals the plugin does not recognise, to map).
             self.flows.step = SETUP;
+            self.flows.set_up = false;
             self.flows.busy = true;
             self.send(Command::ListProcedures(Target::Device {
                 plugin: adding.plugin.clone(),
@@ -427,6 +452,7 @@ impl App {
                 .or(available.first())
         }
         .map(|p| p.id.clone());
+        self.flows.set_up = setup.is_some();
         match setup {
             Some(id) => {
                 // The procedure screen shows the steps of the flow.
@@ -439,11 +465,14 @@ impl App {
         }
     }
 
-    /// The setup procedure ended: finished goes to Done, cancelled back to Connect.
+    /// The setup procedure ended: finished goes to Done, cancelled back to Connect. One the
+    /// user chose on Done goes back to Done either way: it was not needed.
     pub fn flow_procedure_done(&mut self, finished: bool) {
-        self.flows.step = if finished { DONE } else { CONNECT };
-        if !finished {
+        if !finished && self.flows.step != DONE {
+            self.flows.step = CONNECT;
             self.flows.adding = None;
+        } else {
+            self.flows.step = DONE;
         }
         self.window().set_screen(Screen::Add);
         self.refresh_flows();

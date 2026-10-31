@@ -86,6 +86,9 @@ Later: button boxes, dashboards/displays, seat movers and bass shakers.
   components or devices. The core provides only a generic engine (steps with fields, live values,
   tables, notices and actions; steps that advance by themselves); the app renders them without
   knowing them. New procedures never require changes to the core.
+- **FR-09b** Inputs a plugin can know (a table of the model, the device's protocol) are recognised
+  without any procedure. A mapping by hand is still offered on them as a fallback, so a device that
+  responds wrong can be put right by the user; it is required only for what the plugin cannot know.
 
 ### Inputs (read)
 - **FR-10** Show the live state of every component (angle, pedals, gear, buttons…).

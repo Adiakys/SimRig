@@ -82,7 +82,7 @@ flowchart LR
 | Connect | `add-1-connect` | Listening state; devices appear as they are plugged in. Unknown devices offer **Choose a plugin** (a brand plugin, which takes the device or says why not) and **Set up as generic** (the generic USB plugin), never automatically. |
 | Driver | `add-2-driver` | What will be installed and the three promises (works with the app closed, starts only with the device, removable). The password line sits right above **Install the driver**. Skipped when the driver is already there or provided by the system. |
 | Set up | `add-3-setup` | A procedure defined by the plugin, rendered generically: here mapping the gears of a 6+R shifter, advancing by itself as each gear is detected. The drawing follows the configuration (6+R or 7+R). |
-| Done | `add-4-done` | The device moving live, the state saved in the driver, **Back to the rig** (primary) and **Open settings**. |
+| Done | `add-4-done` | The device moving live, the state saved in the driver, **Back to the rig** (primary) and **Open settings**. A device that needed no setup also lists, as optional buttons, the procedures its plugin offers on it, the same as in Settings (e.g. mapping a shifter plugged into a base): run or not, cancelling one comes back here. |
 
 States: no device appears after a while (help: cable, port, permissions, "it is a hub"), the
 procedure fails or is cancelled (back to the previous step, nothing saved), the driver needs a

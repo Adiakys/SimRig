@@ -3,9 +3,10 @@
 
 use simrig_plugin_kit::input::FfControl;
 use simrig_plugin_kit::pedals::{self, PedalNotes, PedalSet};
+use simrig_plugin_kit::shifter::{self, ButtonShifter};
 use simrig_plugin_sdk::prelude::*;
 
-use crate::device::{MozaDevice, Shared, axes, buttons};
+use crate::device::{MozaDevice, Shared, axes};
 use crate::models;
 use crate::settings::{self, Place, Setting};
 
@@ -134,11 +135,26 @@ impl Component for Base {
     }
 
     fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
-        vec![pedals::descriptor(&self.device)]
+        procedures(&self.device)
     }
 
     fn start_procedure(&mut self, id: &str) -> Result<Box<dyn Procedure>> {
-        pedals::start(&self.device, id)
+        start(&self.device, id)
+    }
+}
+
+/// What a base offers: mapping the pedals or a shifter plugged into it.
+pub fn procedures(device: &Shared) -> Vec<ProcedureDescriptor> {
+    let mut list = vec![pedals::descriptor(device)];
+    list.extend(shifter::descriptors(device, device.borrow().gates()));
+    list
+}
+
+pub fn start(device: &Shared, id: &str) -> Result<Box<dyn Procedure>> {
+    if id == pedals::MAP_PEDALS {
+        pedals::start(device, id)
+    } else {
+        shifter::start(device, id, device.borrow().gates())
     }
 }
 
@@ -263,59 +279,20 @@ impl simrig_plugin_sdk::Handbrake for Handbrake {
     }
 }
 
-/// The SGP: a sequential shifter only, its lever two buttons.
-pub struct Sequential {
-    pub device: Shared,
-}
-
-impl Component for Sequential {
-    fn id(&self) -> String {
-        format!("{}/shifter", self.device.borrow().hid.id)
-    }
-
-    fn name(&self) -> String {
-        self.device.borrow().name()
-    }
-
-    fn model(&self) -> Option<String> {
-        Some(models::model_id(&self.device.borrow().product))
-    }
-}
-
-impl Shifter for Sequential {
-    fn gear(&mut self) -> Support<Gear> {
-        Support::not_in_hardware("A sequential shifter has no gear positions.")
-    }
-
-    fn position_xy(&mut self) -> Support<[f64; 2]> {
-        Support::not_in_hardware("The lever is two buttons, not a position.")
-    }
-
-    fn sequential(&mut self) -> Support<[bool; 2]> {
-        let d = self.device.borrow();
-        if let Some(u) = d.hid.unbound() {
-            return Support::Unsupported(u);
-        }
-        let pressed: Vec<bool> = d.hid.inputs.buttons().into_iter().map(|(_, p)| p).collect();
-        match (
-            pressed.get(buttons::GEAR_UP),
-            pressed.get(buttons::GEAR_DOWN),
-        ) {
-            (Some(up), Some(down)) => Support::Supported([*up, *down]),
-            _ => Support::Unsupported(
-                Unsupported::new(Reason::Unavailable)
-                    .with_detail(d.hid.inputs.error().unwrap_or("No shift buttons.")),
-            ),
-        }
-    }
-
-    fn param(&mut self, param: ShifterParam) -> Support<ParamSpec> {
-        match param {
-            ShifterParam::Mode => Support::Supported(
-                ParamSpec::choice("sequential", &[("sequential", "Sequential")]).persistent(),
-            ),
-            _ => Support::not_in_hardware("A sequential shifter has no gear positions."),
-        }
+/// A Moza shifter: the SGP or HGP on its own USB, or one plugged into a base (the HGP once a
+/// gear is engaged, any once mapped by hand).
+pub fn shifter(device: &Shared) -> ButtonShifter<MozaDevice> {
+    let d = device.borrow();
+    let on_base = d.kind == models::Kind::Base;
+    ButtonShifter {
+        device: device.clone(),
+        name: if on_base {
+            format!("Shifter on the {}", d.name())
+        } else {
+            d.name()
+        },
+        model: (!on_base).then(|| models::model_id(&d.product)),
+        gates: d.gates(),
     }
 }
 

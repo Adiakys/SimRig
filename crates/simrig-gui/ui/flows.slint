@@ -339,6 +339,26 @@ export component AddScreen inherits Rectangle {
                     text: @tr("The device has no settings to show yet: it may need a restart of the computer.");
                 }
             }
+            // What else the plugin offers on the device, not required (e.g. a shifter plugged
+            // into a base): the same as in its settings.
+            if Rig.add-procedures.length > 0: VerticalLayout {
+                alignment: start;
+                vertical-stretch: 0;
+                padding-left: 28px;
+                padding-right: 28px;
+                padding-bottom: 20px;
+                spacing: 8px;
+                Small { text: @tr("Optional, also available later in Settings:"); }
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: 8px;
+                    for p in Rig.add-procedures: Button {
+                        small: true;
+                        text: p.label;
+                        clicked => { Api.start-device-procedure(Rig.adding.plugin, Rig.adding.device, p.id); }
+                    }
+                }
+            }
             FlowFooter {
                 Button {
                     kind: ButtonKind.quiet;

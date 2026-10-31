@@ -188,6 +188,8 @@ export struct FoundDevice {
     /// ready, driver, generic, unknown
     state: string,
     plugin: string,
+    /// The id its plugin knows it by, once attached.
+    device: string,
     plugin-name: string,
     is-new: bool,
     /// The device drawn live, when it has components.
@@ -335,6 +337,8 @@ export global Rig {
     in property <[Device]> add-done;
     /// What the plugin said when the setup finished.
     in property <string> add-done-message;
+    /// What else the plugin offers on the device just added, when it needed no setup.
+    in property <[DeviceProcedure]> add-procedures;
     in property <bool> show-all;
     in property <bool> add-privileged;
 
