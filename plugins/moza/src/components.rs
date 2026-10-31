@@ -4,6 +4,7 @@
 use simrig_plugin_kit::input::FfControl;
 use simrig_plugin_kit::pedals::{self, PedalNotes, PedalSet};
 use simrig_plugin_kit::shifter::{self, ButtonShifter};
+use simrig_plugin_sdk::model::{Appearance, Control, RimShape};
 use simrig_plugin_sdk::prelude::*;
 
 use crate::device::{MozaDevice, Shared, axes};
@@ -11,31 +12,39 @@ use crate::models;
 use crate::settings::{self, Place, Setting};
 
 fn spec(device: &Shared, setting: &Setting) -> Support<ParamSpec> {
-    let mut d = device.borrow_mut();
-    if let Some(u) = d.no_settings() {
-        return Support::Unsupported(u);
+    match device.borrow_mut().value(setting.command) {
+        Ok(raw) => Support::Supported(shown(setting, raw)),
+        Err(u) => Support::Unsupported(u),
     }
-    let Some(raw) = d.get(setting.command) else {
-        return Support::Unsupported(
-            Unsupported::new(Reason::Unavailable)
-                .with_detail("The base does not answer for this setting."),
-        );
-    };
-    // The base keeps its settings in its own memory.
-    Support::Supported(
-        if setting.switch {
-            ParamSpec::bool(raw != 0)
-        } else {
-            let value = (raw as f64 / setting.scale).clamp(setting.min, setting.max);
-            ParamSpec::float(value, setting.min, setting.max, setting.step)
-        }
-        .persistent(),
-    )
+}
+
+/// A setting as shown for the device's value. The base and the rim keep their settings in their
+/// own memory.
+fn shown(setting: &Setting, raw: u64) -> ParamSpec {
+    if setting.switch {
+        ParamSpec::bool(raw != 0)
+    } else if !setting.choices.is_empty() {
+        // The option nearest to the value.
+        let index = (0..setting.choices.len())
+            .min_by_key(|i| setting.choices[*i].0.abs_diff(raw))
+            .unwrap_or(0);
+        ParamSpec::choice(&index.to_string(), &setting.options())
+    } else {
+        let value = (raw as f64 / setting.scale).clamp(setting.min, setting.max);
+        ParamSpec::float(value, setting.min, setting.max, setting.step)
+    }
+    .persistent()
 }
 
 fn write(device: &Shared, setting: &Setting, value: &Value) -> Result<()> {
     let raw = match value {
         Value::Bool(on) => u64::from(*on),
+        Value::Choice(id) => id
+            .parse::<usize>()
+            .ok()
+            .and_then(|i| setting.choices.get(i))
+            .map(|(raw, _)| *raw)
+            .ok_or_else(|| Error::InvalidValue(format!("no choice '{id}'")))?,
         v => {
             let v = v
                 .as_f64()
@@ -50,6 +59,52 @@ fn write(device: &Shared, setting: &Setting, value: &Value) -> Result<()> {
         d.set("max-angle", raw)?;
     }
     Ok(())
+}
+
+/// The `Place::Custom` settings of a list, as custom parameters.
+fn custom_params(device: &Shared, list: &[Setting]) -> Vec<CustomParam> {
+    let mut params = Vec::new();
+    for (order, setting) in list.iter().enumerate() {
+        let Place::Custom { group, advanced } = setting.place else {
+            continue;
+        };
+        let support = spec(device, setting);
+        let now = match &support {
+            Support::Supported(s) => s.clone(),
+            Support::Unsupported(_) => shown(setting, setting.rest()),
+        };
+        let mut p = CustomParam::new(
+            &settings::custom_id(setting),
+            setting.label,
+            now.ty,
+            now.value,
+        )
+        .group(group)
+        .order(order as i32)
+        .persistent();
+        if !setting.unit.is_empty() {
+            p = p.unit(setting.unit);
+        }
+        if !setting.help.is_empty() {
+            p = p.help(setting.help);
+        }
+        if advanced {
+            p = p.advanced();
+        }
+        if let Support::Unsupported(u) = support {
+            p = p.availability(Support::Unsupported(u));
+        }
+        params.push(p);
+    }
+    params
+}
+
+fn set_custom(device: &Shared, list: &[Setting], id: &str, value: &Value) -> Result<()> {
+    let setting = list
+        .iter()
+        .find(|s| settings::custom_id(s) == id)
+        .ok_or_else(|| Error::NotFound(format!("no setting '{id}'")))?;
+    write(device, setting, value)
 }
 
 pub struct Base {
@@ -82,51 +137,11 @@ impl Component for Base {
     }
 
     fn custom_params(&mut self) -> Vec<CustomParam> {
-        let mut params = Vec::new();
-        for (order, setting) in settings::SETTINGS.iter().enumerate() {
-            let Place::Custom { group, advanced } = setting.place else {
-                continue;
-            };
-            let support = spec(&self.device, setting);
-            let (ty, value) = match &support {
-                Support::Supported(s) => (s.ty.clone(), s.value.clone()),
-                Support::Unsupported(_) if setting.switch => (ParamType::Bool, Value::Bool(false)),
-                Support::Unsupported(_) => (
-                    ParamType::Float {
-                        min: setting.min,
-                        max: setting.max,
-                        step: setting.step,
-                    },
-                    Value::Float(setting.min),
-                ),
-            };
-            let mut p = CustomParam::new(&settings::custom_id(setting), setting.label, ty, value)
-                .group(group)
-                .order(order as i32)
-                .persistent();
-            if !setting.unit.is_empty() {
-                p = p.unit(setting.unit);
-            }
-            if !setting.help.is_empty() {
-                p = p.help(setting.help);
-            }
-            if advanced {
-                p = p.advanced();
-            }
-            if let Support::Unsupported(u) = support {
-                p = p.availability(Support::Unsupported(u));
-            }
-            params.push(p);
-        }
-        params
+        custom_params(&self.device, settings::SETTINGS)
     }
 
     fn set_custom(&mut self, id: &str, value: &Value) -> Result<()> {
-        let setting = settings::SETTINGS
-            .iter()
-            .find(|s| settings::custom_id(s) == id)
-            .ok_or_else(|| Error::NotFound(format!("no setting '{id}'")))?;
-        write(&self.device, setting, value)
+        set_custom(&self.device, settings::SETTINGS, id, value)
     }
 
     fn save(&mut self, _item: &str, _value: &Value, _host: &mut HostLink<'_>) -> Result<()> {
@@ -235,6 +250,88 @@ impl WheelBase for Base {
         d.hid
             .run_force_action(action)
             .unwrap_or_else(|| Err(Error::unsupported()))
+    }
+}
+
+/// The rim mounted on a base: its controls come through the base, its settings over the base's
+/// serial port.
+pub struct Wheel {
+    pub device: Shared,
+}
+
+/// The rim's analog paddles, on the base's axes (Boxflat's table).
+const PADDLES: [(u16, &str); 2] = [
+    (axes::LEFT_PADDLE, "Left paddle"),
+    (axes::RIGHT_PADDLE, "Right paddle"),
+];
+
+impl Component for Wheel {
+    fn id(&self) -> String {
+        format!("{}/wheel", self.device.borrow().hid.id)
+    }
+
+    fn name(&self) -> String {
+        format!("Steering wheel on the {}", self.device.borrow().name())
+    }
+
+    fn controls(&mut self) -> Vec<Control> {
+        self.device.borrow().hid.controls(&PADDLES, &[])
+    }
+
+    fn appearance(&self) -> Appearance {
+        Appearance::rim(RimShape::Round)
+    }
+
+    fn custom_params(&mut self) -> Vec<CustomParam> {
+        custom_params(&self.device, settings::RIM)
+    }
+
+    fn set_custom(&mut self, id: &str, value: &Value) -> Result<()> {
+        set_custom(&self.device, settings::RIM, id, value)
+    }
+
+    fn save(&mut self, _item: &str, _value: &Value, _host: &mut HostLink<'_>) -> Result<()> {
+        // Already kept: the rim stores what it is sent.
+        Ok(())
+    }
+}
+
+impl SteeringWheel for Wheel {
+    fn buttons(&mut self) -> Support<Vec<bool>> {
+        let d = self.device.borrow();
+        if let Some(u) = d.hid.unbound() {
+            return Support::Unsupported(u);
+        }
+        d.hid.buttons()
+    }
+
+    fn hats(&mut self) -> Support<Vec<i64>> {
+        self.device.borrow().hid.hats()
+    }
+
+    fn analog_paddles(&mut self) -> Support<Vec<f64>> {
+        let codes = PADDLES.map(|(code, _)| code);
+        self.device.borrow().hid.analog_paddles(&codes)
+    }
+
+    fn rim_id(&mut self) -> Support<String> {
+        Support::Unsupported(
+            Unsupported::not_in_driver().with_detail("The base does not say which rim is mounted."),
+        )
+    }
+
+    fn param(&mut self, param: SteeringWheelParam) -> Support<ParamSpec> {
+        match settings::rim(param) {
+            Some(setting) => spec(&self.device, setting),
+            None => Support::Unsupported(
+                Unsupported::not_in_driver().with_detail("No serial command for it is known."),
+            ),
+        }
+    }
+
+    fn set_param(&mut self, param: SteeringWheelParam, value: &Value) -> Result<()> {
+        let setting = settings::rim(param).ok_or_else(Error::unsupported)?;
+        write(&self.device, setting, value)
     }
 }
 

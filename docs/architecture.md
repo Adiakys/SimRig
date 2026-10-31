@@ -1044,11 +1044,20 @@ damper and friction, the games' spring and damper gains as standard parameters; 
 speed, natural inertia, centering spring, road sensitivity, the games' friction and inertia
 gains and the protection settings as custom ones. The base keeps them in its memory. Values are
 cached (the base answers in milliseconds, not microseconds); a port that fails is reopened.
+**The rim** mounted on a base has no USB of its own: a base always gives a steering wheel
+component, whose buttons, hat switches and analog paddles (the base's `ABS_RY` and `ABS_RX`,
+Boxflat's table) come through the base's inputs. Its settings go over the base's serial port to
+the rim's device id: 23 on most rims, 21 on older ones, found by asking both, like Boxflat.
+Analog paddle mode and LED brightness are standard parameters; the combined axis split, the
+rotary encoders' and the left stick's modes custom ones. The rim keeps them in its memory. Its
+answers, missing ones too, are kept only until it is checked again, a few seconds later at the
+id found last: rims are taken off and swapped. Which rim is mounted is not known: the base does
+not say.
 Force feedback (test, stop) needs `hid-universal-pidff` bound to the base; without it the base
 still has inputs and settings, and says why forces are missing. The SR-P's and CRP's axes are known,
 and so are those of pedals plugged into a base (Boxflat's table): no mapping, unless by hand. Tested end to end on a fake R9
 whose fake serial port decodes requests and answers like the real one, a fake SGP and HGP, an
-HGP and an SGP moved on a base, and an SGP mapped on one. Confirmed on real hardware: CRP2 pedals
+HGP and an SGP moved on a base, and an SGP mapped on one, and a fake rim answering on the base's port. Confirmed on real hardware: CRP2 pedals
 (live inputs), the SGP on its own USB and on a base (live inputs, its buttons).
 
 ### 11.2 Logitech

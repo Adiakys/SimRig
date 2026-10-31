@@ -120,13 +120,8 @@ impl Setting {
         )
     }
 
-    /// The options of a choice: ids `0`, `1`… and their labels.
     fn options(&self) -> Vec<(&'static str, &'static str)> {
-        const IDS: [&str; 10] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
-        IDS.iter()
-            .copied()
-            .zip(self.choices.iter().copied())
-            .collect()
+        choice_options(self.choices.iter().copied())
     }
 
     /// The attribute's value for a parameter value.
@@ -207,6 +202,14 @@ impl Setting {
         }
         Some(p)
     }
+}
+
+/// The options of a choice: ids `0`, `1`… and their labels.
+pub fn choice_options(
+    labels: impl IntoIterator<Item = &'static str>,
+) -> Vec<(&'static str, &'static str)> {
+    const IDS: [&str; 10] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+    IDS.iter().copied().zip(labels).collect()
 }
 
 #[cfg(test)]

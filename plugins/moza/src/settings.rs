@@ -1,11 +1,13 @@
-//! The base settings SimRig shows, over the serial commands (`protocol::COMMANDS`), with the
-//! ranges and scales of Boxflat's base panel.
+//! The settings of the base and of its rim SimRig shows, over the serial commands
+//! (`protocol::COMMANDS`), with the ranges and scales of Boxflat's base and wheel panels.
 
-use simrig_plugin_sdk::prelude::WheelBaseParam;
+use simrig_plugin_kit::settings::choice_options;
+use simrig_plugin_sdk::prelude::{SteeringWheelParam, WheelBaseParam};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Place {
     Standard(WheelBaseParam),
+    Rim(SteeringWheelParam),
     Custom { group: &'static str, advanced: bool },
 }
 
@@ -22,8 +24,25 @@ pub struct Setting {
     pub scale: f64,
     /// An on/off switch (0 or 1 on the device).
     pub switch: bool,
+    /// A choice: the device's value of each option, and its label.
+    pub choices: &'static [(u64, &'static str)],
     pub place: Place,
     pub help: &'static str,
+}
+
+impl Setting {
+    pub fn options(&self) -> Vec<(&'static str, &'static str)> {
+        choice_options(self.choices.iter().map(|(_, label)| *label))
+    }
+
+    /// The device's value shown while the setting is unavailable: the first option, else the
+    /// lowest value.
+    pub fn rest(&self) -> u64 {
+        match self.choices.first() {
+            Some((value, _)) => *value,
+            None => (self.min * self.scale) as u64,
+        }
+    }
 }
 
 const fn percent(command: &'static str, label: &'static str, place: Place) -> Setting {
@@ -36,8 +55,22 @@ const fn percent(command: &'static str, label: &'static str, place: Place) -> Se
         step: 1.0,
         scale: 1.0,
         switch: false,
+        choices: &[],
         place,
         help: "",
+    }
+}
+
+const fn choice(
+    command: &'static str,
+    label: &'static str,
+    choices: &'static [(u64, &'static str)],
+    place: Place,
+) -> Setting {
+    Setting {
+        unit: "",
+        choices,
+        ..percent(command, label, place)
     }
 }
 
@@ -66,6 +99,7 @@ pub const SETTINGS: &[Setting] = &[
         // The base stores half the rotation.
         scale: 0.5,
         switch: false,
+        choices: &[],
         place: Place::Standard(WheelBaseParam::Rotation),
         help: "",
     },
@@ -181,10 +215,52 @@ pub const SETTINGS: &[Setting] = &[
     },
 ];
 
+/// The settings of the rim mounted on the base, as Boxflat's wheel panel has them.
+pub const RIM: &[Setting] = &[
+    choice(
+        "wheel-paddles-mode",
+        "Analog paddle mode",
+        &[(1, "Buttons"), (2, "Combined axis"), (3, "Separate axes")],
+        Place::Rim(SteeringWheelParam::AnalogPaddleMode),
+    ),
+    percent(
+        "wheel-rpm-brightness",
+        "LED brightness",
+        Place::Rim(SteeringWheelParam::LedBrightness),
+    ),
+    Setting {
+        min: 5.0,
+        max: 95.0,
+        help: "With the paddles on a combined axis: the share of it the left paddle covers.",
+        ..percent(
+            "wheel-clutch-point",
+            "Combined axis split",
+            custom("Paddles"),
+        )
+    },
+    choice(
+        "wheel-knob-mode",
+        "Rotary encoders",
+        &[(0, "Buttons"), (1, "Knob")],
+        custom("Controls"),
+    ),
+    choice(
+        "wheel-stick-mode",
+        "Left stick",
+        &[(0, "Buttons"), (256, "Directional pad")],
+        custom("Controls"),
+    ),
+];
+
 pub fn standard(param: WheelBaseParam) -> Option<&'static Setting> {
     SETTINGS
         .iter()
         .find(|s| matches!(s.place, Place::Standard(p) if p == param))
+}
+
+pub fn rim(param: SteeringWheelParam) -> Option<&'static Setting> {
+    RIM.iter()
+        .find(|s| matches!(s.place, Place::Rim(p) if p == param))
 }
 
 pub fn custom_id(setting: &Setting) -> String {
@@ -197,7 +273,7 @@ mod tests {
 
     #[test]
     fn every_setting_is_a_command() {
-        for s in SETTINGS {
+        for s in SETTINGS.iter().chain(RIM) {
             let c = crate::protocol::command(s.command).expect(s.command);
             assert!(c.read.is_some() && c.write.is_some(), "{}", s.command);
         }

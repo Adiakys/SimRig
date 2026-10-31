@@ -1,5 +1,5 @@
-//! The adapter: Moza devices as components. A base gives a wheel base, the pedals plugged into
-//! it and a shifter plugged into it (an HGP once a gear is engaged, any once mapped by hand);
+//! The adapter: Moza devices as components. A base gives a wheel base, the rim mounted on it,
+//! the pedals plugged into it and a shifter plugged into it (an HGP once a gear is engaged, any once mapped by hand);
 //! pedal sets, handbrakes and shifters on their own USB give theirs.
 
 use std::cell::RefCell;
@@ -11,7 +11,7 @@ use simrig_plugin_kit::shifter::ShifterMap;
 use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
-use crate::components::{self, Base, Handbrake};
+use crate::components::{self, Base, Handbrake, Wheel};
 use crate::device::{MozaDevice, Shared};
 use crate::models::{self, Kind};
 
@@ -61,9 +61,14 @@ impl MozaAdapter {
         let shifter = || AnyComponent::Shifter(Box::new(components::shifter(device)));
         match d.kind {
             Kind::Base => {
-                let mut list = vec![AnyComponent::WheelBase(Box::new(Base {
-                    device: device.clone(),
-                }))];
+                let mut list = vec![
+                    AnyComponent::WheelBase(Box::new(Base {
+                        device: device.clone(),
+                    })),
+                    AnyComponent::SteeringWheel(Box::new(Wheel {
+                        device: device.clone(),
+                    })),
+                ];
                 if mapped {
                     list.push(pedals());
                 }
@@ -150,7 +155,7 @@ impl Adapter for MozaAdapter {
             if now == *shape {
                 continue;
             }
-            for kind in ["base", "pedals", "handbrake", "shifter"] {
+            for kind in ["base", "wheel", "pedals", "handbrake", "shifter"] {
                 changes.push(Change::ComponentRemoved {
                     component: format!("{id}/{kind}"),
                 });

@@ -1,6 +1,6 @@
 //! End to end through the host: a fake R9 base (inputs, force feedback driver, serial port
-//! answering like the real one), SR-P pedals, an HBP handbrake, SGP and HGP shifters on their
-//! own USB and plugged into the base.
+//! answering like the real one) and the rim mounted on it, SR-P pedals, an HBP handbrake, SGP
+//! and HGP shifters on their own USB and plugged into the base.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use simrig_host::Target;
 use simrig_host::testing::{PluginEnv, reason, step, until};
-use simrig_model::{Gear, ProcedureState, Value};
+use simrig_model::{Gear, ProcedureState, Support, Value};
 
 fn env(name: &str) -> PluginEnv {
     PluginEnv::new(
@@ -39,6 +39,13 @@ fn r9(env: &PluginEnv, settings: &str) -> PathBuf {
     hid
 }
 
+/// Waits for what a base gives with nothing moved: itself, its rim and its pedals.
+fn base_ready(host: &mut simrig_host::Host) {
+    until(host, "base, its rim and its pedals", |h| {
+        h.components().len() == 3
+    });
+}
+
 fn serial(env: &PluginEnv) -> String {
     fs::read_to_string(env.root.join("usb/1-3/simrig-fake-serial")).unwrap()
 }
@@ -51,9 +58,7 @@ fn an_r9_base_and_its_settings() {
         "limit 450\nmax-angle 450\nffb-strength 800\ndamper 10\ntorque 100\nprotection 1\n",
     );
     let mut host = env.start();
-    until(&mut host, "base and its pedals", |h| {
-        h.components().len() == 2
-    });
+    base_ready(&mut host);
     let base = host.find("base").unwrap().address.clone();
     assert_eq!(host.find(&base).unwrap().description.name, "MOZA R9 Base");
 
@@ -95,14 +100,105 @@ fn an_r9_base_and_its_settings() {
 }
 
 #[test]
+fn the_rim_on_the_base_and_its_settings() {
+    let env = env("rim");
+    let base = r9(
+        &env,
+        "limit 450\nwheel-telemetry-mode 1\nwheel-paddles-mode 2\nwheel-clutch-point 50\n\
+         wheel-stick-mode 256\nwheel-rpm-brightness 80\n",
+    );
+    // Left paddle at rest, right one pulled, the first button pressed.
+    env.input(
+        &base,
+        "abs 0 32767 0 65535\nabs 3 65535 0 65535\nabs 4 0 0 65535\nkey 288 1\n",
+    );
+    let mut host = env.start();
+    base_ready(&mut host);
+    let wheel = "moza/usb-346e-0002/wheel";
+    let description = host.find(wheel).unwrap().description.clone();
+    assert_eq!(description.name, "Steering wheel on the MOZA R9 Base");
+    assert!(
+        description
+            .controls
+            .iter()
+            .any(|c| c.label.as_deref() == Some("Left paddle"))
+    );
+
+    // Its controls come through the base.
+    let inputs = host.read_inputs(wheel).unwrap();
+    assert_eq!(
+        inputs.get("analog_paddles"),
+        Some(&Value::Floats(vec![0.0, 1.0]))
+    );
+    assert!(matches!(inputs.get("buttons"), Some(Value::Buttons(b)) if b[0]));
+
+    // Its settings, read from the rim and written to it in its units.
+    assert_eq!(
+        host.param(wheel, "analog_paddle_mode").unwrap().value,
+        Value::Choice("1".into())
+    );
+    assert_eq!(
+        host.param(wheel, "led_brightness").unwrap().value,
+        Value::Float(80.0)
+    );
+    let described = host.describe(wheel).unwrap();
+    let stick = described.custom_param("wheel_stick_mode").unwrap();
+    assert_eq!(stick.value, Value::Choice("1".into()));
+    host.set(wheel, "analog_paddle_mode", Value::Choice("2".into()))
+        .unwrap();
+    host.set(wheel, "led_brightness", Value::Float(40.0))
+        .unwrap();
+    host.set(wheel, "custom.wheel_stick_mode", Value::Choice("0".into()))
+        .unwrap();
+    host.set(wheel, "custom.wheel_clutch_point", Value::Float(35.0))
+        .unwrap();
+    let stored = serial(&env);
+    for line in [
+        "wheel-paddles-mode 3",
+        "wheel-rpm-brightness 40",
+        "wheel-stick-mode 0",
+        "wheel-clutch-point 35",
+    ] {
+        assert!(stored.lines().any(|l| l == line), "{line}: {stored}");
+    }
+    // A setting this rim does not answer for, and one no command is known for.
+    let described = host.describe(wheel).unwrap();
+    let knob = &described
+        .custom_param("wheel_knob_mode")
+        .unwrap()
+        .availability;
+    assert!(matches!(knob, Support::Unsupported(u) if u.explain().contains("does not answer")));
+    assert!(reason(&mut host, wheel, "vibration").contains("No serial command"));
+}
+
+#[test]
+fn without_a_rim_answering_its_settings_are_unavailable() {
+    let env = env("no-rim");
+    r9(&env, "limit 450\n");
+    let mut host = env.start();
+    base_ready(&mut host);
+    let wheel = "moza/usb-346e-0002/wheel";
+    assert!(reason(&mut host, wheel, "analog_paddle_mode").contains("No steering wheel answers"));
+    assert!(
+        host.set(wheel, "led_brightness", Value::Float(40.0))
+            .is_err()
+    );
+    // The base's own settings still work.
+    assert_eq!(
+        host.param("moza/usb-346e-0002/base", "rotation")
+            .unwrap()
+            .value,
+        Value::Float(900.0)
+    );
+}
+
+#[test]
 fn without_hid_universal_pidff_there_is_no_force_feedback() {
     let env = env("noffb");
     let hid = r9(&env, "limit 450\n");
     env.bind(&hid, "hid-generic");
     let mut host = env.start();
-    until(&mut host, "base and its pedals", |h| {
-        h.components().len() == 2
-    });
+    base_ready(&mut host);
     let base = host.find("base").unwrap().address.clone();
     assert!(reason(&mut host, &base, "test_effect").contains("hid-universal-pidff"));
     // Settings and inputs still work.
@@ -138,7 +234,7 @@ fn pedals_handbrake_and_pedals_on_the_base() {
     env.input(&handbrake, "abs 7 65535 0 65535\n");
     let base = r9(&env, "limit 450\n");
     let mut host = env.start();
-    until(&mut host, "components", |h| h.components().len() == 4);
+    until(&mut host, "components", |h| h.components().len() == 5);
 
     // The SR-P's axes are known: no mapping, unless by hand.
     let srp = "moza/usb-346e-0003/pedals";
@@ -331,13 +427,11 @@ fn an_hgp_plugged_into_a_base_shows_itself_when_a_gear_is_engaged() {
     let base = r9(&env, "limit 450\n");
     env.input(&base, &base_buttons(&[]));
     let mut host = env.start();
-    until(&mut host, "base and its pedals", |h| {
-        h.components().len() == 2
-    });
+    base_ready(&mut host);
 
     // First gear, the base's button 114, is the SGP's shift down too: taken for an SGP.
     env.input(&base, &base_buttons(&[0x2d1]));
-    until(&mut host, "the shifter", |h| h.components().len() == 3);
+    until(&mut host, "the shifter", |h| h.components().len() == 4);
     let shifter = "moza/usb-346e-0002/shifter";
     assert_eq!(
         host.param(shifter, "mode").unwrap().value,
@@ -356,7 +450,7 @@ fn an_hgp_plugged_into_a_base_shows_itself_when_a_gear_is_engaged() {
     // Back in neutral, it stays.
     env.input(&base, &base_buttons(&[]));
     assert_eq!(gear(&mut host, shifter), Some(Value::Gear(Gear::Neutral)));
-    assert_eq!(host.components().len(), 3);
+    assert_eq!(host.components().len(), 4);
 
     let device = Target::Device {
         plugin: "moza".into(),
@@ -374,13 +468,11 @@ fn an_sgp_plugged_into_a_base_shows_itself_when_shifted() {
     let base = r9(&env, "limit 450\n");
     env.input(&base, &base_buttons(&[]));
     let mut host = env.start();
-    until(&mut host, "base and its pedals", |h| {
-        h.components().len() == 2
-    });
+    base_ready(&mut host);
 
     // Shifted up: the base's button 113.
     env.input(&base, &base_buttons(&[0x2d0]));
-    until(&mut host, "the shifter", |h| h.components().len() == 3);
+    until(&mut host, "the shifter", |h| h.components().len() == 4);
     let shifter = "moza/usb-346e-0002/shifter";
     assert_eq!(
         host.find(shifter).unwrap().description.name,
@@ -399,9 +491,7 @@ fn with_paddle_sync_an_sgp_on_a_base_is_mapped_by_hand() {
     let base = r9(&env, "limit 450\n");
     env.input(&base, &base_buttons(&[]));
     let mut host = env.start();
-    until(&mut host, "base and its pedals", |h| {
-        h.components().len() == 2
-    });
+    base_ready(&mut host);
 
     // Its buttons are the paddles' (13 and 14), which do not say it is there: mapped by hand,
     // offered, never required.
@@ -426,7 +516,7 @@ fn with_paddle_sync_an_sgp_on_a_base_is_mapped_by_hand() {
         "map-sequential-shifter",
         &[(0x12d, "Shift down"), (0x12c, "Check the mapping")],
     );
-    until(&mut host, "the shifter", |h| h.components().len() == 3);
+    until(&mut host, "the shifter", |h| h.components().len() == 4);
     let shifter = "moza/usb-346e-0002/shifter";
     assert_eq!(
         host.find(shifter).unwrap().description.name,

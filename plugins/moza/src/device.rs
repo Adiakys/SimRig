@@ -5,14 +5,21 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
 use simrig_plugin_kit::shifter::Gate;
 use simrig_plugin_sdk::prelude::*;
 
 use crate::models::{self, Kind};
-use crate::protocol;
+use crate::protocol::{self, Command, Target};
 use crate::serial::{self, Link};
+
+/// Why the rim's settings are unavailable when no rim answers.
+const NO_RIM: &str = "No steering wheel answers on the base's serial port.";
+
+/// How long what is known of the rim holds: rims are taken off and swapped.
+const RIM_RECHECK: Duration = Duration::from_secs(5);
 
 /// The kernel driver of force feedback on Moza bases.
 pub const FFB_DRIVER: &str = "hid-universal-pidff";
@@ -36,6 +43,9 @@ pub mod axes {
     pub const BASE_THROTTLE: u16 = 0x02; // ABS_Z
     pub const BASE_BRAKE: u16 = 0x05; // ABS_RZ
     pub const BASE_CLUTCH: u16 = 0x06; // ABS_THROTTLE
+    // The analog paddles of the rim mounted on a base.
+    pub const LEFT_PADDLE: u16 = 0x04; // ABS_RY
+    pub const RIGHT_PADDLE: u16 = 0x03; // ABS_RX
 }
 
 /// Moza shifters and the buttons they are read on, as Boxflat numbers them: the first 16 are
@@ -74,6 +84,21 @@ pub struct MozaDevice {
     serial_error: Option<String>,
     /// Values read or written, by command: the base answers slowly.
     cache: BTreeMap<&'static str, u64>,
+    rim: Rim,
+}
+
+/// The rim mounted on the base, as last checked.
+enum Rim {
+    Unknown,
+    /// Answering at a device id; its answers since, missing ones too.
+    At {
+        id: u8,
+        checked: Instant,
+        answers: BTreeMap<&'static str, Option<u64>>,
+    },
+    Absent {
+        checked: Instant,
+    },
 }
 
 pub type Shared = Rc<RefCell<MozaDevice>>;
@@ -125,6 +150,7 @@ impl MozaDevice {
             serial: None,
             serial_error: None,
             cache: BTreeMap::new(),
+            rim: Rim::Unknown,
         };
         device.refresh();
         device
@@ -199,21 +225,104 @@ impl MozaDevice {
         Some(Unsupported::new(reason).with_detail(error))
     }
 
-    /// A setting's value on the device.
-    pub fn get(&mut self, name: &'static str) -> Option<u64> {
-        if let Some(v) = self.cache.get(name) {
-            return Some(*v);
+    /// The device id the rim mounted on the base answers at, if one does: checked again when
+    /// what is known of it is a few seconds old, at the id found last first.
+    fn rim(&mut self) -> Option<u8> {
+        let last = match &self.rim {
+            Rim::At { id, checked, .. } if checked.elapsed() < RIM_RECHECK => return Some(*id),
+            Rim::Absent { checked } if checked.elapsed() < RIM_RECHECK => return None,
+            Rim::At { id, .. } => Some(*id),
+            _ => None,
+        };
+        // Without the port nothing can be told: checked once it is open.
+        self.serial.as_ref()?;
+        let probe = protocol::command("wheel-telemetry-mode")?;
+        let others = Target::Wheel.ids().iter().copied();
+        let found = last
+            .into_iter()
+            .chain(others.filter(|id| Some(*id) != last))
+            .find(|id| self.read(probe, *id).is_some());
+        let checked = Instant::now();
+        self.rim = match found {
+            Some(id) => Rim::At {
+                id,
+                checked,
+                answers: BTreeMap::new(),
+            },
+            None => Rim::Absent { checked },
+        };
+        found
+    }
+
+    /// The device id a target answers at, or why it cannot be reached.
+    fn reach(&mut self, target: Target) -> std::result::Result<u8, Unsupported> {
+        if let Some(u) = self.no_settings() {
+            return Err(u);
         }
-        let command = protocol::command(name)?;
+        let id = match target {
+            Target::Wheel => self.rim(),
+            other => other.ids().first().copied(),
+        };
+        id.ok_or_else(|| Unsupported::new(Reason::Unavailable).with_detail(NO_RIM))
+    }
+
+    /// What the device answered to a command, when it is kept: the base's values until the
+    /// port fails, the rim's answers until it is checked again.
+    fn kept(&self, command: &Command) -> Option<Option<u64>> {
+        match (command.target, &self.rim) {
+            (Target::Wheel, Rim::At { answers, .. }) => answers.get(command.name).copied(),
+            (Target::Wheel, _) => None,
+            _ => self.cache.get(command.name).map(|v| Some(*v)),
+        }
+    }
+
+    fn keep(&mut self, command: &Command, value: Option<u64>) {
+        match (command.target, &mut self.rim) {
+            (Target::Wheel, Rim::At { answers, .. }) => {
+                answers.insert(command.name, value);
+            }
+            (Target::Wheel, _) => {}
+            // A base that did not answer is asked again.
+            _ => {
+                if let Some(v) = value {
+                    self.cache.insert(command.name, v);
+                }
+            }
+        }
+    }
+
+    /// A command's value at a device id; `None` when it does not answer.
+    fn read(&mut self, command: &Command, device: u8) -> Option<u64> {
         let (group, id) = command.read?;
-        let frame = protocol::read_frame(command)?;
-        let value = self
-            .serial
+        let frame = protocol::read_frame(command, device)?;
+        self.serial
             .as_mut()?
-            .exchange(&frame, group, command.target, id)
-            .ok()??;
-        self.cache.insert(command.name, value);
-        Some(value)
+            .exchange(&frame, group, device, id)
+            .ok()?
+    }
+
+    /// A setting's value on the device, or why it cannot be had.
+    pub fn value(&mut self, name: &'static str) -> std::result::Result<u64, Unsupported> {
+        let command = protocol::command(name).ok_or_else(Unsupported::not_in_driver)?;
+        let device = self.reach(command.target)?;
+        let value = match self.kept(command) {
+            Some(value) => value,
+            None => {
+                let value = self.read(command, device);
+                self.keep(command, value);
+                value
+            }
+        };
+        value.ok_or_else(|| {
+            Unsupported::new(Reason::Unavailable).with_detail(format!(
+                "The {} does not answer for this setting.",
+                command.target.noun()
+            ))
+        })
+    }
+
+    pub fn get(&mut self, name: &'static str) -> Option<u64> {
+        self.value(name).ok()
     }
 
     pub fn set(&mut self, name: &'static str, value: u64) -> Result<()> {
@@ -222,24 +331,28 @@ impl MozaDevice {
         let (group, id) = command
             .write
             .ok_or_else(|| Error::failed(format!("'{name}' cannot be written")))?;
-        let frame = protocol::write_frame(command, value).ok_or_else(Error::unsupported)?;
-        let link = self.serial.as_mut().ok_or_else(|| {
-            Error::failed(
-                self.serial_error
-                    .clone()
-                    .unwrap_or_else(|| "No serial port.".into()),
-            )
-        })?;
-        match link.exchange(&frame, group, command.target, id) {
+        let device = self
+            .reach(command.target)
+            .map_err(|u| Error::failed(u.explain()))?;
+        let frame = protocol::write_frame(command, device, value).ok_or_else(Error::unsupported)?;
+        let link = self
+            .serial
+            .as_mut()
+            .ok_or_else(|| Error::failed("No serial port."))?;
+        match link.exchange(&frame, group, device, id) {
             Ok(Some(_)) => {
-                self.cache.insert(command.name, value);
+                self.keep(command, Some(value));
                 Ok(())
             }
-            Ok(None) => Err(Error::failed("The base did not answer.")),
+            Ok(None) => Err(Error::failed(format!(
+                "The {} did not answer.",
+                command.target.noun()
+            ))),
             Err(e) => {
                 // A port that fails (unplugged, replaced) is opened again at the next refresh.
                 self.serial = None;
                 self.cache.clear();
+                self.rim = Rim::Unknown;
                 Err(Error::failed(e.to_string()))
             }
         }
