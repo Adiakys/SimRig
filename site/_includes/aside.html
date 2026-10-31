@@ -1,0 +1,9 @@
+<aside class="page-aside" aria-label="Devices">
+  <p class="aside-title">Devices</p>
+  <ul class="aside-list">
+    {% assign brands = site.brands | sort: "order" %}
+    {% for b in brands %}<li><a href="{{ b.url | relative_url }}"{% if b.url == page.url %} aria-current="page"{% endif %}>{{ b.nav }}</a></li>
+    {% endfor %}
+  </ul>
+  <p class="aside-cta"><a class="button" href="{{ '/install/' | relative_url }}">Install SimRig</a></p>
+</aside>

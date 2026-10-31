@@ -1,0 +1,53 @@
+# The public site of SimRig, published on GitHub Pages by .github/workflows/pages.yml.
+# Built by the github-pages gem (Jekyll 3.10, safe mode): only its bundled plugins are used.
+# Preview: scripts/site.sh serve (see docs/development.md).
+
+title: SimRig
+tagline: Sim-racing wheels, pedals and shifters on Linux, any brand
+description: >-
+  SimRig is a free, open source Linux app that sets up a whole sim-racing rig: wheel base,
+  steering wheel, pedals, shifter and handbrake from Fanatec, Moza, Logitech, Thrustmaster, PXN,
+  Simagic and others. It installs the drivers they need, shows every device moving live and
+  keeps them working in every game with the app closed.
+url: https://adiakys.github.io
+baseurl: /SimRig
+lang: en
+logo: /assets/images/mark.png
+image: /assets/images/social.png
+author: Adiakys
+social:
+  name: SimRig
+  links:
+    - https://github.com/Adiakys/SimRig
+
+repo: https://github.com/Adiakys/SimRig
+download: https://github.com/Adiakys/SimRig/releases/latest
+testers: https://github.com/Adiakys/SimRig/discussions/1
+report: https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml
+
+# No theme: the github-pages gem would add its default one's stylesheet.
+theme: null
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# One page per brand: the home lists them, the navigation and llms.txt too.
+collections:
+  brands:
+    output: true
+    permalink: /:name/
+
+defaults:
+  - scope: { path: "" }
+    values: { layout: page, image: /assets/images/social.png }
+  - scope: { type: brands }
+    values: { layout: brand, seo: { type: WebPage } }
+
+exclude:
+  - README.md

@@ -1,0 +1,19 @@
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "SimRig",
+  "description": {{ site.description | jsonify }},
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Linux",
+  "url": {{ '/' | absolute_url | jsonify }},
+  "downloadUrl": {{ site.download | jsonify }},
+  "image": {{ site.image | absolute_url | jsonify }},
+  "screenshot": {{ '/assets/images/home-light.webp' | absolute_url | jsonify }},
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "author": { "@type": "Person", "name": {{ site.author | jsonify }}, "url": "https://github.com/Adiakys" },
+  "sameAs": [{{ site.repo | jsonify }}]
+}
+</script>

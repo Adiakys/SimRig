@@ -1,4 +1,5 @@
 /target
 /dist
-# Design mockups never go in the repository.
+# Design mockups never go in the repository, nor the design tools' working files.
 mockups/
+/.taste-skill/

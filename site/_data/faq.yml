@@ -1,0 +1,71 @@
+# The FAQ page: shown as a list and given to search engines as FAQPage data. Answers in Markdown.
+
+- q: Does my racing wheel work on Linux?
+  a: |
+    Most do, through an open source kernel driver: some are in the kernel already, others
+    (Fanatec, Thrustmaster, Simagic, and Moza or PXN on kernels older than 6.15) need one built
+    for your kernel. SimRig knows which driver each model needs and installs it for you. See the
+    [supported devices](/SimRig/#devices) and your brand's page for what works.
+
+- q: Does SimRig need to be running while I play?
+  a: |
+    No. The drivers do the work, in every game, with SimRig closed. SimRig is only needed to
+    change settings; **Save as default** keeps them in the driver or in the device for every
+    time it is plugged in.
+
+- q: Does SimRig need root?
+  a: |
+    No. It runs as you and asks for your password only when something touches the system, such
+    as installing a driver, and says why before asking. It leaves nothing running when closed.
+
+- q: The wheel works in SimRig but not in a game. Why?
+  a: |
+    Games need the device to be readable by your user, bound to the right kernel driver, and not
+    hidden by Steam Input. SimRig checks each of these for every device, shows what is wrong on
+    the device's screen and fixes it with one click where it can.
+
+- q: What about Secure Boot?
+  a: |
+    With Secure Boot on, a driver built for your kernel loads only when signed with a key the
+    firmware trusts. DKMS signs the drivers it builds; if that key is not trusted yet, SimRig
+    asks to enroll it (MOK) and gives a one-time password. At the next restart, choose
+    **Enroll MOK** and type it. This is needed once, not for every driver.
+
+- q: I already installed a driver myself. Will SimRig replace it?
+  a: |
+    No. A driver you installed by other means (from your distribution, from the AUR, by hand) is
+    kept as it is: SimRig uses it and only adds its access rules next to it.
+
+- q: What happens after a kernel update?
+  a: |
+    Drivers that SimRig builds are registered with DKMS, which rebuilds them for every new
+    kernel. Your devices keep working after updates and reboots.
+
+- q: My shifter or handbrake has no brand, or Linux does not recognize it.
+  a: |
+    SimRig's generic USB plugin sets up any USB shifter (H-pattern or sequential) or handbrake by
+    moving it, even one whose USB descriptor is wrong or that the kernel rejects. Its driver then
+    presents it to games as a proper device.
+
+- q: A button or an axis is wrong. Can I fix it?
+  a: |
+    Yes. Where a plugin knows the device it maps inputs by itself, but mapping by hand is always
+    offered, so a device that responds differently can be put right.
+
+- q: Is SimRig free?
+  a: |
+    Yes, free and open source under GPL-3.0-or-later. The drivers it installs are open source
+    projects of their own communities, credited with their licenses in
+    [THIRD-PARTY.md](https://github.com/Adiakys/SimRig/blob/main/THIRD-PARTY.md).
+
+- q: Is SimRig made by Fanatec, Moza, Logitech or another brand?
+  a: |
+    No. SimRig is an independent project, not affiliated with, endorsed by or sponsored by any
+    manufacturer. Brand names are used only to say which hardware it works with.
+
+- q: How can I help?
+  a: |
+    Test it on your hardware: the [call for testers](https://github.com/Adiakys/SimRig/discussions/1)
+    lists what to try, and a [hardware report](https://github.com/Adiakys/SimRig/issues/new?template=hardware-report.yml)
+    tells how it went, even when everything works. It takes about 15 minutes and moves your
+    device from untested to tested for everyone.

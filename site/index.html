@@ -1,0 +1,352 @@
+---
+layout: default
+title: Sim-racing wheels, pedals and shifters on Linux
+description: >-
+  SimRig sets up a whole sim-racing rig on Linux, any brand: Fanatec, Moza, Logitech,
+  Thrustmaster, PXN, Simagic and more. It installs the drivers, shows every device moving live,
+  and keeps them working in every game with the app closed. Free and open source.
+---
+{%- assign rel = '/assets/devices/' | relative_url -%}
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero__stage">
+    <h1 id="hero-title" class="hero__title">
+      <span class="hero__a">Your sim rig,</span>
+      <span class="hero__b">set up on Linux.</span>
+    </h1>
+
+    <div class="hero__reel" data-reel>
+      <div class="reel__track">
+        <!-- The rig SimRig was tested on: a Fanatec base, Moza pedals, a USB shifter and handbrake. -->
+        <article class="ui card card--wheel" data-ui data-device="wheel" aria-label="Steering wheel, live">
+          <header class="card__head"><span class="ui-label">Steering wheel</span><span class="card__name">Fanatec CSL DD</span></header>
+          <div class="card__body">
+            <div class="card__art wheel" data-wheel-drag>
+              <img src="{{ rel }}wheel-formula.svg" alt="" width="400" height="400" draggable="false" data-wheel-rim>
+            </div>
+            <div class="card__values">
+              <span class="ui-label">Steering</span>
+              <output class="ui-value-l" data-wheel-value>0°</output>
+              <input class="ui-range" type="range" min="-450" max="450" step="1" value="0" aria-label="Steering angle" data-wheel-input>
+              <span class="ui-note">of 900° rotation</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="ui card card--pedals" data-ui data-device="pedals" aria-label="Pedals, live">
+          <header class="card__head"><span class="ui-label">Pedals</span><span class="card__name">Moza CRP2</span></header>
+          <div class="card__body">
+            <div class="card__art pedals">
+              <img class="pedals__frame" src="{{ rel }}pedals-frame.svg" alt="" width="600" height="380">
+              <img class="pedals__pedal" style="--x: 115" src="{{ rel }}pedal.svg" alt="" width="120" height="300">
+              <img class="pedals__pedal" style="--x: 240" src="{{ rel }}pedal.svg" alt="" width="120" height="300">
+              <img class="pedals__pedal" style="--x: 365" src="{{ rel }}pedal.svg" alt="" width="120" height="300">
+            </div>
+            <div class="card__values bars">
+              <div class="bar bar--clutch"><output class="ui-value-m" data-pedal="clutch">0%</output><span class="bar__track"><span class="bar__fill"></span></span><span class="ui-label">Clutch</span></div>
+              <div class="bar bar--brake"><output class="ui-value-m" data-pedal="brake">0%</output><span class="bar__track"><span class="bar__fill"></span></span><span class="ui-label">Brake</span></div>
+              <div class="bar bar--throttle"><output class="ui-value-m" data-pedal="throttle">0%</output><span class="bar__track"><span class="bar__fill"></span></span><span class="ui-label">Throttle</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="ui card card--shifter" data-ui data-device="shifter" aria-label="Shifter, live">
+          <header class="card__head"><span class="ui-label">Shifter</span><span class="card__name">USB H-pattern shifter</span></header>
+          <div class="card__body">
+            <div class="card__art shifter">
+              <img src="{{ rel }}shifter-plate.svg" alt="" width="320" height="320">
+              <svg class="shifter__gate" viewBox="0 0 320 320" aria-hidden="true">
+                <path d="M82 160H238M82 73V247M134 73V247M186 73V247M238 160V247"/>
+              </svg>
+              <img class="shifter__knob" src="{{ rel }}shifter-knob.svg" alt="" width="100" height="100" data-knob>
+            </div>
+            <div class="card__values">
+              <span class="ui-label">Gear</span>
+              <output class="ui-value-xl" data-gear>N</output>
+              <span class="ui-note">H 6+R</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="ui card card--handbrake" data-ui data-device="handbrake" aria-label="Handbrake, live">
+          <header class="card__head"><span class="ui-label">Handbrake</span><span class="card__name">USB handbrake</span></header>
+          <div class="card__body">
+            <div class="card__art handbrake">
+              <img src="{{ rel }}handbrake-body.svg" alt="" width="320" height="380">
+              <img class="handbrake__lever" src="{{ rel }}handbrake-lever.svg" alt="" width="320" height="380" data-lever>
+            </div>
+            <div class="card__values">
+              <span class="ui-label">Position</span>
+              <output class="ui-value-l" data-handbrake>0%</output>
+              <span class="ui-note" data-handbrake-state>At rest</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <div class="hero__foot">
+      <p class="hero__lede">Wheel bases, steering wheels, pedals, shifters and handbrakes of any brand. SimRig installs their drivers, shows each one moving live, and leaves them working in every game with the app closed.</p>
+      <a class="button" href="{{ '/install/' | relative_url }}">Install SimRig</a>
+    </div>
+  </div>
+</section>
+
+<section class="showcase" aria-labelledby="showcase-title">
+  <div class="frame">
+    <h2 id="showcase-title" class="showcase__title" data-reveal>The driver, installed for you</h2>
+    <ol class="states">
+      <li class="state" data-reveal>
+        <p class="state__word">Found</p>
+        <div class="ui device-row" data-ui>
+          <span class="device-row__thumb"><img src="{{ rel }}base.svg" alt="" width="380" height="360"></span>
+          <span class="device-row__text"><span class="device-row__name">Fanatec CSL DD</span><span class="device-row__sub">Fanatec · needs a driver</span></span>
+          <span class="ui-button">Install the driver</span>
+        </div>
+      </li>
+      <li class="state" data-reveal>
+        <p class="state__word">Asks once</p>
+        <div class="ui device-row is-live" data-ui data-install>
+          <span class="device-row__thumb"><img src="{{ rel }}base.svg" alt="" width="380" height="360"></span>
+          <span class="device-row__text">
+            <span class="device-row__name">Fanatec CSL DD</span>
+            <span class="device-row__sub" data-install-sub>Asks for your password once to install hid-fanatecff</span>
+            <span class="device-row__progress" aria-hidden="true"><span></span></span>
+          </span>
+          <button class="ui-button ui-button--primary" type="button" data-install-button>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <span data-install-label>Install the driver</span>
+          </button>
+        </div>
+      </li>
+      <li class="state" data-reveal>
+        <p class="state__word">Ready</p>
+        <div class="ui device-row" data-ui>
+          <span class="device-row__thumb"><img src="{{ rel }}base.svg" alt="" width="380" height="360"></span>
+          <span class="device-row__text"><span class="device-row__name">Fanatec CSL DD</span><span class="device-row__sub">Fanatec · driver installed, kept after kernel updates</span></span>
+          <span class="ui-button">Set up</span>
+        </div>
+      </li>
+    </ol>
+    <p class="showcase__aside" data-reveal>Built for your kernel with DKMS, from the open source driver bundled in the brand's plugin. With Secure Boot on, one restart enrolls its key.</p>
+  </div>
+</section>
+
+<section class="features" aria-labelledby="features-title">
+  <div class="frame features__grid">
+    <h2 id="features-title" class="features__title" data-reveal>Nothing hidden</h2>
+
+    <div class="ui panel" data-ui data-panel>
+      <div class="panel__head">
+        <p class="panel__title">Wheel base</p>
+        <p class="panel__sub">Fanatec CSL DD <span>Fanatec</span></p>
+      </div>
+      <p class="panel__group">Essentials</p>
+      <div class="setting" data-target="rotation">
+        <div class="setting__row"><span class="setting__name">Rotation</span><output class="ui-value-m" data-rot-value>900°</output></div>
+        <input class="ui-range" type="range" min="90" max="2520" step="10" value="900" aria-label="Rotation" data-rot>
+        <div class="chips" role="group" aria-label="Quick rotation values">
+          <button type="button" data-rot-quick="360">360</button><button type="button" data-rot-quick="540">540</button><button type="button" data-rot-quick="900" aria-pressed="true">900</button><button type="button" data-rot-quick="1080">1080</button><button type="button" data-rot-quick="2520">2520</button>
+        </div>
+        <span class="chip-quiet" data-target="kept">Kept with the app closed</span>
+      </div>
+      <div class="setting" data-target="ffb">
+        <div class="setting__row"><span class="setting__name">Force feedback strength</span><output class="ui-value-m" data-ffb-value>75%</output></div>
+        <input class="ui-range" type="range" min="0" max="100" step="1" value="75" aria-label="Force feedback strength" data-ffb>
+      </div>
+      <div class="setting is-disabled" data-target="disabled">
+        <div class="setting__row"><span class="setting__name">Set center</span></div>
+        <p class="setting__reason">Hold the wheel straight and use the base's own menu.</p>
+      </div>
+      <button class="panel__advanced" type="button" aria-expanded="false" data-target="advanced" data-advanced>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>Advanced <span>6 settings</span>
+      </button>
+      <div class="panel__more" hidden data-advanced-list>
+        <div class="setting__row"><span class="setting__name">Natural friction</span><output class="ui-value-m">0%</output></div>
+        <div class="setting__row"><span class="setting__name">Spring effect strength</span><output class="ui-value-m">100%</output></div>
+        <div class="setting__row"><span class="setting__name">Interpolation filter</span><output class="ui-value-m">11</output></div>
+      </div>
+      <p class="panel__group">Fanatec settings</p>
+      <div class="setting__row"><span class="setting__name">Tuning slot</span><output class="ui-value-m">1</output></div>
+      <div class="setting__row"><span class="setting__name">Force effect intensity</span><output class="ui-value-m">100%</output></div>
+      <div class="panel__foot" data-target="save">
+        <span class="panel__undo">Undo changes</span>
+        <span class="ui-button ui-button--primary">Save as default</span>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li class="note" data-note="rotation" tabindex="0"><strong>Rotation in one click</strong>The usual values as chips, the slider for the rest, up to what the base can do.</li>
+      <li class="note" data-note="kept" tabindex="0"><strong>Says where it is kept</strong>In the driver or the device with the app closed, or only until unplugged.</li>
+      <li class="note" data-note="ffb" tabindex="0"><strong>Applies at once</strong>Every change reaches the device while a game runs. Nothing to apply.</li>
+      <li class="note" data-note="disabled" tabindex="0"><strong>Unsupported, with the reason</strong>What the device or its driver cannot do stays in place, disabled, and says why.</li>
+      <li class="note" data-note="advanced" tabindex="0"><strong>Advanced, one step away</strong>The expert settings wait folded, never in the beginner's way.</li>
+      <li class="note" data-note="save" tabindex="0"><strong>Save as default</strong>Stored in the driver or the base, back at every plug-in, in every game.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="screens" aria-labelledby="screens-title">
+  <div class="frame screens__grid">
+    <div class="screens__text" data-reveal>
+      <h2 id="screens-title">The whole rig on one screen</h2>
+      <p>Each device is drawn as it stands on the rig and moves as it is used. A base from one brand, pedals from another and a no-name shifter sit side by side, and a preset switches the whole rig with a click.</p>
+    </div>
+    <figure class="screens__main" data-reveal>
+      <video src="{{ '/assets/video/simrig.mp4' | relative_url }}" poster="{{ '/assets/video/simrig-poster.webp' | relative_url }}" width="1024" height="640" autoplay muted loop playsinline preload="metadata" aria-label="A tour of SimRig: the rig moving live, a wheel base's settings, setting up a shifter, adding a device, plugins and drivers, the first run."></video>
+      <figcaption>The rig live, a base's settings, a shifter set up, a device added, the first run.</figcaption>
+    </figure>
+    <figure class="screens__crop screens__crop--pedals" style="--crop: -600px -200px" data-reveal>
+      <picture>
+        <source srcset="{{ '/assets/images/pedals-dark.webp' | relative_url }}" media="(prefers-color-scheme: dark)">
+        <img src="{{ '/assets/images/pedals-light.webp' | relative_url }}" width="1440" height="900" loading="lazy" alt="The pedals' screen: response curve, dead zones and maximum force, with the live travel of each pedal.">
+      </picture>
+      <figcaption>Pedals: curves, dead zones, maximum force</figcaption>
+    </figure>
+    <figure class="screens__crop screens__crop--base" style="--crop: -600px -150px" data-reveal>
+      <picture>
+        <source srcset="{{ '/assets/images/base-dark.webp' | relative_url }}" media="(prefers-color-scheme: dark)">
+        <img src="{{ '/assets/images/base-light.webp' | relative_url }}" width="1440" height="900" loading="lazy" alt="The wheel base's screen: rotation, force feedback strength and natural damper, with the steering angle live.">
+      </picture>
+      <figcaption>Wheel base: rotation and force feedback</figcaption>
+    </figure>
+    <figure class="screens__crop screens__crop--shifter" style="--crop: -70px -160px" data-reveal>
+      <picture>
+        <source srcset="{{ '/assets/images/shifter-dark.webp' | relative_url }}" media="(prefers-color-scheme: dark)">
+        <img src="{{ '/assets/images/shifter-light.webp' | relative_url }}" width="1440" height="900" loading="lazy" alt="The shifter's screen: its gate, 6 forward gears and reverse, with the engaged gear live.">
+      </picture>
+      <figcaption>Shifter: gate, gears and reverse</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="devices" id="devices" aria-labelledby="devices-title">
+  <div class="frame devices__grid">
+    <div class="devices__intro" data-reveal>
+      <h2 id="devices-title">Supported devices</h2>
+      <p>Each brand has a plugin that knows its devices and the open source Linux driver they use. Open a brand for its models, its driver and what can be set.</p>
+      <p class="muted">Tested means tried on real hardware. The rest works in SimRig's tests on simulated devices: <a href="{{ site.testers }}">a 15-minute test</a> on yours moves it to tested for everyone.</p>
+    </div>
+    <div class="devices__list">
+      {% for brand in site.data.models %}
+      {% assign doc = site.brands | where_exp: "b", "b.url contains brand.page" | first %}
+      <div class="devices__group" data-reveal>
+        <h3><a href="{{ doc.url | relative_url }}">{{ brand.name }}<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></a></h3>
+        <ul>
+          {% for row in brand.rows %}
+          <li><span class="dot{% if row.tested %} dot--tested{% endif %}" aria-hidden="true"></span><span class="devices__name">{{ row.name }}</span><span class="devices__value">{% if row.tested %}Tested{% else %}Untested{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="stages" aria-labelledby="stages-title" data-stages>
+  <h2 id="stages-title" class="visually-hidden">How a device is added</h2>
+  <div class="stages__pin">
+  <div class="stages__fields">
+    <div class="stages__clause" aria-live="polite">
+      <div data-stage-clause="0"><h3>First, plug it in.</h3><p>A known model is recognized by itself. A device no plugin knows can still be set up, as a shifter or a handbrake.</p></div>
+      <div data-stage-clause="1" hidden><h3>Then, one password.</h3><p>If the device needs a driver, SimRig installs it through polkit and says why first. Nothing else runs as root.</p></div>
+      <div data-stage-clause="2" hidden><h3>Next, move it once.</h3><p>Where the plugin cannot know which input is which, each gear or axis is learned by moving it. Mapping by hand stays on offer for any device.</p></div>
+      <div data-stage-clause="3" hidden><h3>Last, just drive.</h3><p>The driver does the work, in every game. SimRig can be closed, and nothing is left running.</p></div>
+    </div>
+    <div class="stages__ui">
+      <div class="ui step" data-ui data-stage-ui="0">
+        <p class="step__head">Add a device</p>
+        <p class="step__text">Connect the device to a USB port. Known devices are recognized automatically.</p>
+        <div class="device-row device-row--compact">
+          <span class="device-row__thumb"><img src="{{ rel }}shifter-plate.svg" alt="" width="320" height="320"></span>
+          <span class="device-row__text"><span class="device-row__name">USB shifter</span><span class="device-row__sub">No plugin knows it · set up by moving it</span></span>
+          <span class="ui-button">Set up</span>
+        </div>
+      </div>
+      <div class="ui step" data-ui data-stage-ui="1" hidden>
+        <p class="step__head">Driver</p>
+        <p class="step__text">SimRig's generic USB service presents the shifter to games as a joystick, with SimRig closed.</p>
+        <span class="ui-button ui-button--primary"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Install the driver</span>
+        <p class="step__why">Asks for your password once to install the driver.</p>
+      </div>
+      <div class="ui step" data-ui data-stage-ui="2" hidden>
+        <p class="step__head">Set up</p>
+        <p class="step__text">Move the lever to 3rd gear and hold it.</p>
+        <div class="step__gate" aria-hidden="true">
+          <span class="is-done">1</span><span class="is-done">2</span><span class="is-now">3</span><span>4</span><span>5</span><span>6</span><span>R</span>
+        </div>
+        <p class="step__why">Gears 1 and 2 mapped. Held for half a second, the gear is learned.</p>
+      </div>
+      <div class="ui step" data-ui data-stage-ui="3" hidden>
+        <p class="step__head">Done</p>
+        <p class="step__text">Games see it as <strong>SimRig shifter</strong>, in every game, with SimRig closed.</p>
+        <div class="step__done"><span class="ui-label">Gear</span><span class="ui-value-xl">3</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="stages__control">
+    <div class="stages__slider" data-stage-slider>
+      <input type="range" min="0" max="3" step="1" value="0" aria-label="Stage of adding a device" aria-valuetext="Connect" data-stage-input>
+    </div>
+    <ol class="stages__names">
+      <li class="is-current">Connect</li><li>Driver</li><li>Set up</li><li>Done</li>
+    </ol>
+  </div>
+  </div>
+</section>
+
+<section class="proof" aria-labelledby="proof-title">
+  <div class="frame proof__row" data-reveal>
+    <h2 id="proof-title">Built on the drivers of</h2>
+    <ul>
+      <li><a href="https://github.com/gotzl/hid-fanatecff">hid-fanatecff</a></li>
+      <li><a href="https://github.com/JacKeTUs/universal-pidff">universal-pidff</a></li>
+      <li><a href="https://github.com/berarma/new-lg4ff">new-lg4ff</a></li>
+      <li><a href="https://github.com/Kimplul/hid-tmff2">hid-tmff2</a></li>
+      <li><a href="https://github.com/JacKeTUs/simagic-ff">simagic-ff</a></li>
+      <li><a href="https://github.com/Lawstorant/boxflat">Boxflat</a></li>
+      <li><a href="https://github.com/unionyxx/pitwall">Pitwall</a></li>
+    </ul>
+  </div>
+</section>
+
+<section class="ask" aria-labelledby="ask-title" data-faq>
+  <div class="frame ask__grid">
+    <div class="ask__index">
+      <h2 id="ask-title">Questions</h2>
+      <ul role="tablist" aria-orientation="vertical">
+        {% for item in site.data.faq limit: 7 %}
+        <li role="presentation"><button type="button" role="tab" id="q{{ forloop.index }}" aria-controls="a{{ forloop.index }}" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" {% unless forloop.first %}tabindex="-1"{% endunless %}>{{ item.q }}</button>
+          <div class="ask__inline" id="i{{ forloop.index }}" {% unless forloop.first %}hidden{% endunless %}>{{ item.a | markdownify }}</div></li>
+        {% endfor %}
+      </ul>
+      <a class="ask__all" href="{{ '/faq/' | relative_url }}">All questions</a>
+    </div>
+    <div class="ask__pane">
+      {% for item in site.data.faq limit: 7 %}
+      <div class="ask__answer" role="tabpanel" id="a{{ forloop.index }}" aria-labelledby="q{{ forloop.index }}" {% unless forloop.first %}hidden{% endunless %}>{{ item.a | markdownify }}</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="get" aria-labelledby="get-title">
+  <div class="frame">
+    <h2 id="get-title" class="get__sentence">
+      Install SimRig on
+      <label class="visually-hidden" for="distro">Distribution</label>
+      <select id="distro" data-distro>
+        <option value="deb">Ubuntu</option>
+        <option value="deb">Debian</option>
+        <option value="deb">Mint</option>
+        <option value="rpm">Fedora</option>
+        <option value="suse">openSUSE</option>
+        <option value="arch">Arch</option>
+        <option value="tar">any distro</option>
+      </select>
+      <a class="get__go" href="{{ site.download }}">now</a>
+    </h2>
+    <pre class="get__cmd"><code data-cmd>sudo apt install ./simrig_*_amd64.deb</code></pre>
+    <p class="get__after">The package is on the <a href="{{ site.download }}">latest release</a>. Then open SimRig: the first setup checks the system, finds the devices and installs what they need. <a href="{{ '/install/' | relative_url }}">More on installing</a>.</p>
+  </div>
+</section>

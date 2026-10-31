@@ -1,0 +1,30 @@
+---
+title: "FAQ: sim-racing wheels on Linux with SimRig"
+heading: Questions
+permalink: /faq/
+description: >-
+  Answers about sim-racing wheels on Linux with SimRig: drivers, Secure Boot, kernel updates,
+  root, games that do not see the wheel, generic USB shifters and handbrakes.
+lede: Drivers, games, Secure Boot and the rest.
+---
+<dl class="faq-list">
+  {% for item in site.data.faq %}
+  <dt id="{{ item.q | slugify }}">{{ item.q }}</dt>
+  <dd>{{ item.a | markdownify }}</dd>
+  {% endfor %}
+</dl>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for item in site.data.faq %}{
+      "@type": "Question",
+      "name": {{ item.q | jsonify }},
+      "acceptedAnswer": { "@type": "Answer", "text": {{ item.a | markdownify | strip_newlines | jsonify }} }
+    }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ]
+}
+</script>
