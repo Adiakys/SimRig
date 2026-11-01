@@ -16,7 +16,7 @@ pub const ANSWER: Duration = Duration::from_millis(250);
 /// `/sys`, standing for the settings the device stores.
 pub const FAKE_SERIAL: &str = "simrig-fake-serial";
 
-pub trait Link {
+pub trait Link: Send {
     /// Sends a request and waits, for up to `wait`, for the answer to `of` (group, device id,
     /// id): the value it carries. `None` when the device does not answer.
     fn exchange(

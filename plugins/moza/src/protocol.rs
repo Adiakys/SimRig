@@ -140,6 +140,7 @@ pub const COMMANDS: &[Command] = &[
     wheel("wheel-knob3-mode", &[42, 3]),
     wheel("wheel-knob4-mode", &[42, 4]),
     wheel("wheel-rpm-brightness", &[27, 0, 255]),
+    wheel("wheel-buttons-brightness", &[27, 1, 255]),
     // Parts plugged into the base: answering says they are there (Boxflat).
     Command {
         name: "sequential-output-y",

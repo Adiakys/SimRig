@@ -1,7 +1,7 @@
 //! The adapter: Moza devices as components. A base gives a wheel base, the rim mounted on it,
-//! the pedals plugged into it, a handbrake plugged into it once pulled, and a shifter plugged
-//! into it (an HGP once a gear is engaged, any once mapped by hand);
-//! pedal sets, handbrakes and shifters on their own USB give theirs.
+//! the pedals plugged into it, and a handbrake and a shifter plugged into it as its serial port
+//! says, or once used where the port does not answer for them; pedal sets, handbrakes and
+//! shifters on their own USB give theirs.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -21,6 +21,8 @@ use crate::models::{self, Kind};
 struct Shape {
     driver: Option<String>,
     settings: bool,
+    /// A rim answers: its settings can be read.
+    rim: bool,
     pedals: Vec<PedalRole>,
     shifter: Option<ShifterMap>,
     parts: Parts,
@@ -50,6 +52,7 @@ impl MozaAdapter {
         Shape {
             driver: d.hid.driver(),
             settings: d.no_settings().is_none(),
+            rim: d.rim(),
             pedals: d.hid.pedal_map.roles(),
             shifter: d.hid.shifter(),
             parts: d.parts(),
