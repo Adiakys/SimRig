@@ -3,10 +3,10 @@
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use simrig_plugin_kit::pedals;
+use simrig_plugin_kit::{pedals, sysfs};
 use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
@@ -90,6 +90,12 @@ impl Adapter for PidffAdapter {
             )));
         };
         let model = models::model(*vid, *pid);
+        // A device the table does not list is taken as a base only if it says it is one.
+        if model.model.is_none() && !sysfs::declares_force_feedback(Path::new(sysfs)) {
+            return Err(Error::NotFound(format!(
+                "{vid:04x}:{pid:04x} is not a wheel base: it declares no force feedback"
+            )));
+        }
         let shared: Shared = Rc::new(RefCell::new(PidffDevice::new(
             &device.id,
             model,

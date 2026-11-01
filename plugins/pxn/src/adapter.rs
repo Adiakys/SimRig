@@ -3,10 +3,10 @@
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use simrig_plugin_kit::pedals;
+use simrig_plugin_kit::{pedals, sysfs};
 use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
@@ -91,6 +91,13 @@ impl Adapter for PxnAdapter {
         let model = models::model(*vid, *pid).ok_or_else(|| {
             Error::NotFound(format!("{vid:04x}:{pid:04x} is not a PXN wheel base"))
         })?;
+        // A model the table does not list is taken as a base only if it says it is one: PXN
+        // pedals and handbrakes on their own USB have the same vendor id.
+        if model.model.is_none() && !sysfs::declares_force_feedback(Path::new(sysfs)) {
+            return Err(Error::NotFound(format!(
+                "{vid:04x}:{pid:04x} is not a wheel base: it declares no force feedback"
+            )));
+        }
         let shared: Shared = Rc::new(RefCell::new(PxnDevice::new(
             &device.id,
             model,

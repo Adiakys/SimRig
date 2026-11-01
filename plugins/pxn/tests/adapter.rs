@@ -36,6 +36,14 @@ fn vd(env: &PluginEnv, pid: u16, name: &str) -> PathBuf {
     fs::write(env.root.join("usb/1-10/simrig-fake-pxn"), text.join(" ")).unwrap();
     // A quarter turn to the right; force feedback.
     env.input(&hid, "abs 0 49151 0 65535\nkey 288 0\nff\n");
+    // A joystick that declares force feedback (the PID usage page), as bases do.
+    fs::write(
+        hid.join("report_descriptor"),
+        [
+            0x05, 0x01, 0x09, 0x04, 0xa1, 0x01, 0x05, 0x0f, 0x09, 0x21, 0xc0,
+        ],
+    )
+    .unwrap();
     hid
 }
 
@@ -147,6 +155,38 @@ fn a_base_not_in_the_table_is_taken_when_chosen() {
         host.problems()
             .iter()
             .any(|p| p.contains("not a PXN wheel base")),
+        "{:?}",
+        host.problems()
+    );
+}
+
+#[test]
+fn pedals_of_the_same_vendor_are_not_taken_for_a_base() {
+    let env = env("pedals");
+    let hid = env.plug(
+        "1-13",
+        0x36e6,
+        0x2002,
+        "PXN Pedals",
+        "1-13:1.0/0003:36E6:2002.0003",
+        Some("hid-generic"),
+    );
+    env.input(&hid, "abs 0 0 0 4095\nabs 1 0 0 4095\nabs 2 0 0 4095\n");
+    // A joystick with simulation controls, without force feedback.
+    fs::write(
+        hid.join("report_descriptor"),
+        [
+            0x05, 0x01, 0x09, 0x04, 0xa1, 0x01, 0x05, 0x02, 0x09, 0xc5, 0xc0,
+        ],
+    )
+    .unwrap();
+    let mut host = env.start();
+    host.choose_plugin("usb:36e6:2002", Some("pxn")).unwrap();
+    assert!(host.components().is_empty());
+    assert!(
+        host.problems()
+            .iter()
+            .any(|p| p.contains("36e6:2002 is not a wheel base: it declares no force feedback")),
         "{:?}",
         host.problems()
     );
