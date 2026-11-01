@@ -50,6 +50,11 @@ fn serial(env: &PluginEnv) -> String {
     fs::read_to_string(env.root.join("usb/1-3/simrig-fake-serial")).unwrap()
 }
 
+/// What the R9's serial port knows from now on: parts plugged or unplugged.
+fn set_serial(env: &PluginEnv, settings: &str) {
+    fs::write(env.root.join("usb/1-3/simrig-fake-serial"), settings).unwrap();
+}
+
 #[test]
 fn an_r9_base_and_its_settings() {
     let env = env("r9");
@@ -532,6 +537,72 @@ fn an_hbp_plugged_into_a_base_shows_itself_when_pulled() {
     host.read_inputs(handbrake).unwrap();
     host.poll();
     assert_eq!(host.components().len(), 4);
+}
+
+#[test]
+fn parts_on_a_base_answer_on_its_serial_port() {
+    let env = env("base-parts");
+    let base = r9(
+        &env,
+        "limit 450\nsequential-output-y 40\nsequential-direction 1\nhandbrake-direction 0\n",
+    );
+    let at_rest = |pressed: &[u16]| {
+        format!(
+            "abs 0 32767 0 65535\nabs 7 0 0 65535\n{}",
+            base_buttons(pressed)
+        )
+    };
+    env.input(&base, &at_rest(&[]));
+    let mut host = env.start();
+
+    // Nothing moved: an SGP and a handbrake answer at their device ids.
+    until(&mut host, "the shifter and the handbrake", |h| {
+        h.components().len() == 5
+    });
+    let shifter = "moza/usb-346e-0002/shifter";
+    assert_eq!(
+        host.param(shifter, "mode").unwrap().value,
+        Value::Choice("sequential".into())
+    );
+    assert!(host.find("moza/usb-346e-0002/handbrake").is_ok());
+    // Its direction reversed in its settings: up on 114.
+    env.input(&base, &at_rest(&[0x2d1]));
+    let inputs = host.read_inputs(shifter).unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![true, false]))
+    );
+
+    // Unplugged: they no longer answer, and go.
+    env.input(&base, &at_rest(&[]));
+    set_serial(&env, "limit 450\n");
+    until(&mut host, "the parts gone", |h| h.components().len() == 3);
+
+    // An HGP plugged instead, moved: shown at once, then the port says what it is.
+    set_serial(&env, "limit 450\nsequential-output-y 200\n");
+    env.input(&base, &at_rest(&[0x2d1]));
+    until(&mut host, "an H-pattern shifter", |h| {
+        h.param(shifter, "mode")
+            .is_ok_and(|p| p.value == Value::Choice("h_pattern".into()))
+    });
+}
+
+#[test]
+fn an_sgp_with_paddle_synchronization_on_a_base() {
+    // Its buttons are the paddles': the base's serial port says so.
+    let env = env("base-sgp-sync");
+    let base = r9(
+        &env,
+        "limit 450\nsequential-output-y 40\nsequential-paddle-sync 2\n",
+    );
+    env.input(&base, &base_buttons(&[0x12d]));
+    let mut host = env.start();
+    until(&mut host, "the shifter", |h| h.components().len() == 4);
+    let inputs = host.read_inputs("moza/usb-346e-0002/shifter").unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![true, false]))
+    );
 }
 
 #[test]

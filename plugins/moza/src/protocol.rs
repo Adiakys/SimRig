@@ -19,6 +19,10 @@ pub enum Target {
     Base,
     /// The rim mounted on the base.
     Wheel,
+    /// A shifter plugged into the base (the SGP's and the HGP's share an id).
+    Shifter,
+    /// A handbrake plugged into the base.
+    Handbrake,
 }
 
 impl Target {
@@ -29,6 +33,20 @@ impl Target {
             Target::Main => &[18],
             Target::Base => &[19],
             Target::Wheel => &[23, 21, 19],
+            Target::Shifter => &[26],
+            Target::Handbrake => &[27],
+        }
+    }
+
+    /// Boxflat's name for it in its command table: commands of the parts are named after it
+    /// (`wheel-…`, `sequential-…`).
+    pub fn boxflat(self) -> &'static str {
+        match self {
+            Target::Main => "main",
+            Target::Base => "base",
+            Target::Wheel => "wheel",
+            Target::Shifter => "sequential",
+            Target::Handbrake => "handbrake",
         }
     }
 
@@ -37,6 +55,8 @@ impl Target {
         match self {
             Target::Main | Target::Base => "base",
             Target::Wheel => "steering wheel",
+            Target::Shifter => "shifter",
+            Target::Handbrake => "handbrake",
         }
     }
 }
@@ -132,6 +152,17 @@ pub const COMMANDS: &[Command] = &[
     wheel("wheel-knob3-mode", &[42, 3]),
     wheel("wheel-knob4-mode", &[42, 4]),
     wheel("wheel-rpm-brightness", &[27, 0, 255]),
+    // Parts plugged into the base: answering says they are there (Boxflat).
+    Command {
+        name: "sequential-output-y",
+        target: Target::Shifter,
+        read: Some((83, &[2])),
+        write: None,
+        bytes: 2,
+    },
+    rw("sequential-direction", Target::Shifter, 81, 82, &[5]),
+    rw("sequential-paddle-sync", Target::Shifter, 81, 82, &[6]),
+    rw("handbrake-direction", Target::Handbrake, 91, 92, &[1]),
 ];
 
 pub fn command(name: &str) -> Option<&'static Command> {
@@ -344,12 +375,8 @@ mod tests {
     fn every_command_is_boxflats() {
         let table = boxflat();
         for c in COMMANDS {
-            let device = match c.target {
-                Target::Main => "main",
-                Target::Base => "base",
-                Target::Wheel => "wheel",
-            };
-            let name = c.name.strip_prefix("wheel-").unwrap_or(c.name);
+            let device = c.target.boxflat();
+            let name = c.name.strip_prefix(&format!("{device}-")).unwrap_or(c.name);
             let entry = |name: String| {
                 table
                     .get(&(device.to_string(), name.clone()))

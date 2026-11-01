@@ -1031,20 +1031,27 @@ tells them apart by USB product name, like Boxflat: bases, SR-P/CRP pedal sets, 
 handbrake, the SGP sequential and HGP H-pattern shifters. Their positions are buttons: the SGP
 shifts up on its 13th and down on its 14th (checked on an SGP; Boxflat has them the other way),
 the HGP's seven gears are its 6th to 12th and reverse its 5th (Boxflat's table). Plugged into a
-base instead, a shifter becomes buttons of the base, and shows up once one of its buttons is
-pressed, known or mapped by hand (a mapping kept from before shows nothing until then; one made
-while running shows at once, it was just moved): the SGP its
-113th (up) and 114th (down, checked), the HGP its 113th to 120th (reverse, then the gears). The
-two share 113 and 114, so a shifter seen only there is taken for an SGP until a gear only the
-HGP has is engaged. The base's buttons past the 80th exist only with hid-universal-pidff, which
-maps them from `KEY_NEXT_FAVORITE`. With paddle synchronization on, the SGP uses the paddles'
-buttons instead, which do not say it is there: the base offers to map it ("Map a sequential
-shifter connected to the base"). Every shifter can be mapped by hand too, never required (a
-direction reversed in the shifter's own settings, another firmware). On its own USB, a
-shifter's other buttons show too, the positions named; on a base they are the base's. The HGP's
-reverse is drawn right and down, not checked on the device. The HBP is read on
-`ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table); the base has that
-axis with nothing plugged in, so a handbrake on it shows up once pulled past half its travel. Hubs
+base instead, a shifter becomes buttons of the base: the SGP its 113th (up) and 114th (down,
+checked), or with paddle synchronization the paddles' 14th (up) and 13th (down, Boxflat's, not
+checked), the HGP its 113th to 120th (reverse, then the gears). The base's buttons past the 80th
+exist only with hid-universal-pidff, which maps them from `KEY_NEXT_FAVORITE`. The HBP is read
+on `ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table).
+**Parts plugged into a base** are asked for over its serial port, as Boxflat does: a shifter
+answers at device id 26 with its lever's height (past 100 an HGP, else an SGP), its paddle
+synchronization and its direction, so the SGP's buttons are known whatever its settings; a
+handbrake answers at 27. They are asked every few seconds while one answers, every half minute
+while none does (each silent one costs a wait). Once a part has answered, the port says whether
+it is there; a part used again while it is not answering shows at once and the base is asked
+straight away. A part that never answers (a base that does not pass the question on) shows once
+used instead, since the base has its inputs whether it is plugged in or not: a shifter once one
+of its buttons is pressed, known or mapped by hand (a mapping kept from before shows nothing
+until then; one made while running shows at once), a handbrake once pulled past half its
+travel. Seen only by its buttons, a shifter on 113 and 114, which both have, is taken for an SGP
+until a gear only the HGP has is engaged. Every shifter can be mapped by hand too, never
+required (a firmware with other buttons, a shifter the port does not answer for): "Map a
+sequential shifter connected to the base". On its own USB, a shifter's other buttons show too,
+the positions named; on a base they are the base's. The HGP's reverse is drawn right and down,
+not checked on the device. Hubs
 and the like are attached without components for now (they can be given to the generic USB
 plugin). Settings are read and written over the serial port: rotation
 (stored as half the angle, with the games' maximum kept equal), force feedback strength, natural
