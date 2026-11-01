@@ -1039,10 +1039,12 @@ on `ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table).
 **Parts plugged into a base** are asked for over its serial port, as Boxflat does: a shifter
 answers at device id 26 with its lever's height (past 100 an HGP, else an SGP), its paddle
 synchronization and its direction, so the SGP's buttons are known whatever its settings; a
-handbrake answers at 27. They are asked every few seconds while one answers, every half minute
-while none does (each silent one costs a wait). Once a part has answered, the port says whether
-it is there; a part used again while it is not answering shows at once and the base is asked
-straight away. A part that never answers (a base that does not pass the question on) shows once
+handbrake answers at 27. Each is asked every few seconds while it answers or is in use again,
+every half minute while it is silent (each silence costs a wait); the SGP's settings are read
+when it starts answering. Once a part has answered, the port says whether it is there, a
+mapping made by hand or not; a part used again while it is not answering shows at once and is
+asked for within seconds. Unplugged, a shifter's buttons as the port gave them no longer count
+as use (with paddle synchronization they are the rim's paddles). A part that never answers (a base that does not pass the question on) shows once
 used instead, since the base has its inputs whether it is plugged in or not: a shifter once one
 of its buttons is pressed, known or mapped by hand (a mapping kept from before shows nothing
 until then; one made while running shows at once), a handbrake once pulled past half its

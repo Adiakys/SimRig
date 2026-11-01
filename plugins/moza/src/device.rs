@@ -8,16 +8,12 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
-use simrig_plugin_kit::shifter::{Gate, ShifterMap};
+use simrig_plugin_kit::shifter::{self, Gate, ShifterMap};
 use simrig_plugin_sdk::prelude::*;
 
 use crate::models::{self, Kind};
 use crate::protocol::{self, Command, Target};
 use crate::serial::{self, Link};
-
-/// Why the rim's settings are unavailable when no rim answers.
-const NO_RIM: &str = "No steering wheel answers on the base's serial port (device ids 23, 21 and 19 \
-                      asked).";
 
 /// How long what is known of the rim holds: rims are taken off and swapped.
 const RIM_RECHECK: Duration = Duration::from_secs(5);
@@ -26,10 +22,10 @@ const RIM_RECHECK: Duration = Duration::from_secs(5);
 /// seconds.
 const NO_RIM_RECHECK: Duration = Duration::from_secs(30);
 
-/// How often the base is asked what is plugged into it: often while a part answers, seldom
-/// while none does (each silent part costs a wait).
-const PARTS_ASKED: Duration = Duration::from_secs(3);
-const NO_PARTS_ASKED: Duration = Duration::from_secs(30);
+/// How often a part plugged into a base is asked for: often while it answers or is in use,
+/// seldom while it is silent (each silence costs a wait).
+const PART_ASKED: Duration = Duration::from_secs(3);
+const SILENT_PART_ASKED: Duration = Duration::from_secs(30);
 
 /// How long a rim has to answer when it is looked for: through the base it can take longer than
 /// the base itself (Boxflat waits until its next poll, seconds later).
@@ -102,25 +98,54 @@ pub struct MozaDevice {
     /// Values read or written, by command: the base answers slowly.
     cache: BTreeMap<&'static str, u64>,
     rim: Rim,
-    /// Parts plugged into the base seen in use since the plugin started: the base has their
-    /// inputs whether they are plugged in or not.
-    seen: Parts,
-    /// Parts that answered on the base's serial port at least once: then the port tells.
-    answered: Parts,
-    /// Parts answering on the base's serial port when last asked.
-    plugged: Parts,
-    /// When the base was last asked what is plugged into it.
-    parts_asked: Option<Instant>,
-    /// The shifter mapping made by hand when the plugin started: one made since says the
-    /// shifter is there.
+    shifter: Part,
+    handbrake: Part,
+    /// The shifter mapping made by hand last noticed: one made since says the shifter is there.
     mapped: Option<ShifterMap>,
 }
 
-/// One flag for each part a base can have plugged in.
+/// The parts plugged into a base to show.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Parts {
     pub shifter: bool,
     pub handbrake: bool,
+}
+
+/// A part a base can have plugged in. The base has its inputs whether it is plugged in or not:
+/// once the part has answered on the base's serial port, the port says whether it is there;
+/// until then, its use does.
+#[derive(Default)]
+struct Part {
+    /// Seen in use since the plugin started, or since it stopped answering.
+    seen: bool,
+    /// Answered on the serial port at least once.
+    answered: bool,
+    /// Answering when last asked.
+    plugged: bool,
+    asked: Option<Instant>,
+}
+
+impl Part {
+    fn shown(&self) -> bool {
+        self.plugged || self.seen
+    }
+
+    /// Whether to ask for it now: often while it answers or is in use again, seldom otherwise.
+    fn due(&self) -> bool {
+        let often = self.plugged || (self.answered && self.seen);
+        let every = if often { PART_ASKED } else { SILENT_PART_ASKED };
+        self.asked.is_none_or(|at| at.elapsed() >= every)
+    }
+
+    fn answer(&mut self, answers: bool) {
+        // One that answered before and no longer does was unplugged.
+        if !answers && self.answered {
+            self.seen = false;
+        }
+        self.answered |= answers;
+        self.plugged = answers;
+        self.asked = Some(Instant::now());
+    }
 }
 
 /// The rim mounted on the base, as last checked.
@@ -179,6 +204,7 @@ impl MozaDevice {
             }
             _ => {}
         }
+        let mapped = hid.shifter_map.clone();
         let mut device = Self {
             hid,
             kind,
@@ -187,13 +213,10 @@ impl MozaDevice {
             serial_error: None,
             cache: BTreeMap::new(),
             rim: Rim::Unknown,
-            seen: Parts::default(),
-            answered: Parts::default(),
-            plugged: Parts::default(),
-            parts_asked: None,
-            mapped: None,
+            shifter: Part::default(),
+            handbrake: Part::default(),
+            mapped,
         };
-        device.mapped = device.hid.shifter_map.clone();
         device.refresh();
         device
     }
@@ -227,124 +250,97 @@ impl MozaDevice {
         }
     }
 
-    /// The parts plugged into a base to show: those answering on its serial port, and those
-    /// seen in use (a part that answered before and is used again shows at once, until the port
-    /// says otherwise).
+    /// The parts plugged into a base to show: those answering on its serial port, and those seen
+    /// in use (one that answered before and is used again shows at once, and is asked for soon).
     pub fn parts(&self) -> Parts {
         Parts {
-            shifter: self.plugged.shifter || self.seen.shifter,
-            handbrake: self.plugged.handbrake || self.seen.handbrake,
+            shifter: self.shifter.shown(),
+            handbrake: self.handbrake.shown(),
         }
     }
 
-    /// A part that answered before, seen in use again while it was not answering: the base is
-    /// asked at once.
-    fn used_again(&mut self, answered: bool, plugged: bool) {
-        if answered && !plugged {
-            self.parts_asked = None;
-        }
+    /// A command's value from the part or device it is for, if it answers.
+    fn ask(&mut self, name: &str) -> Option<u64> {
+        let command = protocol::command(name)?;
+        let id = self.reach(command.target).ok()?;
+        self.read(command, id, serial::ANSWER)
     }
 
-    /// Asks the base's serial port which parts are plugged in, as Boxflat does: a shifter
-    /// answers at 26 with its lever's height (past 100 an HGP), its paddle synchronization and
-    /// direction; a handbrake at 27.
+    /// Asks the base's serial port for the parts plugged in, as Boxflat does: a shifter answers
+    /// at 26 with its lever's height (past 100 an HGP), a handbrake at 27.
     fn ask_parts(&mut self) {
-        if self.kind != Kind::Base || self.serial.is_none() {
+        if self.serial.is_none() {
             return;
         }
-        let any = self.plugged.shifter || self.plugged.handbrake;
-        let every = if any { PARTS_ASKED } else { NO_PARTS_ASKED };
-        if self.parts_asked.is_some_and(|at| at.elapsed() < every) {
-            return;
+        if self.shifter.due() {
+            let was = self.shifter.plugged;
+            let lever = self.ask("sequential-output-y");
+            self.shifter.answer(lever.is_some());
+            match (was, lever) {
+                (false, Some(height)) => {
+                    self.hid.shifter_layout = Some(self.shifter_layout(height))
+                }
+                // Unplugged: its buttons no longer say it is there (with paddle synchronization
+                // they were the rim's paddles).
+                (true, None) => self.hid.shifter_layout = None,
+                _ => {}
+            }
         }
-        self.parts_asked = Some(Instant::now());
-        let ask = |d: &mut Self, name: &str| {
-            let command = protocol::command(name)?;
-            d.read(command, command.target.ids()[0], serial::ANSWER)
-        };
-        let lever = ask(self, "sequential-output-y");
-        self.plugged.shifter = lever.is_some();
-        // A part that answered before and no longer does was unplugged.
-        if lever.is_none() && self.answered.shifter {
-            self.seen.shifter = false;
+        if self.handbrake.due() {
+            let answers = self.ask("handbrake-direction").is_some();
+            self.handbrake.answer(answers);
         }
-        if let Some(height) = lever {
-            self.answered.shifter = true;
-            self.hid.shifter_layout = Some(if height > 100 {
-                shifters::HGP.layout(&shifters::HGP_ON_BASE)
-            } else {
-                let paddles = ask(self, "sequential-paddle-sync") == Some(2);
-                let reversed = ask(self, "sequential-direction") == Some(1);
-                let [up, down] = if paddles {
-                    shifters::SGP_PADDLES
-                } else {
-                    shifters::SGP_ON_BASE
-                };
-                shifters::SGP.layout(&if reversed { [down, up] } else { [up, down] })
-            });
-        }
-        self.plugged.handbrake = ask(self, "handbrake-direction").is_some();
-        if !self.plugged.handbrake && self.answered.handbrake {
-            self.seen.handbrake = false;
-        }
-        self.answered.handbrake |= self.plugged.handbrake;
     }
 
-    /// A shifter plugged into a base shows itself when it is moved. Until it answers on the
-    /// serial port, which tells its kind, buttons 113 and 114 are both the SGP's and the HGP's
-    /// reverse and first gear: an SGP until a gear only the HGP has (115 to 120) is engaged.
+    /// The buttons of the shifter that just answered: an HGP's, or an SGP's as its paddle
+    /// synchronization and direction say (read once, when it starts answering).
+    fn shifter_layout(&mut self, height: u64) -> ShifterMap {
+        if height > 100 {
+            return shifters::HGP.layout(&shifters::HGP_ON_BASE);
+        }
+        let paddles = self.ask("sequential-paddle-sync") == Some(2);
+        let reversed = self.ask("sequential-direction") == Some(1);
+        let [up, down] = if paddles {
+            shifters::SGP_PADDLES
+        } else {
+            shifters::SGP_ON_BASE
+        };
+        shifters::SGP.layout(&if reversed { [down, up] } else { [up, down] })
+    }
+
+    /// A shifter plugged into a base is in use when one of its buttons is pressed. Until it
+    /// answers on the serial port, which tells its kind, buttons 113 and 114 are both the SGP's
+    /// and the HGP's reverse and first gear: an SGP until a gear only the HGP has (115 to 120) is
+    /// engaged.
     fn notice_shifter(&mut self) {
-        if self.kind != Kind::Base {
-            return;
-        }
+        // A mapping made by hand since: the shifter was just moved.
         if self.hid.shifter_map != self.mapped {
-            self.seen.shifter = true;
+            self.mapped = self.hid.shifter_map.clone();
+            self.shifter.seen = true;
         }
-        let hgp = shifters::HGP.layout(&shifters::HGP_ON_BASE);
-        let known = self.hid.shifter_map.is_some()
-            || self.answered.shifter
-            || self.hid.shifter_layout.as_ref() == Some(&hgp);
-        if self.seen.shifter && known {
-            return;
-        }
-        let pressed: Vec<u16> = self
-            .hid
-            .inputs
-            .buttons()
-            .into_iter()
-            .filter_map(|(code, pressed)| pressed.then_some(code))
-            .collect();
+        let pressed = shifter::pressed(self);
         let any = |codes: &[u16]| codes.iter().any(|c| pressed.contains(c));
-        if !self.answered.shifter && self.hid.shifter_layout.as_ref() != Some(&hgp) {
+        if !self.shifter.plugged {
             if any(&shifters::HGP_ON_BASE[1..7]) {
-                self.hid.shifter_layout = Some(hgp);
+                self.hid.shifter_layout = Some(shifters::HGP.layout(&shifters::HGP_ON_BASE));
             } else if self.hid.shifter_layout.is_none() && any(&shifters::SGP_ON_BASE) {
                 self.hid.shifter_layout = Some(shifters::SGP.layout(&shifters::SGP_ON_BASE));
             }
         }
-        // Mapped by hand or known, it is there once one of its buttons is pressed.
-        let buttons: Vec<u16> = self
+        if self
             .hid
             .shifter()
-            .into_iter()
-            .flat_map(|m| m.into_values())
-            .collect();
-        if any(&buttons) {
-            self.seen.shifter = true;
-            self.used_again(self.answered.shifter, self.plugged.shifter);
+            .is_some_and(|map| map.values().any(|c| pressed.contains(c)))
+        {
+            self.shifter.seen = true;
         }
     }
 
-    /// A handbrake plugged into a base shows itself when it is pulled past half its travel:
-    /// the base has the axis whether one is plugged in or not.
+    /// A handbrake plugged into a base is in use when pulled past half its travel.
     fn notice_handbrake(&mut self) {
-        if self.kind != Kind::Base || self.seen.handbrake {
-            return;
-        }
         let now = self.hid.inputs.axes();
-        self.seen.handbrake = now.get(&axes::HANDBRAKE).is_some_and(|a| a.unit() > 0.5);
-        if self.seen.handbrake {
-            self.used_again(self.answered.handbrake, self.plugged.handbrake);
+        if now.get(&axes::HANDBRAKE).is_some_and(|a| a.unit() > 0.5) {
+            self.handbrake.seen = true;
         }
     }
 
@@ -365,9 +361,11 @@ impl MozaDevice {
             }
         }
         let changed = self.hid.refresh();
-        self.ask_parts();
-        self.notice_shifter();
-        self.notice_handbrake();
+        if self.kind == Kind::Base {
+            self.ask_parts();
+            self.notice_shifter();
+            self.notice_handbrake();
+        }
         changed
     }
 
@@ -401,14 +399,11 @@ impl MozaDevice {
             .chain(others.filter(|id| Some(*id) != last))
             .find(|id| self.read(probe, *id, RIM_ANSWER).is_some());
         // What the same rim did not answer stays unanswered: asking again costs a wait each.
-        let missing = match (&self.rim, found) {
-            (Rim::At { id, answers, .. }, Some(again)) if *id == again => answers
-                .iter()
-                .filter(|(_, v)| v.is_none())
-                .map(|(k, v)| (*k, *v))
-                .collect(),
+        let mut missing = match std::mem::replace(&mut self.rim, Rim::Unknown) {
+            Rim::At { id, answers, .. } if Some(id) == found => answers,
             _ => BTreeMap::new(),
         };
+        missing.retain(|_, v| v.is_none());
         let checked = Instant::now();
         self.rim = match found {
             Some(id) => Rim::At {
@@ -430,7 +425,13 @@ impl MozaDevice {
             Target::Wheel => self.rim(),
             other => other.ids().first().copied(),
         };
-        id.ok_or_else(|| Unsupported::new(Reason::Unavailable).with_detail(NO_RIM))
+        id.ok_or_else(|| {
+            let ids: Vec<String> = Target::Wheel.ids().iter().map(u8::to_string).collect();
+            Unsupported::new(Reason::Unavailable).with_detail(format!(
+                "No steering wheel answers on the base's serial port (device ids {} asked).",
+                ids.join(", ")
+            ))
+        })
     }
 
     /// What the device answered to a command, when it is kept: the base's values until the

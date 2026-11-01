@@ -38,18 +38,6 @@ impl Target {
         }
     }
 
-    /// Boxflat's name for it in its command table: commands of the parts are named after it
-    /// (`wheel-…`, `sequential-…`).
-    pub fn boxflat(self) -> &'static str {
-        match self {
-            Target::Main => "main",
-            Target::Base => "base",
-            Target::Wheel => "wheel",
-            Target::Shifter => "sequential",
-            Target::Handbrake => "handbrake",
-        }
-    }
-
     /// What answers, for messages.
     pub fn noun(self) -> &'static str {
         match self {
@@ -375,7 +363,14 @@ mod tests {
     fn every_command_is_boxflats() {
         let table = boxflat();
         for c in COMMANDS {
-            let device = c.target.boxflat();
+            // Boxflat's name for the target: commands of the parts are named after it.
+            let device = match c.target {
+                Target::Main => "main",
+                Target::Base => "base",
+                Target::Wheel => "wheel",
+                Target::Shifter => "sequential",
+                Target::Handbrake => "handbrake",
+            };
             let name = c.name.strip_prefix(&format!("{device}-")).unwrap_or(c.name);
             let entry = |name: String| {
                 table

@@ -30,7 +30,7 @@ fn r9(env: &PluginEnv, settings: &str) -> PathBuf {
         "1-3:1.0/0003:346E:0002.0001",
         Some("hid-universal-pidff"),
     );
-    fs::write(env.root.join("usb/1-3/simrig-fake-serial"), settings).unwrap();
+    set_serial(env, settings);
     // Steering a quarter to the left.
     env.input(
         &hid,
@@ -50,7 +50,7 @@ fn serial(env: &PluginEnv) -> String {
     fs::read_to_string(env.root.join("usb/1-3/simrig-fake-serial")).unwrap()
 }
 
-/// What the R9's serial port knows from now on: parts plugged or unplugged.
+/// What the R9's serial port knows from now on: its settings, parts plugged or unplugged.
 fn set_serial(env: &PluginEnv, settings: &str) {
     fs::write(env.root.join("usb/1-3/simrig-fake-serial"), settings).unwrap();
 }
@@ -585,6 +585,31 @@ fn parts_on_a_base_answer_on_its_serial_port() {
         h.param(shifter, "mode")
             .is_ok_and(|p| p.value == Value::Choice("h_pattern".into()))
     });
+}
+
+#[test]
+fn a_shifter_mapped_by_hand_still_goes_when_unplugged() {
+    // The port says whether it is there, a mapping made while running or not.
+    let env = env("base-sgp-mapped");
+    let base = r9(&env, "limit 450\nsequential-output-y 40\n");
+    env.input(&base, &base_buttons(&[]));
+    let mut host = env.start();
+    until(&mut host, "the shifter", |h| h.components().len() == 4);
+    let device = Target::Device {
+        plugin: "moza".into(),
+        device: "usb-346e-0002".into(),
+    };
+    map_shifter(
+        &mut host,
+        &env,
+        &base,
+        base_buttons,
+        &device,
+        "map-sequential-shifter",
+        &[(0x2d1, "Shift down"), (0x2d0, "Check the mapping")],
+    );
+    set_serial(&env, "limit 450\n");
+    until(&mut host, "the shifter gone", |h| h.components().len() == 3);
 }
 
 #[test]
