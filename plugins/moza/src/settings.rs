@@ -233,11 +233,20 @@ pub const RIM: &[Setting] = &[
         &[(1, "Buttons"), (2, "Combined axis"), (3, "Separate axes")],
         Place::Rim(SteeringWheelParam::AnalogPaddleMode),
     ),
+    // The RPM LEDs'.
     percent(
         "wheel-rpm-brightness",
         "LED brightness",
         Place::Rim(SteeringWheelParam::LedBrightness),
     ),
+    Setting {
+        help: "The buttons' lights, apart from the RPM LEDs.",
+        ..percent(
+            "wheel-buttons-brightness",
+            "Button LED brightness",
+            custom("Lights"),
+        )
+    },
     Setting {
         min: 5.0,
         max: 95.0,

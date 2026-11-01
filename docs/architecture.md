@@ -1036,15 +1036,17 @@ checked), or with paddle synchronization the paddles' 14th (up) and 13th (down, 
 checked), the HGP its 113th to 120th (reverse, then the gears). The base's buttons past the 80th
 exist only with hid-universal-pidff, which maps them from `KEY_NEXT_FAVORITE`. The HBP is read
 on `ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table).
-**Parts plugged into a base** are asked for over its serial port, as Boxflat does: a shifter
-answers at device id 26 with its lever's height (past 100 an HGP, else an SGP), its paddle
-synchronization and its direction, so the SGP's buttons are known whatever its settings; a
-handbrake answers at 27. Each is asked every few seconds while it answers or is in use again,
-every half minute while it is silent (each silence costs a wait); the SGP's settings are read
-when it starts answering. Once a part has answered, the port says whether it is there, a
-mapping made by hand or not; a part used again while it is not answering shows at once and is
-asked for within seconds. Unplugged, a shifter's buttons as the port gave them no longer count
-as use (with paddle synchronization they are the rim's paddles). A part that never answers (a base that does not pass the question on) shows once
+**The base's serial port is served by a thread of its own** (`port.rs`), as Boxflat does: every
+second it asks what is plugged into the base and checks the rim, and it runs the plugin's
+requests in between. The plugin takes what it heard at each refresh without waiting, so a part
+or a rim that does not answer never holds up the live inputs; only reading or writing a
+setting waits for its answer. **Parts plugged into a base** answer there: a shifter at device id
+26 with its lever's height (past 100 an HGP, else an SGP), its paddle synchronization and its
+direction (read when it starts answering), so the SGP's buttons are known whatever its
+settings; a handbrake at 27. Once a part has answered, the port says whether it is there, a
+mapping made by hand or not, within a second or two of plugging or unplugging it. Unplugged, a
+shifter's buttons as the port gave them are forgotten (with paddle synchronization they are the
+rim's paddles). A part that never answers (a base that does not pass the question on) shows once
 used instead, since the base has its inputs whether it is plugged in or not: a shifter once one
 of its buttons is pressed, known or mapped by hand (a mapping kept from before shows nothing
 until then; one made while running shows at once), a handbrake once pulled past half its
@@ -1064,15 +1066,15 @@ cached (the base answers in milliseconds, not microseconds); a port that fails i
 **The rim** mounted on a base has no USB of its own: a base always gives a steering wheel
 component, whose buttons, hat switches and analog paddles (the base's `ABS_RY` and `ABS_RX`,
 Boxflat's table) come through the base's inputs. Its settings go over the base's serial port to
-the rim's device id: 23 on most rims, 21 or 19 on others, found by asking each in turn with a
-second to answer, like Boxflat. As in Boxflat, a rim's answer (groups 63 to 66) counts whatever
-device id it carries: some rims answer with the base's. Analog paddle mode and LED brightness
-are standard parameters; the combined axis split, the stick used as a directional pad and each
-rotary encoder's mode custom ones. The rim keeps them in its memory. Its values are kept only
-until it is checked again, a few seconds later at the id found last (rims are taken off and
-swapped); what it did not answer stays unanswered while the same rim answers there. With no rim
-answering, it is asked again half a minute later. Which rim is mounted is not known: the base
-does not say.
+the rim's device id: 23 on most rims, 21 or 19 on others, found by the port's thread asking each
+in turn with a second to answer, like Boxflat, every few seconds while none answers, and checked
+at its id every second once found. As in Boxflat, a rim's answer (groups 63 to 66) counts
+whatever device id it carries: some rims answer with the base's. Analog paddle mode and the RPM
+LEDs' brightness are standard parameters; the buttons' LED brightness, the combined axis split,
+the stick used as a directional pad and each rotary encoder's mode custom ones. The rim keeps
+them in its memory. Its answers, missing ones too, are kept while the same rim answers: one
+taken off or swapped is noticed within a second or two. Which rim is mounted is not known: the
+base does not say.
 **Boxflat** is pinned as a submodule (`plugins/moza/boxflat`), used unmodified and not shipped:
 a test checks every command of `protocol.rs` against its `data/serial.yml`, so a change there
 shows when the submodule is moved forward.

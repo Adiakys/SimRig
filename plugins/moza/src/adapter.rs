@@ -21,6 +21,8 @@ use crate::models::{self, Kind};
 struct Shape {
     driver: Option<String>,
     settings: bool,
+    /// A rim answers: its settings can be read.
+    rim: bool,
     pedals: Vec<PedalRole>,
     shifter: Option<ShifterMap>,
     parts: Parts,
@@ -50,6 +52,7 @@ impl MozaAdapter {
         Shape {
             driver: d.hid.driver(),
             settings: d.no_settings().is_none(),
+            rim: d.rim(),
             pedals: d.hid.pedal_map.roles(),
             shifter: d.hid.shifter(),
             parts: d.parts(),

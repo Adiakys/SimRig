@@ -110,7 +110,8 @@ fn the_rim_on_the_base_and_its_settings() {
     let base = r9(
         &env,
         "limit 450\nwheel-telemetry-mode 1\nwheel-paddles-mode 2\nwheel-clutch-point 50\n\
-         wheel-stick-mode 2\nwheel-knob0-mode 1\nwheel-rpm-brightness 80\n",
+         wheel-stick-mode 2\nwheel-knob0-mode 1\nwheel-rpm-brightness 80\n\
+         wheel-buttons-brightness 30\n",
     );
     // Left paddle at rest, right one pulled, the first button pressed.
     env.input(
@@ -159,12 +160,15 @@ fn the_rim_on_the_base_and_its_settings() {
         .unwrap();
     host.set(wheel, "custom.wheel_clutch_point", Value::Float(35.0))
         .unwrap();
+    host.set(wheel, "custom.wheel_buttons_brightness", Value::Float(60.0))
+        .unwrap();
     let stored = serial(&env);
     for line in [
         "wheel-paddles-mode 3",
         "wheel-rpm-brightness 40",
         "wheel-stick-mode 0",
         "wheel-clutch-point 35",
+        "wheel-buttons-brightness 60",
     ] {
         assert!(stored.lines().any(|l| l == line), "{line}: {stored}");
     }
@@ -578,12 +582,16 @@ fn parts_on_a_base_answer_on_its_serial_port() {
     set_serial(&env, "limit 450\n");
     until(&mut host, "the parts gone", |h| h.components().len() == 3);
 
-    // An HGP plugged instead, moved: shown at once, then the port says what it is.
-    set_serial(&env, "limit 450\nsequential-output-y 200\n");
-    env.input(&base, &at_rest(&[0x2d1]));
-    until(&mut host, "an H-pattern shifter", |h| {
-        h.param(shifter, "mode")
-            .is_ok_and(|p| p.value == Value::Choice("h_pattern".into()))
+    // An HGP and the handbrake plugged while running, nothing moved: the port says what they
+    // are within a second or two.
+    set_serial(
+        &env,
+        "limit 450\nsequential-output-y 200\nhandbrake-direction 0\n",
+    );
+    until(&mut host, "an H-pattern shifter and the handbrake", |h| {
+        h.components().len() == 5
+            && h.param(shifter, "mode")
+                .is_ok_and(|p| p.value == Value::Choice("h_pattern".into()))
     });
 }
 

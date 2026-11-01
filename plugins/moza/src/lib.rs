@@ -7,6 +7,7 @@ pub mod adapter;
 pub mod components;
 pub mod device;
 pub mod models;
+pub mod port;
 pub mod protocol;
 pub mod serial;
 pub mod settings;
