@@ -193,11 +193,12 @@ fn a_rim_at_another_id_answering_as_the_base() {
     );
     let mut host = env.start();
     base_ready(&mut host);
+    // Looked for at one id a second: found at the second.
     let wheel = "moza/usb-346e-0002/wheel";
-    assert_eq!(
-        host.param(wheel, "analog_paddle_mode").unwrap().value,
-        Value::Choice("2".into())
-    );
+    until(&mut host, "the rim at 21", |h| {
+        h.param(wheel, "analog_paddle_mode")
+            .is_ok_and(|p| p.value == Value::Choice("2".into()))
+    });
     host.set(wheel, "analog_paddle_mode", Value::Choice("0".into()))
         .unwrap();
     assert!(serial(&env).lines().any(|l| l == "wheel-paddles-mode 1"));

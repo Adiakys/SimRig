@@ -1038,9 +1038,12 @@ exist only with hid-universal-pidff, which maps them from `KEY_NEXT_FAVORITE`. T
 on `ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table).
 **The base's serial port is served by a thread of its own** (`port.rs`), as Boxflat does: every
 second it asks what is plugged into the base and checks the rim, and it runs the plugin's
-requests in between. The plugin takes what it heard at each refresh without waiting, so a part
-or a rim that does not answer never holds up the live inputs; only reading or writing a
-setting waits for its answer. **Parts plugged into a base** answer there: a shifter at device id
+requests in between, staying with them for a moment after one (setting reads come together).
+The plugin takes what it heard at each refresh without waiting, so asking for a part or a rim
+that does not answer never holds up the live inputs; reading or writing a setting waits for its
+answer, behind at most the one question being asked. Something that answered counts as gone
+after two polls missed in a row, so one late answer does not describe every component again.
+**Parts plugged into a base** answer there: a shifter at device id
 26 with its lever's height (past 100 an HGP, else an SGP), its paddle synchronization and its
 direction (read when it starts answering), so the SGP's buttons are known whatever its
 settings; a handbrake at 27. Once a part has answered, the port says whether it is there, a
@@ -1066,9 +1069,9 @@ cached (the base answers in milliseconds, not microseconds); a port that fails i
 **The rim** mounted on a base has no USB of its own: a base always gives a steering wheel
 component, whose buttons, hat switches and analog paddles (the base's `ABS_RY` and `ABS_RX`,
 Boxflat's table) come through the base's inputs. Its settings go over the base's serial port to
-the rim's device id: 23 on most rims, 21 or 19 on others, found by the port's thread asking each
-in turn with a second to answer, like Boxflat, every few seconds while none answers, and checked
-at its id every second once found. As in Boxflat, a rim's answer (groups 63 to 66) counts
+the rim's device id: 23 on most rims, 21 or 19 on others, found by the port's thread asking one
+id each second in turn, with a second to answer, like Boxflat, and checked at its id every
+second once found. As in Boxflat, a rim's answer (groups 63 to 66) counts
 whatever device id it carries: some rims answer with the base's. Analog paddle mode and the RPM
 LEDs' brightness are standard parameters; the buttons' LED brightness, the combined axis split,
 the stick used as a directional pad and each rotary encoder's mode custom ones. The rim keeps

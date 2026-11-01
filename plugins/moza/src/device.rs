@@ -107,22 +107,12 @@ struct Part {
     seen: bool,
     /// Answered on the serial port at least once.
     answered: bool,
-    /// Answering now.
-    plugged: bool,
 }
 
 impl Part {
-    fn shown(&self) -> bool {
-        if self.answered {
-            self.plugged
-        } else {
-            self.seen
-        }
-    }
-
-    fn hear(&mut self, answers: bool) {
-        self.answered |= answers;
-        self.plugged = answers;
+    /// Whether to show it, `plugged` being whether it answers now.
+    fn shown(&self, plugged: bool) -> bool {
+        if self.answered { plugged } else { self.seen }
     }
 }
 
@@ -219,8 +209,8 @@ impl MozaDevice {
     /// there; else those seen in use.
     pub fn parts(&self) -> Parts {
         Parts {
-            shifter: self.shifter.shown(),
-            handbrake: self.handbrake.shown(),
+            shifter: self.shifter.shown(self.heard.shifter.is_some()),
+            handbrake: self.handbrake.shown(self.heard.handbrake),
         }
     }
 
@@ -237,7 +227,7 @@ impl MozaDevice {
         if !heard.polled {
             return;
         }
-        if heard.rim.is_none() || heard.rims != self.heard.rims {
+        if heard.rims != self.heard.rims {
             self.rim_answers.clear();
         }
         match (self.heard.shifter, heard.shifter) {
@@ -247,8 +237,8 @@ impl MozaDevice {
             (Some(_), None) => self.hid.shifter_layout = None,
             _ => {}
         }
-        self.shifter.hear(heard.shifter.is_some());
-        self.handbrake.hear(heard.handbrake);
+        self.shifter.answered |= heard.shifter.is_some();
+        self.handbrake.answered |= heard.handbrake;
         self.heard = heard;
     }
 
@@ -262,14 +252,16 @@ impl MozaDevice {
             self.mapped = self.hid.shifter_map.clone();
             self.shifter.seen = true;
         }
+        // Once it has answered, the port says whether it is there and what it is.
+        if self.shifter.answered {
+            return;
+        }
         let pressed = shifter::pressed(self);
         let any = |codes: &[u16]| codes.iter().any(|c| pressed.contains(c));
-        if !self.shifter.plugged {
-            if any(&shifters::HGP_ON_BASE[1..7]) {
-                self.hid.shifter_layout = Some(shifters::HGP.layout(&shifters::HGP_ON_BASE));
-            } else if self.hid.shifter_layout.is_none() && any(&shifters::SGP_ON_BASE) {
-                self.hid.shifter_layout = Some(shifters::SGP.layout(&shifters::SGP_ON_BASE));
-            }
+        if any(&shifters::HGP_ON_BASE[1..7]) {
+            self.hid.shifter_layout = Some(shifters::HGP.layout(&shifters::HGP_ON_BASE));
+        } else if self.hid.shifter_layout.is_none() && any(&shifters::SGP_ON_BASE) {
+            self.hid.shifter_layout = Some(shifters::SGP.layout(&shifters::SGP_ON_BASE));
         }
         if self
             .hid
@@ -282,6 +274,9 @@ impl MozaDevice {
 
     /// A handbrake plugged into a base is in use when pulled past half its travel.
     fn notice_handbrake(&mut self) {
+        if self.handbrake.answered || self.handbrake.seen {
+            return;
+        }
         let now = self.hid.inputs.axes();
         if now.get(&axes::HANDBRAKE).is_some_and(|a| a.unit() > 0.5) {
             self.handbrake.seen = true;
@@ -291,7 +286,7 @@ impl MozaDevice {
     /// Looks for the HID driver and the serial port again, and takes what the port heard; true
     /// when the HID binding changed.
     pub fn refresh(&mut self) -> bool {
-        if self.serial.as_ref().is_some_and(|port| port.heard().failed) {
+        if self.serial.as_ref().is_some_and(Port::failed) {
             // Unplugged or replaced: opened again below.
             self.forget_port();
         }
@@ -378,13 +373,8 @@ impl MozaDevice {
     }
 
     /// A command's value at a device id; `None` when it does not answer.
-    fn read(&mut self, command: &Command, device: u8) -> Option<u64> {
-        let (group, id) = command.read?;
-        let frame = protocol::read_frame(command, device)?;
-        self.serial
-            .as_ref()?
-            .exchange(&frame, (group, device, id), serial::ANSWER)
-            .ok()?
+    fn read(&mut self, command: &'static Command, device: u8) -> Option<u64> {
+        self.serial.as_ref()?.exchange(command, device, None).ok()?
     }
 
     /// A setting's value on the device, or why it cannot be had.
@@ -414,18 +404,17 @@ impl MozaDevice {
     pub fn set(&mut self, name: &'static str, value: u64) -> Result<()> {
         let command = protocol::command(name)
             .ok_or_else(|| Error::NotFound(format!("no command '{name}'")))?;
-        let (group, id) = command
-            .write
-            .ok_or_else(|| Error::failed(format!("'{name}' cannot be written")))?;
+        if command.write.is_none() {
+            return Err(Error::failed(format!("'{name}' cannot be written")));
+        }
         let device = self
             .reach(command.target)
             .map_err(|u| Error::failed(u.explain()))?;
-        let frame = protocol::write_frame(command, device, value).ok_or_else(Error::unsupported)?;
         let port = self
             .serial
             .as_ref()
             .ok_or_else(|| Error::failed("No serial port."))?;
-        match port.exchange(&frame, (group, device, id), serial::ANSWER) {
+        match port.exchange(command, device, Some(value)) {
             Ok(Some(_)) => {
                 self.keep(command, Some(value));
                 Ok(())
@@ -434,11 +423,8 @@ impl MozaDevice {
                 "The {} did not answer.",
                 command.target.noun()
             ))),
-            Err(e) => {
-                // A port that fails (unplugged, replaced) is opened again at the next refresh.
-                self.forget_port();
-                Err(Error::failed(e.to_string()))
-            }
+            // A port that fails (unplugged, replaced) is opened again at the next refresh.
+            Err(e) => Err(Error::failed(e.to_string())),
         }
     }
 

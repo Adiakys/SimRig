@@ -1,7 +1,7 @@
 //! The adapter: Moza devices as components. A base gives a wheel base, the rim mounted on it,
-//! the pedals plugged into it, a handbrake plugged into it once pulled, and a shifter plugged
-//! into it (an HGP once a gear is engaged, any once mapped by hand);
-//! pedal sets, handbrakes and shifters on their own USB give theirs.
+//! the pedals plugged into it, and a handbrake and a shifter plugged into it as its serial port
+//! says, or once used where the port does not answer for them; pedal sets, handbrakes and
+//! shifters on their own USB give theirs.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
