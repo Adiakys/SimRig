@@ -120,7 +120,11 @@ fn the_rim_on_the_base_and_its_settings() {
     );
     let mut host = env.start();
     base_ready(&mut host);
+    // The port's thread finds the rim a moment after the base is ready.
     let wheel = "moza/usb-346e-0002/wheel";
+    until(&mut host, "the rim", |h| {
+        h.param(wheel, "analog_paddle_mode").is_ok()
+    });
     let description = host.find(wheel).unwrap().description.clone();
     assert_eq!(description.name, "Steering wheel on the MOZA R9 Base");
     assert!(
