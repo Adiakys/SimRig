@@ -7,24 +7,23 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use crate::protocol;
+use crate::protocol::{self, Target};
+
+/// How long a device has to answer: the base answers in milliseconds.
+pub const ANSWER: Duration = Duration::from_millis(250);
 
 /// The fake port of tests: a file of `<command> <value>` lines in a USB device directory outside
 /// `/sys`, standing for the settings the device stores.
 pub const FAKE_SERIAL: &str = "simrig-fake-serial";
 
-/// How long a device has to answer.
-const TIMEOUT: Duration = Duration::from_millis(250);
-
 pub trait Link {
-    /// Sends a request and waits for the answer to (group, device id, id): the value it
-    /// carries. `None` when the device does not answer.
+    /// Sends a request and waits, for up to `wait`, for the answer to `of` (group, device id,
+    /// id): the value it carries. `None` when the device does not answer.
     fn exchange(
         &mut self,
         request: &[u8],
-        group: u8,
-        device: u8,
-        id: &[u8],
+        of: (u8, u8, &[u8]),
+        wait: Duration,
     ) -> io::Result<Option<u64>>;
 }
 
@@ -84,12 +83,15 @@ impl Link for Tty {
     fn exchange(
         &mut self,
         request: &[u8],
-        group: u8,
-        device: u8,
-        id: &[u8],
+        (group, device, id): (u8, u8, &[u8]),
+        wait: Duration,
     ) -> io::Result<Option<u64>> {
+        // What came after the last answer was waited for is dropped: a late answer to another
+        // device id must not pass for this one's.
+        self.buf.clear();
+        let _ = rustix::termios::tcflush(&self.file, rustix::termios::QueueSelector::IFlush);
         self.file.write_all(request)?;
-        let deadline = Instant::now() + TIMEOUT;
+        let deadline = Instant::now() + wait;
         let mut chunk = [0u8; 64];
         while Instant::now() < deadline {
             while let Some(frame) = protocol::take_frame(&mut self.buf) {
@@ -105,7 +107,8 @@ impl Link for Tty {
 }
 
 /// Answers like a device, from and to the file: requests are checked, answers go through the
-/// same decoding as real ones.
+/// same decoding as real ones. A `wheel-id` line sets the rim's device id (23 when absent), a
+/// `wheel-answers-as` line the id its answers carry.
 struct Fake(PathBuf);
 
 impl Fake {
@@ -125,14 +128,26 @@ impl Link for Fake {
     fn exchange(
         &mut self,
         request: &[u8],
-        group: u8,
-        device: u8,
-        id: &[u8],
+        (group, device, id): (u8, u8, &[u8]),
+        _wait: Duration,
     ) -> io::Result<Option<u64>> {
-        let frame = protocol::parse_request(request)
+        let mut frame = protocol::parse_request(request)
             .ok_or_else(|| io::Error::other(format!("malformed request {request:02x?}")))?;
+        let mut values = self.values();
+        let setting = |name: &str| {
+            values
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, v)| *v as u8)
+        };
+        let wheel_id = setting("wheel-id").unwrap_or(23);
+        let answers_as = setting("wheel-answers-as");
         let found = protocol::COMMANDS.iter().find_map(|c| {
-            if !c.target.ids().contains(&frame.device) {
+            let at = match c.target {
+                Target::Wheel => frame.device == wheel_id,
+                other => other.ids().contains(&frame.device),
+            };
+            if !at {
                 return None;
             }
             [(c.read, false), (c.write, true)]
@@ -147,7 +162,11 @@ impl Link for Fake {
         let Some((command, id_len, write)) = found else {
             return Ok(None);
         };
-        let mut values = self.values();
+        if command.target == Target::Wheel
+            && let Some(as_id) = answers_as
+        {
+            frame.device = as_id;
+        }
         let value = if write {
             let value = frame.payload[id_len..]
                 .iter()

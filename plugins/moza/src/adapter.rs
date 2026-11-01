@@ -13,7 +13,7 @@ use simrig_plugin_sdk::model::Bus;
 use simrig_plugin_sdk::prelude::*;
 
 use crate::components::{self, Base, Handbrake, Wheel};
-use crate::device::{MozaDevice, Shared};
+use crate::device::{MozaDevice, Parts, Shared};
 use crate::models::{self, Kind};
 
 /// What a device showed last, to notice changes.
@@ -23,7 +23,7 @@ struct Shape {
     settings: bool,
     pedals: Vec<PedalRole>,
     shifter: Option<ShifterMap>,
-    handbrake: bool,
+    parts: Parts,
     /// The inputs can be read (the event node is given to the user a moment after binding).
     inputs: bool,
 }
@@ -52,7 +52,7 @@ impl MozaAdapter {
             settings: d.no_settings().is_none(),
             pedals: d.hid.pedal_map.roles(),
             shifter: d.hid.shifter(),
-            handbrake: d.handbrake,
+            parts: d.parts(),
             inputs: d.hid.inputs_ready(),
         }
     }
@@ -80,11 +80,13 @@ impl MozaAdapter {
                 if mapped {
                     list.push(pedals());
                 }
-                // A shifter plugged into the base, once it is known to be there.
-                if d.hid.shifter().is_some() {
+                // A shifter or a handbrake plugged into the base, as its serial port or their
+                // use says.
+                let parts = d.parts();
+                if parts.shifter {
                     list.push(shifter());
                 }
-                if d.handbrake {
+                if parts.handbrake {
                     list.push(handbrake());
                 }
                 list

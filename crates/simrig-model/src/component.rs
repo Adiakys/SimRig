@@ -337,6 +337,7 @@ std_items! {
         Gear => "gear", "Gear", Gear, None;
         PositionXy => "position_xy", "Lever position", Floats, None;
         Sequential => "sequential", "Sequential up/down", Buttons, None;
+        Buttons => "buttons", "Buttons", Buttons, None;
     }
 }
 

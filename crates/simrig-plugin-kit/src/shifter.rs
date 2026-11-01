@@ -55,7 +55,8 @@ fn is_sequential(map: &ShifterMap) -> bool {
     map.contains_key("+")
 }
 
-fn pressed<D: HasHid>(device: &D) -> BTreeSet<u16> {
+/// The device's buttons held now, by code.
+pub fn pressed<D: HasHid>(device: &D) -> BTreeSet<u16> {
     device
         .hid()
         .inputs
@@ -67,6 +68,16 @@ fn pressed<D: HasHid>(device: &D) -> BTreeSet<u16> {
 
 const NO_GEARS: &str = "A sequential shifter has no gear positions.";
 
+/// A position's name: on the button it is on, in the mapping's steps.
+fn position_name(position: &str) -> String {
+    match position {
+        "+" => "Shift up".into(),
+        "-" => "Shift down".into(),
+        "R" => "Reverse".into(),
+        gear => format!("Gear {gear}"),
+    }
+}
+
 /// A shifter as a standard component, once its buttons are known.
 pub struct ButtonShifter<D: HasHid> {
     pub device: Rc<RefCell<D>>,
@@ -77,15 +88,22 @@ pub struct ButtonShifter<D: HasHid> {
 }
 
 impl<D: HasHid> ButtonShifter<D> {
-    /// The map and the buttons pressed, or why they cannot be read.
-    fn read(&self) -> std::result::Result<(ShifterMap, BTreeSet<u16>), Unsupported> {
+    /// Why the buttons cannot be read, if they cannot.
+    fn unreadable(&self) -> Option<Unsupported> {
         let d = self.device.borrow();
         if let Some(u) = d.hid().unbound() {
+            return Some(u);
+        }
+        let error = d.hid().inputs.error()?;
+        Some(Unsupported::new(Reason::Unavailable).with_detail(error))
+    }
+
+    /// The map and the buttons pressed, or why they cannot be read.
+    fn read(&self) -> std::result::Result<(ShifterMap, BTreeSet<u16>), Unsupported> {
+        if let Some(u) = self.unreadable() {
             return Err(u);
         }
-        if let Some(e) = d.hid().inputs.error() {
-            return Err(Unsupported::new(Reason::Unavailable).with_detail(e));
-        }
+        let d = self.device.borrow();
         let map = d.hid().shifter().ok_or_else(Unsupported::not_in_driver)?;
         Ok((map, pressed(&*d)))
     }
@@ -102,6 +120,23 @@ impl<D: HasHid> Component for ButtonShifter<D> {
 
     fn model(&self) -> Option<String> {
         self.model.clone()
+    }
+
+    /// The device's buttons, the positions named. Not on a base: its buttons are the base's.
+    fn controls(&mut self) -> Vec<Control> {
+        let d = self.device.borrow();
+        let hid = d.hid();
+        if hid.steering.is_some() {
+            return Vec::new();
+        }
+        let names: Vec<(u16, String)> = hid
+            .shifter()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(position, code)| (code, position_name(&position)))
+            .collect();
+        let labels: Vec<(u16, &str)> = names.iter().map(|(c, n)| (*c, n.as_str())).collect();
+        hid.controls(&[], &labels)
     }
 
     fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
@@ -144,6 +179,20 @@ impl<D: HasHid> Shifter for ButtonShifter<D> {
         }
         let held = |p: &str| map.get(p).is_some_and(|code| pressed.contains(code));
         Support::Supported([held("+"), held("-")])
+    }
+
+    fn buttons(&mut self) -> Support<Vec<bool>> {
+        if let Some(u) = self.unreadable() {
+            return Support::Unsupported(u);
+        }
+        let d = self.device.borrow();
+        let hid = d.hid();
+        if hid.steering.is_some() {
+            return Support::Unsupported(Unsupported::not_in_driver().with_detail(
+                "Plugged into a base, its buttons are the base's: they show with the base's rim.",
+            ));
+        }
+        hid.buttons()
     }
 
     fn param(&mut self, param: ShifterParam) -> Support<ParamSpec> {
@@ -247,15 +296,6 @@ struct MapShifter<D: HasHid> {
 }
 
 impl<D: HasHid> MapShifter<D> {
-    fn name(position: &str) -> String {
-        match position {
-            "+" => "Shift up".into(),
-            "-" => "Shift down".into(),
-            "R" => "Reverse".into(),
-            g => format!("Gear {g}"),
-        }
-    }
-
     fn table(&self) -> Element {
         let buttons = self.device.borrow().hid().inputs.buttons();
         Element::Table {
@@ -273,7 +313,7 @@ impl<D: HasHid> MapShifter<D> {
                             None => input::key_name(*code),
                         },
                     };
-                    vec![Self::name(p), input]
+                    vec![position_name(p), input]
                 })
                 .collect(),
         }
@@ -313,8 +353,11 @@ impl<D: HasHid> MapShifter<D> {
                 .action(StepAction::cancel());
         };
         let title = match position.as_str() {
-            "+" | "-" => format!("{} and hold the lever", Self::name(position)),
-            _ => format!("Engage {} and hold it", Self::name(position).to_lowercase()),
+            "+" | "-" => format!("{} and hold the lever", position_name(position)),
+            _ => format!(
+                "Engage {} and hold it",
+                position_name(position).to_lowercase()
+            ),
         };
         Step::new(&title)
             .text("Hold it until it is detected, then release it.")

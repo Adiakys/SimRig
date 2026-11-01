@@ -74,6 +74,16 @@ const fn choice(
     }
 }
 
+/// A rotary encoder's mode: buttons, or a knob turning a value up and down.
+const fn knob(command: &'static str, label: &'static str) -> Setting {
+    choice(
+        command,
+        label,
+        &[(0, "Buttons"), (1, "Knob")],
+        custom("Controls"),
+    )
+}
+
 const fn custom(group: &'static str) -> Place {
     Place::Custom {
         group,
@@ -239,17 +249,16 @@ pub const RIM: &[Setting] = &[
         )
     },
     choice(
-        "wheel-knob-mode",
-        "Rotary encoders",
-        &[(0, "Buttons"), (1, "Knob")],
-        custom("Controls"),
-    ),
-    choice(
         "wheel-stick-mode",
-        "Left stick",
-        &[(0, "Buttons"), (256, "Directional pad")],
+        "Stick as directional pad",
+        &[(0, "None"), (1, "Left stick"), (2, "Right stick")],
         custom("Controls"),
     ),
+    knob("wheel-knob0-mode", "Rotary encoder 1"),
+    knob("wheel-knob1-mode", "Rotary encoder 2"),
+    knob("wheel-knob2-mode", "Rotary encoder 3"),
+    knob("wheel-knob3-mode", "Rotary encoder 4"),
+    knob("wheel-knob4-mode", "Rotary encoder 5"),
 ];
 
 pub fn standard(param: WheelBaseParam) -> Option<&'static Setting> {

@@ -148,6 +148,7 @@ impl Facade for ShifterFacade<'_> {
             ShifterInput::Gear => self.0.gear().map(Value::Gear),
             ShifterInput::PositionXy => self.0.position_xy().map(|p| Value::Floats(p.to_vec())),
             ShifterInput::Sequential => self.0.sequential().map(|s| Value::Buttons(s.to_vec())),
+            ShifterInput::Buttons => self.0.buttons().map(Value::Buttons),
         })
     }
     fn param(&mut self, id: &str) -> Option<Support<ParamSpec>> {

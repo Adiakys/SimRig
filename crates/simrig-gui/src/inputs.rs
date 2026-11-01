@@ -1,4 +1,5 @@
-//! A steering wheel's controls, live: what was pressed last, what is held, and the Inputs view
+//! A component's controls (a steering wheel's, a shifter's), live: what was pressed last, what
+//! is held, and the Inputs view
 //! of its screen (buttons, hat switches, encoders, analog paddles, as games number them).
 
 use std::collections::{BTreeMap, HashMap};
@@ -16,7 +17,7 @@ pub const SHOWN: Duration = Duration::from_millis(1500);
 /// A button held longer than this is reported as probably stuck.
 pub const STUCK: Duration = Duration::from_secs(30);
 
-/// What a steering wheel's controls did, followed across live updates.
+/// What a component's controls did, followed across live updates.
 #[derive(Default)]
 pub struct Presses {
     buttons: Vec<bool>,
@@ -112,7 +113,7 @@ fn model<T: Clone + 'static>(items: Vec<T>) -> ModelRc<T> {
     ModelRc::from(Rc::new(VecModel::from(items)))
 }
 
-/// The Inputs view of a steering wheel.
+/// The Inputs view of a component that lists its controls.
 pub fn view(
     controls: &[Control],
     live: &BTreeMap<String, Value>,
@@ -219,7 +220,7 @@ pub fn view(
     }
 }
 
-/// Followed presses of every steering wheel, by component address.
+/// Followed presses of every component that lists its controls, by address.
 pub type AllPresses = HashMap<String, Presses>;
 
 #[cfg(test)]
@@ -279,21 +280,21 @@ mod tests {
 #[derive(Default)]
 pub struct InputsState {
     pub presses: AllPresses,
-    /// The open steering wheel shows its Inputs view.
+    /// The open component shows its Inputs view.
     pub tab: bool,
     /// Hides presses on the home and counts held buttons when nothing else moves.
     ticker: Option<slint::Timer>,
 }
 
 impl crate::app::App {
-    /// The steering wheel at `address`, with its controls, when it lists any.
+    /// The component at `address`, with its controls, when it lists any (a steering wheel, a
+    /// shifter with buttons of its own).
     fn controls_of(&self, address: &str) -> Option<Vec<Control>> {
         let d = &self.view(address)?.component.description;
-        (d.kind == simrig_model::ComponentKind::SteeringWheel && !d.controls.is_empty())
-            .then(|| d.controls.clone())
+        (!d.controls.is_empty()).then(|| d.controls.clone())
     }
 
-    /// Follows the controls of the steering wheels that just sent live values.
+    /// Follows the controls of the components that just sent live values.
     pub fn track_presses(&mut self, addresses: &[String]) {
         let now = Instant::now();
         for address in addresses {

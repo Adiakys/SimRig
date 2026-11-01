@@ -30,7 +30,7 @@ fn r9(env: &PluginEnv, settings: &str) -> PathBuf {
         "1-3:1.0/0003:346E:0002.0001",
         Some("hid-universal-pidff"),
     );
-    fs::write(env.root.join("usb/1-3/simrig-fake-serial"), settings).unwrap();
+    set_serial(env, settings);
     // Steering a quarter to the left.
     env.input(
         &hid,
@@ -48,6 +48,11 @@ fn base_ready(host: &mut simrig_host::Host) {
 
 fn serial(env: &PluginEnv) -> String {
     fs::read_to_string(env.root.join("usb/1-3/simrig-fake-serial")).unwrap()
+}
+
+/// What the R9's serial port knows from now on: its settings, parts plugged or unplugged.
+fn set_serial(env: &PluginEnv, settings: &str) {
+    fs::write(env.root.join("usb/1-3/simrig-fake-serial"), settings).unwrap();
 }
 
 #[test]
@@ -105,7 +110,7 @@ fn the_rim_on_the_base_and_its_settings() {
     let base = r9(
         &env,
         "limit 450\nwheel-telemetry-mode 1\nwheel-paddles-mode 2\nwheel-clutch-point 50\n\
-         wheel-stick-mode 256\nwheel-rpm-brightness 80\n",
+         wheel-stick-mode 2\nwheel-knob0-mode 1\nwheel-rpm-brightness 80\n",
     );
     // Left paddle at rest, right one pulled, the first button pressed.
     env.input(
@@ -143,7 +148,9 @@ fn the_rim_on_the_base_and_its_settings() {
     );
     let described = host.describe(wheel).unwrap();
     let stick = described.custom_param("wheel_stick_mode").unwrap();
-    assert_eq!(stick.value, Value::Choice("1".into()));
+    assert_eq!(stick.value, Value::Choice("2".into()));
+    let knob = described.custom_param("wheel_knob0_mode").unwrap();
+    assert_eq!(knob.value, Value::Choice("1".into()));
     host.set(wheel, "analog_paddle_mode", Value::Choice("2".into()))
         .unwrap();
     host.set(wheel, "led_brightness", Value::Float(40.0))
@@ -161,14 +168,35 @@ fn the_rim_on_the_base_and_its_settings() {
     ] {
         assert!(stored.lines().any(|l| l == line), "{line}: {stored}");
     }
-    // A setting this rim does not answer for, and one no command is known for.
+    // A rotary encoder this rim does not have, and a setting no command is known for.
     let described = host.describe(wheel).unwrap();
     let knob = &described
-        .custom_param("wheel_knob_mode")
+        .custom_param("wheel_knob1_mode")
         .unwrap()
         .availability;
     assert!(matches!(knob, Support::Unsupported(u) if u.explain().contains("does not answer")));
     assert!(reason(&mut host, wheel, "vibration").contains("No serial command"));
+}
+
+#[test]
+fn a_rim_at_another_id_answering_as_the_base() {
+    // Some rims answer at 21 or 19, some carry the base's id in their answers (Boxflat).
+    let env = env("rim-21");
+    r9(
+        &env,
+        "limit 450\nwheel-id 21\nwheel-answers-as 19\nwheel-telemetry-mode 1\n\
+         wheel-paddles-mode 3\n",
+    );
+    let mut host = env.start();
+    base_ready(&mut host);
+    let wheel = "moza/usb-346e-0002/wheel";
+    assert_eq!(
+        host.param(wheel, "analog_paddle_mode").unwrap().value,
+        Value::Choice("2".into())
+    );
+    host.set(wheel, "analog_paddle_mode", Value::Choice("0".into()))
+        .unwrap();
+    assert!(serial(&env).lines().any(|l| l == "wheel-paddles-mode 1"));
 }
 
 #[test]
@@ -351,6 +379,19 @@ fn an_sgp_sequential_shifter() {
     );
     assert!(reason(&mut host, shifter, "gear").contains("no gear positions"));
 
+    // Its other buttons show too, the positions named.
+    let controls = host.find(shifter).unwrap().description.controls.clone();
+    assert_eq!(controls.len(), 16);
+    assert_eq!(controls[12].label.as_deref(), Some("Shift up"));
+    assert_eq!(controls[13].label.as_deref(), Some("Shift down"));
+    env.input(&sgp, &buttons(&[0x12e]));
+    let inputs = host.read_inputs(shifter).unwrap();
+    let Some(Value::Buttons(pressed)) = inputs.get("buttons") else {
+        panic!("{inputs:?}")
+    };
+    assert_eq!(pressed.iter().position(|b| *b), Some(14));
+    env.input(&sgp, &buttons(&[0x12c]));
+
     // Recognised, mapped by hand only to put it right: here, the direction reversed in the
     // shifter's own settings.
     let target = Target::Component(shifter.into());
@@ -499,6 +540,97 @@ fn an_hbp_plugged_into_a_base_shows_itself_when_pulled() {
 }
 
 #[test]
+fn parts_on_a_base_answer_on_its_serial_port() {
+    let env = env("base-parts");
+    let base = r9(
+        &env,
+        "limit 450\nsequential-output-y 40\nsequential-direction 1\nhandbrake-direction 0\n",
+    );
+    let at_rest = |pressed: &[u16]| {
+        format!(
+            "abs 0 32767 0 65535\nabs 7 0 0 65535\n{}",
+            base_buttons(pressed)
+        )
+    };
+    env.input(&base, &at_rest(&[]));
+    let mut host = env.start();
+
+    // Nothing moved: an SGP and a handbrake answer at their device ids.
+    until(&mut host, "the shifter and the handbrake", |h| {
+        h.components().len() == 5
+    });
+    let shifter = "moza/usb-346e-0002/shifter";
+    assert_eq!(
+        host.param(shifter, "mode").unwrap().value,
+        Value::Choice("sequential".into())
+    );
+    assert!(host.find("moza/usb-346e-0002/handbrake").is_ok());
+    // Its direction reversed in its settings: up on 114.
+    env.input(&base, &at_rest(&[0x2d1]));
+    let inputs = host.read_inputs(shifter).unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![true, false]))
+    );
+
+    // Unplugged: they no longer answer, and go.
+    env.input(&base, &at_rest(&[]));
+    set_serial(&env, "limit 450\n");
+    until(&mut host, "the parts gone", |h| h.components().len() == 3);
+
+    // An HGP plugged instead, moved: shown at once, then the port says what it is.
+    set_serial(&env, "limit 450\nsequential-output-y 200\n");
+    env.input(&base, &at_rest(&[0x2d1]));
+    until(&mut host, "an H-pattern shifter", |h| {
+        h.param(shifter, "mode")
+            .is_ok_and(|p| p.value == Value::Choice("h_pattern".into()))
+    });
+}
+
+#[test]
+fn a_shifter_mapped_by_hand_still_goes_when_unplugged() {
+    // The port says whether it is there, a mapping made while running or not.
+    let env = env("base-sgp-mapped");
+    let base = r9(&env, "limit 450\nsequential-output-y 40\n");
+    env.input(&base, &base_buttons(&[]));
+    let mut host = env.start();
+    until(&mut host, "the shifter", |h| h.components().len() == 4);
+    let device = Target::Device {
+        plugin: "moza".into(),
+        device: "usb-346e-0002".into(),
+    };
+    map_shifter(
+        &mut host,
+        &env,
+        &base,
+        base_buttons,
+        &device,
+        "map-sequential-shifter",
+        &[(0x2d1, "Shift down"), (0x2d0, "Check the mapping")],
+    );
+    set_serial(&env, "limit 450\n");
+    until(&mut host, "the shifter gone", |h| h.components().len() == 3);
+}
+
+#[test]
+fn an_sgp_with_paddle_synchronization_on_a_base() {
+    // Its buttons are the paddles': the base's serial port says so.
+    let env = env("base-sgp-sync");
+    let base = r9(
+        &env,
+        "limit 450\nsequential-output-y 40\nsequential-paddle-sync 2\n",
+    );
+    env.input(&base, &base_buttons(&[0x12d]));
+    let mut host = env.start();
+    until(&mut host, "the shifter", |h| h.components().len() == 4);
+    let inputs = host.read_inputs("moza/usb-346e-0002/shifter").unwrap();
+    assert_eq!(
+        inputs.get("sequential"),
+        Some(&Value::Buttons(vec![true, false]))
+    );
+}
+
+#[test]
 fn an_sgp_plugged_into_a_base_shows_itself_when_shifted() {
     let env = env("base-sgp");
     let base = r9(&env, "limit 450\n");
@@ -564,4 +696,19 @@ fn with_paddle_sync_an_sgp_on_a_base_is_mapped_by_hand() {
         inputs.get("sequential"),
         Some(&Value::Buttons(vec![false, true]))
     );
+
+    // Started again with the shifter unplugged, the mapping is kept but shows nothing until
+    // the shifter is used. Two requests make the plugin look before the count.
+    drop(host);
+    env.input(&base, &base_buttons(&[]));
+    let mut host = env.start();
+    base_ready(&mut host);
+    host.read_inputs("moza/usb-346e-0002/base").unwrap();
+    host.read_inputs("moza/usb-346e-0002/base").unwrap();
+    host.poll();
+    assert_eq!(host.components().len(), 3);
+    env.input(&base, &base_buttons(&[0x12d]));
+    until(&mut host, "the shifter, used", |h| {
+        h.components().len() == 4
+    });
 }

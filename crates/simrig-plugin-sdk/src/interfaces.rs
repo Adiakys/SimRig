@@ -173,6 +173,10 @@ pub trait Shifter: Component {
     fn sequential(&mut self) -> Support<[bool; 2]> {
         Support::not_in_driver()
     }
+    /// All the device's buttons, the positions' and any other, as games number them.
+    fn buttons(&mut self) -> Support<Vec<bool>> {
+        Support::not_in_driver()
+    }
     fn param(&mut self, _param: ShifterParam) -> Support<ParamSpec> {
         Support::not_in_driver()
     }

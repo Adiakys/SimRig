@@ -25,3 +25,6 @@
 [submodule "plugins/simagic/driver/simagic-ff"]
 	path = plugins/simagic/driver/simagic-ff
 	url = https://github.com/JacKeTUs/simagic-ff
+[submodule "plugins/moza/boxflat"]
+	path = plugins/moza/boxflat
+	url = https://github.com/Lawstorant/boxflat
