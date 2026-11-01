@@ -286,11 +286,11 @@ pub struct InputsState {
 }
 
 impl crate::app::App {
-    /// The steering wheel at `address`, with its controls, when it lists any.
+    /// The component at `address`, with its controls, when it lists any (a steering wheel, a
+    /// shifter with buttons of its own).
     fn controls_of(&self, address: &str) -> Option<Vec<Control>> {
         let d = &self.view(address)?.component.description;
-        (d.kind == simrig_model::ComponentKind::SteeringWheel && !d.controls.is_empty())
-            .then(|| d.controls.clone())
+        (!d.controls.is_empty()).then(|| d.controls.clone())
     }
 
     /// Follows the controls of the steering wheels that just sent live values.

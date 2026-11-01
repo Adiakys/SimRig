@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use simrig_plugin_kit::device::{Binding, HasHid, HidDevice};
-use simrig_plugin_kit::shifter::Gate;
+use simrig_plugin_kit::shifter::{Gate, ShifterMap};
 use simrig_plugin_sdk::prelude::*;
 
 use crate::models::{self, Kind};
@@ -16,10 +16,19 @@ use crate::protocol::{self, Command, Target};
 use crate::serial::{self, Link};
 
 /// Why the rim's settings are unavailable when no rim answers.
-const NO_RIM: &str = "No steering wheel answers on the base's serial port.";
+const NO_RIM: &str = "No steering wheel answers on the base's serial port (device ids 23, 21 and 19 \
+                      asked).";
 
 /// How long what is known of the rim holds: rims are taken off and swapped.
 const RIM_RECHECK: Duration = Duration::from_secs(5);
+
+/// How long a base without a rim answering is left before asking again: asking every id takes
+/// seconds.
+const NO_RIM_RECHECK: Duration = Duration::from_secs(30);
+
+/// How long a rim has to answer when it is looked for: through the base it can take longer than
+/// the base itself (Boxflat waits until its next poll, seconds later).
+const RIM_ANSWER: Duration = Duration::from_secs(1);
 
 /// The kernel driver of force feedback on Moza bases.
 pub const FFB_DRIVER: &str = "hid-universal-pidff";
@@ -85,7 +94,17 @@ pub struct MozaDevice {
     /// Values read or written, by command: the base answers slowly.
     cache: BTreeMap<&'static str, u64>,
     rim: Rim,
-    /// A handbrake plugged into the base was seen pulled.
+    pub seen: Seen,
+    /// The shifter mapping made by hand when the plugin started: one made since says the
+    /// shifter is there.
+    mapped: Option<ShifterMap>,
+}
+
+/// Parts plugged into a base, seen in use since the plugin started: the base has their inputs
+/// whether they are plugged in or not.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Seen {
+    pub shifter: bool,
     pub handbrake: bool,
 }
 
@@ -153,8 +172,10 @@ impl MozaDevice {
             serial_error: None,
             cache: BTreeMap::new(),
             rim: Rim::Unknown,
-            handbrake: false,
+            seen: Seen::default(),
+            mapped: None,
         };
+        device.mapped = device.hid.shifter_map.clone();
         device.refresh();
         device
     }
@@ -192,32 +213,53 @@ impl MozaDevice {
     /// both the SGP's and the HGP's reverse and first gear: an SGP until a gear only the HGP has
     /// (115 to 120) is engaged.
     fn notice_shifter(&mut self) {
-        let hgp = shifters::HGP.layout(&shifters::HGP_ON_BASE);
-        if self.kind != Kind::Base || self.hid.shifter_layout.as_ref() == Some(&hgp) {
+        if self.kind != Kind::Base {
             return;
         }
-        let pressed = |codes: &[u16]| {
-            self.hid
-                .inputs
-                .buttons()
-                .into_iter()
-                .any(|(code, pressed)| pressed && codes.contains(&code))
-        };
-        if pressed(&shifters::HGP_ON_BASE[1..7]) {
-            self.hid.shifter_layout = Some(hgp);
-        } else if self.hid.shifter_layout.is_none() && pressed(&shifters::SGP_ON_BASE) {
-            self.hid.shifter_layout = Some(shifters::SGP.layout(&shifters::SGP_ON_BASE));
+        if self.hid.shifter_map != self.mapped {
+            self.seen.shifter = true;
+        }
+        let hgp = shifters::HGP.layout(&shifters::HGP_ON_BASE);
+        let known =
+            self.hid.shifter_map.is_some() || self.hid.shifter_layout.as_ref() == Some(&hgp);
+        if self.seen.shifter && known {
+            return;
+        }
+        let pressed: Vec<u16> = self
+            .hid
+            .inputs
+            .buttons()
+            .into_iter()
+            .filter_map(|(code, pressed)| pressed.then_some(code))
+            .collect();
+        let any = |codes: &[u16]| codes.iter().any(|c| pressed.contains(c));
+        if self.hid.shifter_layout.as_ref() != Some(&hgp) {
+            if any(&shifters::HGP_ON_BASE[1..7]) {
+                self.hid.shifter_layout = Some(hgp);
+            } else if self.hid.shifter_layout.is_none() && any(&shifters::SGP_ON_BASE) {
+                self.hid.shifter_layout = Some(shifters::SGP.layout(&shifters::SGP_ON_BASE));
+            }
+        }
+        // Mapped by hand or known, it is there once one of its buttons is pressed.
+        let buttons: Vec<u16> = self
+            .hid
+            .shifter()
+            .into_iter()
+            .flat_map(|m| m.into_values())
+            .collect();
+        if any(&buttons) {
+            self.seen.shifter = true;
         }
     }
 
     /// A handbrake plugged into a base shows itself when it is pulled past half its travel:
     /// the base has the axis whether one is plugged in or not.
     fn notice_handbrake(&mut self) {
-        if self.kind != Kind::Base || self.handbrake {
+        if self.kind != Kind::Base || self.seen.handbrake {
             return;
         }
         let now = self.hid.inputs.axes();
-        self.handbrake = now.get(&axes::HANDBRAKE).is_some_and(|a| a.unit() > 0.5);
+        self.seen.handbrake = now.get(&axes::HANDBRAKE).is_some_and(|a| a.unit() > 0.5);
     }
 
     /// Looks for the HID driver and the serial port again; true when the HID binding changed.
@@ -259,7 +301,7 @@ impl MozaDevice {
     fn rim(&mut self) -> Option<u8> {
         let last = match &self.rim {
             Rim::At { id, checked, .. } if checked.elapsed() < RIM_RECHECK => return Some(*id),
-            Rim::Absent { checked } if checked.elapsed() < RIM_RECHECK => return None,
+            Rim::Absent { checked } if checked.elapsed() < NO_RIM_RECHECK => return None,
             Rim::At { id, .. } => Some(*id),
             _ => None,
         };
@@ -270,13 +312,22 @@ impl MozaDevice {
         let found = last
             .into_iter()
             .chain(others.filter(|id| Some(*id) != last))
-            .find(|id| self.read(probe, *id).is_some());
+            .find(|id| self.read(probe, *id, RIM_ANSWER).is_some());
+        // What the same rim did not answer stays unanswered: asking again costs a wait each.
+        let missing = match (&self.rim, found) {
+            (Rim::At { id, answers, .. }, Some(again)) if *id == again => answers
+                .iter()
+                .filter(|(_, v)| v.is_none())
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            _ => BTreeMap::new(),
+        };
         let checked = Instant::now();
         self.rim = match found {
             Some(id) => Rim::At {
                 id,
                 checked,
-                answers: BTreeMap::new(),
+                answers: missing,
             },
             None => Rim::Absent { checked },
         };
@@ -320,13 +371,13 @@ impl MozaDevice {
         }
     }
 
-    /// A command's value at a device id; `None` when it does not answer.
-    fn read(&mut self, command: &Command, device: u8) -> Option<u64> {
+    /// A command's value at a device id; `None` when it does not answer within `wait`.
+    fn read(&mut self, command: &Command, device: u8, wait: Duration) -> Option<u64> {
         let (group, id) = command.read?;
         let frame = protocol::read_frame(command, device)?;
         self.serial
             .as_mut()?
-            .exchange(&frame, group, device, id)
+            .exchange(&frame, (group, device, id), wait)
             .ok()?
     }
 
@@ -337,7 +388,7 @@ impl MozaDevice {
         let value = match self.kept(command) {
             Some(value) => value,
             None => {
-                let value = self.read(command, device);
+                let value = self.read(command, device, serial::ANSWER);
                 self.keep(command, value);
                 value
             }
@@ -368,7 +419,7 @@ impl MozaDevice {
             .serial
             .as_mut()
             .ok_or_else(|| Error::failed("No serial port."))?;
-        match link.exchange(&frame, group, device, id) {
+        match link.exchange(&frame, (group, device, id), serial::ANSWER) {
             Ok(Some(_)) => {
                 self.keep(command, Some(value));
                 Ok(())

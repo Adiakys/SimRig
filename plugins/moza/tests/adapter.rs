@@ -105,7 +105,7 @@ fn the_rim_on_the_base_and_its_settings() {
     let base = r9(
         &env,
         "limit 450\nwheel-telemetry-mode 1\nwheel-paddles-mode 2\nwheel-clutch-point 50\n\
-         wheel-stick-mode 256\nwheel-rpm-brightness 80\n",
+         wheel-stick-mode 2\nwheel-knob0-mode 1\nwheel-rpm-brightness 80\n",
     );
     // Left paddle at rest, right one pulled, the first button pressed.
     env.input(
@@ -143,7 +143,9 @@ fn the_rim_on_the_base_and_its_settings() {
     );
     let described = host.describe(wheel).unwrap();
     let stick = described.custom_param("wheel_stick_mode").unwrap();
-    assert_eq!(stick.value, Value::Choice("1".into()));
+    assert_eq!(stick.value, Value::Choice("2".into()));
+    let knob = described.custom_param("wheel_knob0_mode").unwrap();
+    assert_eq!(knob.value, Value::Choice("1".into()));
     host.set(wheel, "analog_paddle_mode", Value::Choice("2".into()))
         .unwrap();
     host.set(wheel, "led_brightness", Value::Float(40.0))
@@ -161,14 +163,35 @@ fn the_rim_on_the_base_and_its_settings() {
     ] {
         assert!(stored.lines().any(|l| l == line), "{line}: {stored}");
     }
-    // A setting this rim does not answer for, and one no command is known for.
+    // A rotary encoder this rim does not have, and a setting no command is known for.
     let described = host.describe(wheel).unwrap();
     let knob = &described
-        .custom_param("wheel_knob_mode")
+        .custom_param("wheel_knob1_mode")
         .unwrap()
         .availability;
     assert!(matches!(knob, Support::Unsupported(u) if u.explain().contains("does not answer")));
     assert!(reason(&mut host, wheel, "vibration").contains("No serial command"));
+}
+
+#[test]
+fn a_rim_at_another_id_answering_as_the_base() {
+    // Some rims answer at 21 or 19, some carry the base's id in their answers (Boxflat).
+    let env = env("rim-21");
+    r9(
+        &env,
+        "limit 450\nwheel-id 21\nwheel-answers-as 19\nwheel-telemetry-mode 1\n\
+         wheel-paddles-mode 3\n",
+    );
+    let mut host = env.start();
+    base_ready(&mut host);
+    let wheel = "moza/usb-346e-0002/wheel";
+    assert_eq!(
+        host.param(wheel, "analog_paddle_mode").unwrap().value,
+        Value::Choice("2".into())
+    );
+    host.set(wheel, "analog_paddle_mode", Value::Choice("0".into()))
+        .unwrap();
+    assert!(serial(&env).lines().any(|l| l == "wheel-paddles-mode 1"));
 }
 
 #[test]
@@ -350,6 +373,19 @@ fn an_sgp_sequential_shifter() {
         Some(&Value::Buttons(vec![true, false]))
     );
     assert!(reason(&mut host, shifter, "gear").contains("no gear positions"));
+
+    // Its other buttons show too, the positions named.
+    let controls = host.find(shifter).unwrap().description.controls.clone();
+    assert_eq!(controls.len(), 16);
+    assert_eq!(controls[12].label.as_deref(), Some("Shift up"));
+    assert_eq!(controls[13].label.as_deref(), Some("Shift down"));
+    env.input(&sgp, &buttons(&[0x12e]));
+    let inputs = host.read_inputs(shifter).unwrap();
+    let Some(Value::Buttons(pressed)) = inputs.get("buttons") else {
+        panic!("{inputs:?}")
+    };
+    assert_eq!(pressed.iter().position(|b| *b), Some(14));
+    env.input(&sgp, &buttons(&[0x12c]));
 
     // Recognised, mapped by hand only to put it right: here, the direction reversed in the
     // shifter's own settings.
@@ -564,4 +600,19 @@ fn with_paddle_sync_an_sgp_on_a_base_is_mapped_by_hand() {
         inputs.get("sequential"),
         Some(&Value::Buttons(vec![false, true]))
     );
+
+    // Started again with the shifter unplugged, the mapping is kept but shows nothing until
+    // the shifter is used. Two requests make the plugin look before the count.
+    drop(host);
+    env.input(&base, &base_buttons(&[]));
+    let mut host = env.start();
+    base_ready(&mut host);
+    host.read_inputs("moza/usb-346e-0002/base").unwrap();
+    host.read_inputs("moza/usb-346e-0002/base").unwrap();
+    host.poll();
+    assert_eq!(host.components().len(), 3);
+    env.input(&base, &base_buttons(&[0x12d]));
+    until(&mut host, "the shifter, used", |h| {
+        h.components().len() == 4
+    });
 }

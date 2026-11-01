@@ -1,4 +1,5 @@
-// The Inputs view of a steering wheel: what the rim sends, as games number it, live.
+// The Inputs view of a component that lists its controls (a steering wheel, a shifter with
+// buttons of its own): what it sends, as games number it, live.
 
 import { Theme, Icons } from "theme.slint";
 import { InputsView, InputButton, InputHat, InputEncoder, InputAxis } from "api.slint";
@@ -184,7 +185,7 @@ export component InputsPanel inherits VerticalLayout {
     in property <InputsView> view;
     spacing: 0;
 
-    // What the rim has, at a glance.
+    // What the device has, at a glance.
     HorizontalLayout {
         padding-top: 18px;
         padding-bottom: 16px;
@@ -195,7 +196,7 @@ export component InputsPanel inherits VerticalLayout {
         if root.view.hats.length > 0: Count { label: @tr("HAT"); value: root.view.hats.length; }
         if root.view.axes.length > 0: Count { label: @tr("ANALOG PADDLES"); value: root.view.axes.length; }
     }
-    Small { text: @tr("What the rim sends. Steering and pedals are on their own screens."); color: Theme.ink3; }
+    Small { text: @tr("What the device sends. Steering, pedals and gears are on their own screens."); color: Theme.ink3; }
     Rectangle { height: 14px; }
 
     // The control used last: press one to find it.
@@ -232,7 +233,7 @@ export component InputsPanel inherits VerticalLayout {
     }
 
     if root.view.buttons.length > 0: VerticalLayout {
-        SectionTitle { title: @tr("Buttons"); note: @tr("numbered as games read them, named where the plugin knows the rim"); }
+        SectionTitle { title: @tr("Buttons"); note: @tr("numbered as games read them, named where the plugin knows the device"); }
         ButtonGrid { buttons: root.view.buttons; }
         if root.view.stuck != "": Notice { text: root.view.stuck; level: "warning"; }
     }

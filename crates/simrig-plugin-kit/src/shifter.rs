@@ -67,6 +67,16 @@ fn pressed<D: HasHid>(device: &D) -> BTreeSet<u16> {
 
 const NO_GEARS: &str = "A sequential shifter has no gear positions.";
 
+/// A position's name, for the button it is on.
+fn position_name(position: &str) -> String {
+    match position {
+        "+" => "Shift up".into(),
+        "-" => "Shift down".into(),
+        "R" => "Reverse".into(),
+        gear => format!("Gear {gear}"),
+    }
+}
+
 /// A shifter as a standard component, once its buttons are known.
 pub struct ButtonShifter<D: HasHid> {
     pub device: Rc<RefCell<D>>,
@@ -102,6 +112,23 @@ impl<D: HasHid> Component for ButtonShifter<D> {
 
     fn model(&self) -> Option<String> {
         self.model.clone()
+    }
+
+    /// The device's buttons, the positions named. Not on a base: its buttons are the base's.
+    fn controls(&mut self) -> Vec<Control> {
+        let d = self.device.borrow();
+        let hid = d.hid();
+        if hid.steering.is_some() {
+            return Vec::new();
+        }
+        let names: Vec<(u16, String)> = hid
+            .shifter()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(position, code)| (code, position_name(&position)))
+            .collect();
+        let labels: Vec<(u16, &str)> = names.iter().map(|(c, n)| (*c, n.as_str())).collect();
+        hid.controls(&[], &labels)
     }
 
     fn procedures(&mut self) -> Vec<ProcedureDescriptor> {
@@ -144,6 +171,20 @@ impl<D: HasHid> Shifter for ButtonShifter<D> {
         }
         let held = |p: &str| map.get(p).is_some_and(|code| pressed.contains(code));
         Support::Supported([held("+"), held("-")])
+    }
+
+    fn buttons(&mut self) -> Support<Vec<bool>> {
+        let d = self.device.borrow();
+        let hid = d.hid();
+        if let Some(u) = hid.unbound() {
+            return Support::Unsupported(u);
+        }
+        if hid.steering.is_some() {
+            return Support::Unsupported(Unsupported::not_in_driver().with_detail(
+                "Plugged into a base, its buttons are the base's: they show with the base's rim.",
+            ));
+        }
+        hid.buttons()
     }
 
     fn param(&mut self, param: ShifterParam) -> Support<ParamSpec> {

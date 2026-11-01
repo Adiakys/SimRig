@@ -198,6 +198,7 @@ Pedal item ids are prefixed with the pedal: `brake.position`, `throttle.curve`.
 | `gear` (`R`, `N`, `1..n`) — H | `gears` (forward gear count), `reverse_position` (choice) | `calibrate_gears` |
 | `position_xy` (`-1..1`) — analog | `mode` (H / sequential, if the model has both) | |
 | `sequential` (up, down) — sequential | `engage_threshold` (%, analog) | |
+| `buttons` (all the device's, positions' and others') | | |
 
 **`Handbrake`**
 
@@ -280,11 +281,12 @@ explicit answer carrying its reason.
 ### 3.3.1 Controls
 
 A component may also list the physical **controls** its inputs come from (`controls` in its
-description): a rim's buttons, hat switches, encoders and analog paddles. Each has its kind, its
-number as games read it, the kernel's code (`BTN_THUMB`), the plugin's name for it when it knows
-the rim ("Shift up"), and where its live value is: a standard input (`buttons`, `hats`,
-`encoders`, `analog_paddles`) and a position in it. The core knows nothing about any rim; the
-app lists the controls and lights them from the live values.
+description): a rim's buttons, hat switches, encoders and analog paddles, a shifter's buttons.
+Each has its kind, its number as games read it, the kernel's code (`BTN_THUMB`), the plugin's
+name for it when it knows the device ("Shift up"), and where its live value is: a standard input
+(`buttons`, `hats`, `encoders`, `analog_paddles`) and a position in it. The core knows nothing
+about any device; the app lists the controls of any component that has them, in its Inputs view,
+and lights them from the live values.
 
 Games under Proton get their controllers through SDL, which numbers buttons from the codes
 `BTN_JOYSTICK` and up, then the ones below, and axes in code order without the hat switches'.
@@ -1029,14 +1031,18 @@ tells them apart by USB product name, like Boxflat: bases, SR-P/CRP pedal sets, 
 handbrake, the SGP sequential and HGP H-pattern shifters. Their positions are buttons: the SGP
 shifts up on its 13th and down on its 14th (checked on an SGP; Boxflat has them the other way),
 the HGP's seven gears are its 6th to 12th and reverse its 5th (Boxflat's table). Plugged into a
-base instead, a shifter becomes buttons of the base, and shows up when it is moved: the SGP its
+base instead, a shifter becomes buttons of the base, and shows up once one of its buttons is
+pressed, known or mapped by hand (a mapping kept from before shows nothing until then; one made
+while running shows at once, it was just moved): the SGP its
 113th (up) and 114th (down, checked), the HGP its 113th to 120th (reverse, then the gears). The
 two share 113 and 114, so a shifter seen only there is taken for an SGP until a gear only the
 HGP has is engaged. The base's buttons past the 80th exist only with hid-universal-pidff, which
 maps them from `KEY_NEXT_FAVORITE`. With paddle synchronization on, the SGP uses the paddles'
 buttons instead, which do not say it is there: the base offers to map it ("Map a sequential
 shifter connected to the base"). Every shifter can be mapped by hand too, never required (a
-direction reversed in the shifter's own settings, another firmware). The HGP's reverse is drawn right and down, not checked on the device. The HBP is read on
+direction reversed in the shifter's own settings, another firmware). On its own USB, a
+shifter's other buttons show too, the positions named; on a base they are the base's. The HGP's
+reverse is drawn right and down, not checked on the device. The HBP is read on
 `ABS_RUDDER`, on its own USB and plugged into a base alike (Boxflat's table); the base has that
 axis with nothing plugged in, so a handbrake on it shows up once pulled past half its travel. Hubs
 and the like are attached without components for now (they can be given to the generic USB
@@ -1049,12 +1055,18 @@ cached (the base answers in milliseconds, not microseconds); a port that fails i
 **The rim** mounted on a base has no USB of its own: a base always gives a steering wheel
 component, whose buttons, hat switches and analog paddles (the base's `ABS_RY` and `ABS_RX`,
 Boxflat's table) come through the base's inputs. Its settings go over the base's serial port to
-the rim's device id: 23 on most rims, 21 on older ones, found by asking both, like Boxflat.
-Analog paddle mode and LED brightness are standard parameters; the combined axis split, the
-rotary encoders' and the left stick's modes custom ones. The rim keeps them in its memory. Its
-answers, missing ones too, are kept only until it is checked again, a few seconds later at the
-id found last: rims are taken off and swapped. Which rim is mounted is not known: the base does
-not say.
+the rim's device id: 23 on most rims, 21 or 19 on others, found by asking each in turn with a
+second to answer, like Boxflat. As in Boxflat, a rim's answer (groups 63 to 66) counts whatever
+device id it carries: some rims answer with the base's. Analog paddle mode and LED brightness
+are standard parameters; the combined axis split, the stick used as a directional pad and each
+rotary encoder's mode custom ones. The rim keeps them in its memory. Its values are kept only
+until it is checked again, a few seconds later at the id found last (rims are taken off and
+swapped); what it did not answer stays unanswered while the same rim answers there. With no rim
+answering, it is asked again half a minute later. Which rim is mounted is not known: the base
+does not say.
+**Boxflat** is pinned as a submodule (`plugins/moza/boxflat`), used unmodified and not shipped:
+a test checks every command of `protocol.rs` against its `data/serial.yml`, so a change there
+shows when the submodule is moved forward.
 Force feedback (test, stop) needs `hid-universal-pidff` bound to the base; without it the base
 still has inputs and settings, and says why forces are missing. The SR-P's and CRP's axes are known,
 and so are those of pedals plugged into a base (Boxflat's table): no mapping, unless by hand. Tested end to end on a fake R9

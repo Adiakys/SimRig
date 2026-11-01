@@ -1,5 +1,7 @@
 //! The Moza serial protocol, as reverse engineered by Boxflat
 //! (<https://github.com/Lawstorant/boxflat>, GPL-3.0, `moza-protocol.md` and `data/serial.yml`).
+//! Boxflat is pinned in `plugins/moza/boxflat`: the tests check every command here against its
+//! table.
 //!
 //! A frame is `0x7e, length, group, device, command id…, value…, checksum`: `length` counts
 //! the command id and the value, values are big-endian, and the checksum is the sum of every
@@ -20,13 +22,13 @@ pub enum Target {
 }
 
 impl Target {
-    /// The device ids it answers at, the usual one first: most rims answer at 23, older ones at
-    /// 21 (Boxflat tries one, then the other).
+    /// The device ids it answers at, the usual one first: most rims answer at 23, others at 21
+    /// or 19 (Boxflat tries them in turn).
     pub fn ids(self) -> &'static [u8] {
         match self {
             Target::Main => &[18],
             Target::Base => &[19],
-            Target::Wheel => &[23, 21],
+            Target::Wheel => &[23, 21, 19],
         }
     }
 
@@ -122,11 +124,13 @@ pub const COMMANDS: &[Command] = &[
     wheel("wheel-paddles-mode", &[3]),
     // Percent of the combined axis given to the left paddle.
     wheel("wheel-clutch-point", &[9]),
-    wheel("wheel-knob-mode", &[10]),
-    Command {
-        bytes: 2,
-        ..wheel("wheel-stick-mode", &[5])
-    },
+    wheel("wheel-stick-mode", &[5]),
+    // Each rotary encoder's.
+    wheel("wheel-knob0-mode", &[42, 0]),
+    wheel("wheel-knob1-mode", &[42, 1]),
+    wheel("wheel-knob2-mode", &[42, 2]),
+    wheel("wheel-knob3-mode", &[42, 3]),
+    wheel("wheel-knob4-mode", &[42, 4]),
     wheel("wheel-rpm-brightness", &[27, 0, 255]),
 ];
 
@@ -210,9 +214,12 @@ fn swap_nibbles(b: u8) -> u8 {
     b.rotate_left(4)
 }
 
-/// The value a response carries for a request of (group, id) to `device`, if it is one.
+/// The value a response carries for a request of (group, id) to `device`, if it is one. A rim's
+/// answers (groups 63 to 66) count whatever device id they carry: some rims answer with the
+/// base's or the main controller's, and Boxflat takes them by their group.
 pub fn answer(frame: &Frame, group: u8, device: u8, id: &[u8]) -> Option<u64> {
-    if frame.group != group | 0x80 || frame.device != swap_nibbles(device) {
+    let rim = (63..=66).contains(&group);
+    if frame.group != group | 0x80 || (!rim && frame.device != swap_nibbles(device)) {
         return None;
     }
     let value = frame.payload.strip_prefix(id)?;
@@ -273,5 +280,98 @@ mod tests {
         assert_eq!(answer(&frame, 41, 19, &[2]), None);
         assert_eq!(answer(&frame, 41, 23, &[1]), None);
         assert!(stream.is_empty());
+    }
+
+    #[test]
+    fn a_rims_answer_counts_whatever_id_it_carries() {
+        let request = read_frame(command("wheel-paddles-mode").unwrap(), 23).unwrap();
+        let mut req = parse_request(&request).unwrap();
+        // Answered as the base.
+        req.device = 19;
+        let mut stream = respond(&req, 1, Some(2));
+        let frame = take_frame(&mut stream).unwrap();
+        assert_eq!(answer(&frame, 64, 23, &[3]), Some(2));
+        assert_eq!(answer(&frame, 64, 23, &[9]), None);
+    }
+
+    /// A command of Boxflat's table: read group, write group (-1 when it cannot), id, bytes.
+    type Entry = (i64, i64, Vec<u8>, usize);
+
+    /// Boxflat's command table (`data/serial.yml` of the pinned submodule), by device and name.
+    fn boxflat() -> std::collections::BTreeMap<(String, String), Entry> {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/boxflat/data/serial.yml");
+        let text = std::fs::read_to_string(path).expect("the Boxflat submodule");
+        let mut table = std::collections::BTreeMap::new();
+        let (mut device, mut name) = (String::new(), String::new());
+        for line in text.lines() {
+            let line = line.split('#').next().unwrap_or("").trim_end();
+            let indent = line.len() - line.trim_start().len();
+            let Some((key, value)) = line.trim().split_once(':') else {
+                continue;
+            };
+            let value = value.trim();
+            match indent {
+                2 if value.is_empty() => device = key.to_string(),
+                4 if value.is_empty() => {
+                    name = key.to_string();
+                    table.insert((device.clone(), name.clone()), (-1, -1, Vec::new(), 0));
+                }
+                6 => {
+                    let Some(entry) = table.get_mut(&(device.clone(), name.clone())) else {
+                        continue;
+                    };
+                    match key {
+                        "read" => entry.0 = value.parse().unwrap(),
+                        "write" => entry.1 = value.parse().unwrap(),
+                        "bytes" => entry.3 = value.parse().unwrap(),
+                        "id" => {
+                            entry.2 = value
+                                .trim_matches(['[', ']'])
+                                .split(',')
+                                .map(|b| b.trim().parse().unwrap())
+                                .collect()
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+        table
+    }
+
+    #[test]
+    fn every_command_is_boxflats() {
+        let table = boxflat();
+        for c in COMMANDS {
+            let device = match c.target {
+                Target::Main => "main",
+                Target::Base => "base",
+                Target::Wheel => "wheel",
+            };
+            let name = c.name.strip_prefix("wheel-").unwrap_or(c.name);
+            let entry = |name: String| {
+                table
+                    .get(&(device.to_string(), name.clone()))
+                    .unwrap_or_else(|| panic!("{device}-{name} is not in Boxflat's table"))
+            };
+            // Commands Boxflat splits in two: `get-` reads, `set-` writes.
+            let (read, write) = if table.contains_key(&(device.to_string(), name.to_string())) {
+                (entry(name.into()), entry(name.into()))
+            } else {
+                (entry(format!("get-{name}")), entry(format!("set-{name}")))
+            };
+            let as_ours =
+                |group: i64, id: &Vec<u8>| (group >= 0).then(|| (group as u8, id.clone()));
+            let ours = |rw: Option<(u8, &[u8])>| rw.map(|(g, id)| (g, id.to_vec()));
+            assert_eq!(ours(c.read), as_ours(read.0, &read.2), "{} read", c.name);
+            assert_eq!(
+                ours(c.write),
+                as_ours(write.1, &write.2),
+                "{} write",
+                c.name
+            );
+            assert_eq!(c.bytes, read.3, "{} bytes", c.name);
+        }
     }
 }
