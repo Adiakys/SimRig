@@ -97,6 +97,23 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.1" date="2026-11-03">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.1</url>
+      <description>
+        <p>SimRig shows up in software centres, with its description, screenshots and release notes.</p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-11-03">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.0</url>
+      <description>
+        <ul>
+          <li>Add a device shows the plugin of each device, with Change to pick another one</li>
+          <li>An unlisted model of a known maker is offered that maker's plugin first</li>
+          <li>Any device no plugin handles can be given to a plugin by hand</li>
+          <li>When a plugin does not take a device, the reason shows under its row</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-03">
       <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.2.0</url>
       <description>
