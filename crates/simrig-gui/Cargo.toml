@@ -21,7 +21,7 @@ simrig-model.workspace = true
 slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-femtovg", "renderer-software", "software-renderer-systemfonts", "software-renderer-path", "image-default-formats", "accessibility"] }
 png = "0.17"
 # Already used by Slint: draws rotated layers when the renderer cannot rotate (software).
-resvg = { version = "0.48", default-features = false }
+resvg = { version = "0.48", default-features = false, features = ["text"] }
 serde_json.workspace = true
 # Updates: the releases on GitHub (HTTPS with rustls, no system TLS library), the download's
 # checksum and version order.
