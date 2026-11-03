@@ -507,7 +507,7 @@ kernel_driver = "fanatec"                 # optional: the HID driver games need 
 | app → plugin | `action/run` | standard actions: calibration, centering, test effect, stop force |
 | app → plugin | `output/write` | standard outputs: LEDs, display |
 | app → plugin | `input/read` | all supported inputs once |
-| app → plugin | `input/subscribe` `input/unsubscribe` → `input/state` | live inputs when they change, at a capped rate; subscribing again changes it (the app reads components with axes only at 10 Hz while they stay still) |
+| app → plugin | `input/subscribe` `input/unsubscribe` → `input/state` | live inputs when they change, at a capped rate; subscribing again changes it (the app reads components with axes only at 5 Hz while they stay still) |
 | plugin → app | `params/changed` | fresh description after a set or action (availability may have changed) |
 | app → plugin | `shutdown` | the app is closing |
 | plugin → app | `components/changed` | components of a device changed (rim swap), with their descriptions |

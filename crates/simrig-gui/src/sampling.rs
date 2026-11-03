@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use simrig_model::Value;
 
 /// Readings per second of a component with axes only, while it stays still.
-pub const STILL_HZ: f64 = 10.0;
+pub const STILL_HZ: f64 = 5.0;
 /// How long a component with axes only stays at the live rate after it last moved.
 const STILL_AFTER: Duration = Duration::from_secs(1);
 
