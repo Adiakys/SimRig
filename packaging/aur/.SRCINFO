@@ -1,6 +1,6 @@
 pkgbase = simrig-bin
 	pkgdesc = Configure a sim-racing rig of any brand: wheel bases, steering wheels, pedals, shifters, handbrakes
-	pkgver = 0.1.1
+	pkgver = 0.2.0
 	pkgrel = 1
 	url = https://adiakys.github.io/SimRig/
 	install = simrig.install
@@ -17,7 +17,7 @@ pkgbase = simrig-bin
 	conflicts = simrig
 	options = !strip
 	options = !debug
-	source = https://github.com/Adiakys/SimRig/releases/download/v0.1.1/simrig-0.1.1-x86_64-linux.tar.gz
-	sha256sums = 236fe6e59a76e2ca7a384c6a061e851ef2c316592bc78a8ff66f11d669afc77a
+	source = https://github.com/Adiakys/SimRig/releases/download/v0.2.0/simrig-0.2.0-x86_64-linux.tar.gz
+	sha256sums = 55ae9a697babed9f475f5f99c7dae9e0416aad0a256e8c02ceb1e8f0398e1098
 
 pkgname = simrig-bin
