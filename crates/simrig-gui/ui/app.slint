@@ -188,6 +188,13 @@ export component AppWindow inherits Window {
     default-font-family: "Barlow";
     default-font-size: 16px;
 
+    init => {
+        Theme.window-width = self.width;
+        Theme.window-height = self.height;
+    }
+    changed width => { Theme.window-width = self.width; }
+    changed height => { Theme.window-height = self.height; }
+
     FocusScope {
         key-pressed(e) => {
             if e.text == Key.Escape && Rig.update-open {

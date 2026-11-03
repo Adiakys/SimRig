@@ -1034,6 +1034,28 @@ impl Host {
         claims.into_iter().map(|(_, id)| id).collect()
     }
 
+    /// The plugin that handles a USB device when the user chose none: the most specific match.
+    pub fn automatic_plugin(&self, device: &UsbDevice) -> Option<String> {
+        let manifests: Vec<&Manifest> = self.plugins.iter().map(|p| &p.manifest).collect();
+        let (assigned, _) =
+            manifest::assign_usb(&manifests, std::slice::from_ref(device), &BTreeMap::new());
+        assigned
+            .iter()
+            .position(|devices| !devices.is_empty())
+            .map(|i| manifests[i].id.clone())
+    }
+
+    /// The plugin of a USB device's maker, to offer for a model no plugin lists (see
+    /// [`manifest::maker`]). None for a keyboard or a mouse: a desktop device of a brand that
+    /// also makes wheels is not a rig device.
+    pub fn maker_plugin(&self, device: &UsbDevice) -> Option<String> {
+        if device.boot_input {
+            return None;
+        }
+        let manifests: Vec<&Manifest> = self.plugins.iter().map(|p| &p.manifest).collect();
+        manifest::maker(&manifests, device.vid).map(String::from)
+    }
+
     /// USB devices currently connected, with the plugin handling each one.
     pub fn usb_devices(&self) -> Vec<(UsbDevice, Option<String>)> {
         self.usb

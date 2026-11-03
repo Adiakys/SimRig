@@ -130,6 +130,10 @@ pub struct UsbView {
     pub plugin: Option<String>,
     /// Plugins that can handle it, most specific first.
     pub candidates: Vec<String>,
+    /// The plugin that handles it when none is chosen.
+    pub automatic: Option<String>,
+    /// The plugin of its maker, which may take a model it does not list.
+    pub maker: Option<String>,
     /// The plugin the user chose for it, if any (otherwise the most specific one handles it).
     pub chosen: Option<String>,
     /// Guided procedures its plugin offers on it (setup, forget…).
@@ -484,6 +488,8 @@ fn snapshot(host: &mut Host, drivers: &Drivers) -> Snapshot {
             vid: device.vid,
             pid: device.pid,
             candidates: host.candidate_plugins(&device),
+            automatic: host.automatic_plugin(&device),
+            maker: host.maker_plugin(&device),
             chosen,
             procedures,
             plugin,
