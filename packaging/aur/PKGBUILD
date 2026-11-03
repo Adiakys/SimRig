@@ -3,7 +3,7 @@
 # SimRig from its release archive, for the AUR. Updated by packaging/aur/update.sh at each
 # stable release (see docs/development.md).
 pkgname=simrig-bin
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Configure a sim-racing rig of any brand: wheel bases, steering wheels, pedals, shifters, handbrakes"
 arch=('x86_64')
@@ -21,7 +21,7 @@ conflicts=('simrig')
 options=('!strip' '!debug')
 install=simrig.install
 source=("https://github.com/Adiakys/SimRig/releases/download/v${pkgver}/simrig-${pkgver}-${CARCH}-linux.tar.gz")
-sha256sums=('55ae9a697babed9f475f5f99c7dae9e0416aad0a256e8c02ceb1e8f0398e1098')
+sha256sums=('151d7be34b61b13278f74e03c2702f769a1305e29f451fe5bf921200b2ca00a9')
 
 package() {
     cp -a "simrig-${pkgver}-${CARCH}-linux/root/." "${pkgdir}/"
