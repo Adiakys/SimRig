@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
 
 use simrig_model::{Control, ControlKind, Value};
 
@@ -223,6 +223,23 @@ pub fn view(
 /// Followed presses of every component that lists its controls, by address.
 pub type AllPresses = HashMap<String, Presses>;
 
+/// True when `a` and `b` show the same inputs. Each view carries new lists, which `==` compares
+/// by identity: setting it again would rebuild the whole Inputs view with nothing moving.
+fn same_view(a: &InputsView, b: &InputsView) -> bool {
+    let bare = |v: &InputsView| InputsView {
+        buttons: ModelRc::default(),
+        hats: ModelRc::default(),
+        encoders: ModelRc::default(),
+        axes: ModelRc::default(),
+        ..v.clone()
+    };
+    bare(a) == bare(b)
+        && a.buttons.iter().eq(b.buttons.iter())
+        && a.hats.iter().eq(b.hats.iter())
+        && a.encoders.iter().eq(b.encoders.iter())
+        && a.axes.iter().eq(b.axes.iter())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,12 +284,24 @@ mod tests {
             "{}",
             v.stuck
         );
-        use slint::Model;
         let first = v.buttons.row_data(0).unwrap();
         assert!(first.pressed);
         assert_eq!(first.held, "held 31 s");
         assert_eq!(first.label, "Shift down");
         assert_eq!(v.last_what, "Hat 1");
+    }
+
+    #[test]
+    fn a_still_view_is_unchanged() {
+        let c = controls();
+        let p = Presses::default();
+        let now = Instant::now();
+        let still = view(&c, &live(&[false, false], -1), &p, now);
+        let again = view(&c, &live(&[false, false], -1), &p, now);
+        assert_ne!(still, again, "new lists every time");
+        assert!(same_view(&still, &again));
+        let pressed = view(&c, &live(&[false, true], -1), &p, now);
+        assert!(!same_view(&still, &pressed));
     }
 }
 
@@ -345,7 +374,10 @@ impl crate::app::App {
         let empty = BTreeMap::new();
         let live = self.live.get(&address).unwrap_or(&empty);
         let presses = self.inputs.presses.entry(address.clone()).or_default();
-        rig.set_inputs(view(&controls, live, presses, Instant::now()));
+        let view = view(&controls, live, presses, Instant::now());
+        if !same_view(&rig.get_inputs(), &view) {
+            rig.set_inputs(view);
+        }
     }
 
     /// Every quarter of a second: presses on the home fade out, held buttons count up.
