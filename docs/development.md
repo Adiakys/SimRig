@@ -179,6 +179,11 @@ cargo build --release
 packaging/build-packages.sh 1.2.3       # → dist/packages
 ```
 
+Each release also goes into `packaging/simrig.metainfo.xml` (`<releases>`, newest first): it is
+what software centres and distribution repositories show. Its screenshots are
+`docs/images/screenshots`, redrawn by `scripts/site.sh shots`; check it with
+`appstreamcli validate --no-net packaging/simrig.metainfo.xml`.
+
 ### The AUR package
 
 `packaging/aur` is `simrig-bin`, the AUR package made from a release's `.tar.gz`. It follows stable
