@@ -199,7 +199,7 @@ impl App {
         let window = self.window();
         let rig = window.global::<Rig>();
         let device = self.device(&address);
-        if rig.get_current() != device {
+        if !crate::app::same_card(&rig.get_current(), &device) {
             rig.set_current(device);
         }
 

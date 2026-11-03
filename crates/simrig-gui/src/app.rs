@@ -353,7 +353,7 @@ impl App {
                     continue;
                 }
                 let new = self.device(&old.address);
-                if new != old {
+                if !same_card(&old, &new) {
                     model.set_row_data(i, new);
                 }
             }
@@ -778,6 +778,31 @@ impl App {
     }
 }
 
+/// True when `a` and `b` draw the same card. Slint never finds two empty images equal, so `==`
+/// alone sees every card without a picture as changed, and the window redraws at the live rate
+/// even with nothing moving.
+pub fn same_card(a: &Device, b: &Device) -> bool {
+    thread_local! {
+        static BLANK: slint::Image =
+            slint::Image::from_rgba8(slint::SharedPixelBuffer::new(1, 1));
+    }
+    let empty = |i: &slint::Image| i.size() == Default::default();
+    let same = |x: &slint::Image, y: &slint::Image| x == y || (empty(x) && empty(y));
+    let bare = |d: &Device| {
+        let blank = BLANK.with(Clone::clone);
+        Device {
+            picture: blank.clone(),
+            gate: blank.clone(),
+            frame: blank,
+            ..d.clone()
+        }
+    };
+    same(&a.picture, &b.picture)
+        && same(&a.gate, &b.gate)
+        && same(&a.frame, &b.frame)
+        && bare(a) == bare(b)
+}
+
 /// True when `moved` and `address` are on the same device (a wheel follows its base).
 fn same_device(moved: &str, address: &str) -> bool {
     let device = |a: &str| a.rsplit_once('/').map(|(d, _)| d.to_string());
@@ -814,4 +839,34 @@ fn set_geometry(window: &AppWindow, g: &Geometry) {
     geo.set_lever_pivot_x(g.handbrake.lever.pivot[0]);
     geo.set_lever_pivot_y(g.handbrake.lever.pivot[1]);
     geo.set_lever_angle(g.handbrake.lever.pulled_angle);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_still_card_is_unchanged() {
+        let card = Device {
+            address: "sim/base".into(),
+            angle: 12.5,
+            ..Device::default()
+        };
+        assert_ne!(card, card.clone(), "Slint's empty images differ");
+        assert!(same_card(&card, &card.clone()));
+
+        let turned = Device {
+            angle: 13.0,
+            ..card.clone()
+        };
+        assert!(!same_card(&card, &turned));
+
+        let picture = slint::Image::from_rgba8(slint::SharedPixelBuffer::new(2, 2));
+        let pictured = Device {
+            picture: picture.clone(),
+            ..card.clone()
+        };
+        assert!(!same_card(&card, &pictured));
+        assert!(same_card(&pictured, &Device { picture, ..card }));
+    }
 }
