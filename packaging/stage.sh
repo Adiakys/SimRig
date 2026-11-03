@@ -6,7 +6,7 @@
 #
 # Layout: /usr/bin (app, CLI), /usr/libexec/simrig (helper and updater, run through pkexec),
 # /usr/lib/simrig/plugins (official plugins with their drivers), polkit actions, desktop entry,
-# icon, documentation and licenses. The packages and the archive add
+# AppStream metadata, icon, documentation and licenses. The packages and the archive add
 # /usr/lib/simrig/package-format, which tells the app which file of a release updates it.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -33,6 +33,8 @@ for policy in org.simrig.helper org.simrig.update; do
         "$dest/usr/share/polkit-1/actions/$policy.policy"
 done
 install -D -m 0644 "$root/packaging/simrig.desktop" "$dest/usr/share/applications/simrig.desktop"
+install -D -m 0644 "$root/packaging/simrig.metainfo.xml" \
+    "$dest/usr/share/metainfo/io.github.adiakys.SimRig.metainfo.xml"
 install -D -m 0644 "$root/crates/simrig-gui/ui/icons/mark.svg" \
     "$dest/usr/share/icons/hicolor/scalable/apps/simrig.svg"
 

@@ -4,7 +4,8 @@
 #   scripts/site.sh stage   copy the shared assets (fonts, the mark, device drawings) into site/
 #   scripts/site.sh build   stage, then build into target/site as GitHub Pages does (Docker)
 #   scripts/site.sh serve   build, then serve it at http://localhost:4000/SimRig/
-#   scripts/site.sh shots   redraw the app's screenshots and the demo video (Pillow, ffmpeg)
+#   scripts/site.sh shots   redraw the app's screenshots (site, software centres) and the demo
+#                           video (Pillow, ffmpeg)
 #   scripts/site.sh social  redraw the preview image (search results, link previews) from
 #                           site/_social/card.html, in three formats (Chromium)
 set -euo pipefail
@@ -64,6 +65,12 @@ for name in ("home", "base", "pedals", "shifter"):
         Image.open(f"{src}/{name}-{theme}.png").convert("RGB").save(
             f"{out}/{name}-{theme}.webp", quality=88, method=6)
 
+# The software centres' screenshots (packaging/simrig.metainfo.xml): PNG, light theme.
+import os
+os.makedirs("docs/images/screenshots", exist_ok=True)
+for name, file in (("home", "rig"), ("base", "wheel-base"), ("pedals", "pedals"), ("shifter", "shifter")):
+    Image.open(f"{src}/{name}-light.png").convert("RGB").save(f"docs/images/screenshots/{file}.png", optimize=True)
+
 # The mark (crates/simrig-gui/ui/icons/mark.svg) as a PNG, for search engines' logos.
 s = 512 / 22
 mark = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
@@ -114,7 +121,7 @@ case "${1:-}" in
     shots) shots ;;
     social) social ;;
     *)
-        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
         exit 1
         ;;
 esac

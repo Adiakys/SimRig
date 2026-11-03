@@ -15,7 +15,7 @@ lede: >-
 | Brands | Fanatec, Moza, Logitech, Thrustmaster, PXN, Simagic, standard force feedback bases, any USB shifter or handbrake | Logitech, Thrustmaster, Fanatec (with their drivers) | Moza | PXN VD series |
 | Installs the drivers | Yes, with one password | No | No (not needed on Linux 6.15 and later) | No |
 | Several brands in one rig | Yes, with presets for the whole rig | One wheel at a time | Moza devices | One base |
-| Brand's own settings | Moza bases, PXN VD bases, Fanatec tuning menu, Simagic bases | What the kernel driver offers | The whole Moza range, wheels and dashboards included | The whole VD base, pedal curves, lights, button map |
+| Brand's own settings | Moza bases and wheels, PXN VD bases, Fanatec tuning menu, Simagic bases | What the kernel driver offers | The whole Moza range, wheels and dashboards included | The whole VD base, pedal curves, lights, button map |
 {: .table-scroll}
 
 ## Oversteer
@@ -35,9 +35,10 @@ rig mixes devices and brands.
 on Linux: base, wheels, pedals, shifters, handbrake, dashboard and more. SimRig's Moza plugin
 speaks the serial protocol that Boxflat worked out, and credits it.
 
-**Choose Boxflat** for the settings of Moza wheels and dashboards, which SimRig does not offer
-yet. **Choose SimRig** when the Moza devices share the rig with other brands, or on a kernel
-older than 6.15, where SimRig builds the force feedback driver for you.
+**Choose Boxflat** for Moza dashboards, hubs and the finer settings of the wheels (their
+lights' colours, for one), which SimRig does not offer yet. **Choose SimRig** when the Moza
+devices share the rig with other brands, or on a kernel older than 6.15, where SimRig builds the
+force feedback driver for you.
 
 ## Pitwall
 

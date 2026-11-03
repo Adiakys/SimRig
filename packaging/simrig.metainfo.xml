@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata: what software centres (GNOME Software, KDE Discover) and distribution
+     repositories show about SimRig. Installed by packaging/stage.sh; add each release below. -->
+<component type="desktop-application">
+  <id>io.github.adiakys.SimRig</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>SimRig</name>
+  <summary>Set up a sim-racing rig of any brand</summary>
+  <developer id="io.github.adiakys">
+    <name>Adiakys</name>
+  </developer>
+
+  <description>
+    <p>
+      SimRig sets up a whole sim-racing rig on Linux: wheel base, steering wheel, pedals, shifter
+      and handbrake, whatever the brand. It installs the drivers the devices need, shows every
+      device moving live, tunes and calibrates them and keeps presets, then steps aside: the
+      devices keep working in every game with SimRig closed.
+    </p>
+    <ul>
+      <li>Fanatec, Moza, Logitech, Thrustmaster, PXN, Simagic and standard force feedback bases</li>
+      <li>Any USB shifter or handbrake, set up by moving it</li>
+      <li>Drivers installed with one password, kept after kernel updates</li>
+      <li>Rotation, force feedback and each brand's own settings, saved in the device</li>
+      <li>What a device cannot do stays visible, with the reason</li>
+      <li>Checks what games need from each device, and says how to fix it</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">simrig.desktop</launchable>
+  <provides>
+    <binary>simrig</binary>
+    <binary>simrig-cli</binary>
+  </provides>
+
+  <url type="homepage">https://adiakys.github.io/SimRig/</url>
+  <url type="bugtracker">https://github.com/Adiakys/SimRig/issues</url>
+  <url type="faq">https://adiakys.github.io/SimRig/faq/</url>
+  <url type="vcs-browser">https://github.com/Adiakys/SimRig</url>
+  <url type="contribute">https://github.com/Adiakys/SimRig/discussions/1</url>
+
+  <categories>
+    <category>Settings</category>
+    <category>HardwareSettings</category>
+    <category>Game</category>
+  </categories>
+  <keywords>
+    <keyword>sim racing</keyword>
+    <keyword>racing wheel</keyword>
+    <keyword>steering wheel</keyword>
+    <keyword>force feedback</keyword>
+    <keyword>pedals</keyword>
+    <keyword>shifter</keyword>
+    <keyword>handbrake</keyword>
+    <keyword>Fanatec</keyword>
+    <keyword>Moza</keyword>
+    <keyword>Logitech</keyword>
+    <keyword>Thrustmaster</keyword>
+    <keyword>PXN</keyword>
+    <keyword>Simagic</keyword>
+  </keywords>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>The rig, live: every device drawn as it stands and moving as it is used</caption>
+      <image>https://raw.githubusercontent.com/Adiakys/SimRig/main/docs/images/screenshots/rig.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A wheel base: rotation, force feedback and its own settings</caption>
+      <image>https://raw.githubusercontent.com/Adiakys/SimRig/main/docs/images/screenshots/wheel-base.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Pedals: response curve, dead zones and maximum force</caption>
+      <image>https://raw.githubusercontent.com/Adiakys/SimRig/main/docs/images/screenshots/pedals.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A shifter: its gate, gears and reverse</caption>
+      <image>https://raw.githubusercontent.com/Adiakys/SimRig/main/docs/images/screenshots/shifter.png</image>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#f3c726</color>
+    <color type="primary" scheme_preference="dark">#efc63a</color>
+  </branding>
+
+  <requires>
+    <display_length compare="ge">1280</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.3.1" date="2026-11-03">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.1</url>
+      <description>
+        <p>SimRig shows up in software centres, with its description, screenshots and release notes.</p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-11-03">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.0</url>
+      <description>
+        <ul>
+          <li>Add a device shows the plugin of each device, with Change to pick another one</li>
+          <li>An unlisted model of a known maker is offered that maker's plugin first</li>
+          <li>Any device no plugin handles can be given to a plugin by hand</li>
+          <li>When a plugin does not take a device, the reason shows under its row</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.0" date="2026-11-03">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.2.0</url>
+      <description>
+        <p>Moza, confirmed on real hardware with an R21 Ultra base, a CS Pro wheel, CRP2 pedals, the HBP handbrake and the SGP shifter.</p>
+        <ul>
+          <li>The steering wheel on a Moza base, with its buttons, paddles and settings</li>
+          <li>Shifters and handbrake plugged into a Moza base show up on their own</li>
+          <li>The SGP sequential shifter on its own USB, with its extra buttons</li>
+          <li>Mapping by hand stays available for any device that responds wrong</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.1" date="2026-10-25">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.1.1</url>
+      <description>
+        <ul>
+          <li>The PXN VD4 is recognised</li>
+          <li>A USB device no plugin knows can be given to a plugin</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-10-18">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.1.0</url>
+      <description>
+        <p>The first release: a whole sim-racing rig set up on Linux, with the drivers its devices need.</p>
+      </description>
+    </release>
+  </releases>
+</component>

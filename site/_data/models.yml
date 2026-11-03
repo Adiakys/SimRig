@@ -13,10 +13,11 @@
 - page: moza-linux
   name: Moza
   rows:
-    - { name: "CRP2 pedals", tested: true }
-    - { name: "R3, R5, R9, R12, R16 and R21 bases" }
-    - { name: "SR-P and CRP pedals, HBP handbrake" }
-    - { name: "SGP and HGP shifters" }
+    - { name: "R21 Ultra base", tested: true }
+    - { name: "CS Pro steering wheel", tested: true }
+    - { name: "CRP2 pedals, HBP handbrake, SGP shifter", tested: true }
+    - { name: "R3, R5, R9, R12 and R16 bases" }
+    - { name: "SR-P pedals, HGP shifter" }
 - page: logitech-linux
   name: Logitech
   rows:
