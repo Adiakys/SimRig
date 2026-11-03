@@ -2,7 +2,7 @@
 //! never freeze the interface. The interface sends [`Command`]s; the thread answers with
 //! [`Update`]s, delivered on the UI thread by the `deliver` callback.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -13,9 +13,9 @@ use simrig_host::{
 };
 use simrig_model::{DeviceInfo, ProcedureState, Value};
 
-/// Live inputs per second, for every component of the rig.
-const LIVE_RATE_HZ: f64 = 60.0;
-const FRAME: Duration = Duration::from_millis(16);
+use crate::sampling::{STILL_HZ, Sampling};
+use crate::settings::GraphicsMode;
+
 /// USB hotplug is checked less often than plugins.
 const USB_SCAN: Duration = Duration::from_millis(750);
 /// What games need is checked again now and then too: access and drivers change with udev, not
@@ -23,6 +23,8 @@ const USB_SCAN: Duration = Duration::from_millis(750);
 const DEVICE_CHECKS: Duration = Duration::from_secs(3);
 
 pub enum Command {
+    /// Live inputs read and drawn this many times a second (the setting).
+    LiveRate(f64),
     Set {
         address: String,
         item: String,
@@ -225,10 +227,10 @@ struct Dirty {
 
 fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
     let mut host = Host::start(&options);
-    let mut subscribed: HashSet<String> = HashSet::new();
+    let mut sampling = Sampling::new(GraphicsMode::default().live_rate());
     let mut drivers: Drivers = BTreeMap::new();
     let system = host.system();
-    resubscribe(&mut host, &mut subscribed);
+    resubscribe(&mut host, &mut sampling);
     refresh_drivers(&host, &mut drivers);
     let full = |host: &mut Host, drivers: &Drivers, findings: &mut Vec<DeviceFindings>| {
         let mut s = snapshot(host, drivers);
@@ -245,7 +247,8 @@ fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
     let mut last_scan = Instant::now();
     let mut last_check = Instant::now();
     loop {
-        let wait = FRAME.saturating_sub(last_frame.elapsed());
+        let frame = Duration::from_secs_f64(1.0 / sampling.live());
+        let wait = frame.saturating_sub(last_frame.elapsed());
         let mut dirty = Dirty::default();
         match rx.recv_timeout(wait) {
             Ok(command) => {
@@ -254,6 +257,12 @@ fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
                 batch.extend(rx.try_iter());
                 let batch = coalesce(batch);
                 for command in batch {
+                    if let Command::LiveRate(rate) = command {
+                        for address in sampling.set_live(rate) {
+                            let _ = host.subscribe(&address, rate);
+                        }
+                        continue;
+                    }
                     execute(&mut host, command, &deliver, &mut dirty);
                 }
             }
@@ -270,6 +279,9 @@ fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
         for event in events {
             match event {
                 HostEvent::Inputs { address, values } => {
+                    if let Some(rate) = sampling.inputs(&address, &values, Instant::now()) {
+                        let _ = host.subscribe(&address, rate);
+                    }
                     live.entry(address).or_default().extend(values);
                 }
                 HostEvent::ProcedureUpdated { session, state } => {
@@ -290,8 +302,11 @@ fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
         if dirty.drivers {
             refresh_drivers(&host, &mut drivers);
         }
+        for address in sampling.still(Instant::now()) {
+            let _ = host.subscribe(&address, STILL_HZ);
+        }
         if dirty.rig || dirty.drivers {
-            resubscribe(&mut host, &mut subscribed);
+            resubscribe(&mut host, &mut sampling);
             deliver(Update::Snapshot(full(&mut host, &drivers, &mut findings)));
             last_check = Instant::now();
         } else {
@@ -309,7 +324,7 @@ fn run(options: HostOptions, rx: Receiver<Command>, deliver: impl Fn(Update)) {
                 }
             }
         }
-        if last_frame.elapsed() >= FRAME {
+        if last_frame.elapsed() >= frame {
             last_frame = Instant::now();
             if !live.is_empty() {
                 deliver(Update::Live(
@@ -343,16 +358,15 @@ fn coalesce(batch: Vec<Command>) -> Vec<Command> {
 }
 
 /// Subscribes to the live inputs of every component not subscribed yet.
-fn resubscribe(host: &mut Host, subscribed: &mut HashSet<String>) {
+fn resubscribe(host: &mut Host, sampling: &mut Sampling) {
     let addresses: Vec<String> = host
         .components()
         .iter()
         .map(|c| c.address.clone())
         .collect();
-    subscribed.retain(|a| addresses.contains(a));
-    for address in addresses {
-        if !subscribed.contains(&address) && host.subscribe(&address, LIVE_RATE_HZ).is_ok() {
-            subscribed.insert(address);
+    for address in sampling.missing(&addresses) {
+        if host.subscribe(&address, sampling.live()).is_ok() {
+            sampling.add(&address, Instant::now());
         }
     }
 }
@@ -517,6 +531,8 @@ fn snapshot(host: &mut Host, drivers: &Drivers) -> Snapshot {
 fn execute(host: &mut Host, command: Command, deliver: &impl Fn(Update), dirty: &mut Dirty) {
     let fail = |text: String| deliver(Update::Done { ok: false, text });
     let rig = match command {
+        // The loop follows the rate itself.
+        Command::LiveRate(_) => false,
         Command::Set {
             address,
             item,

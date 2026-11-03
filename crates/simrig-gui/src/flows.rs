@@ -10,7 +10,7 @@ use simrig_model::{Bus, ComponentKind, ProcedureDescriptor};
 
 use crate::app::App;
 use crate::backend::{Command, PluginView, Snapshot, UsbView};
-use crate::settings::ThemeMode;
+use crate::settings::{GraphicsMode, ThemeMode};
 use crate::ui::{self, Rig, Screen};
 
 /// Steps of the add-device flow.
@@ -787,7 +787,7 @@ impl App {
         rig.set_usb_devices(ModelRc::new(VecModel::from(usb)));
         rig.set_composition(ModelRc::new(VecModel::from(rows)));
         rig.set_theme_index(self.settings.theme.index());
-        rig.set_reduced_motion(self.settings.reduced_motion);
+        rig.set_graphics_index(self.settings.graphics.index());
     }
 
     pub fn set_excluded(&mut self, address: &str, excluded: bool) {
@@ -835,6 +835,11 @@ impl App {
 
     pub fn set_theme_index(&mut self, index: i32) {
         self.set_theme(ThemeMode::from_index(index));
+        self.refresh_settings();
+    }
+
+    pub fn set_graphics_index(&mut self, index: i32) {
+        self.set_graphics(GraphicsMode::from_index(index));
         self.refresh_settings();
     }
 

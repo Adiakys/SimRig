@@ -363,7 +363,7 @@ export global Rig {
     /// Installed drivers with an update: a dot on Plugins.
     in property <int> drivers-outdated;
     in property <int> theme-index;
-    in property <bool> reduced-motion;
+    in property <int> graphics-index;
     in property <int> first-step;
     in property <[FoundDevice]> first-found;
     in property <bool> first-busy;
@@ -420,7 +420,7 @@ export global Api {
     callback restart-plugin(string);
     callback set-excluded(string, bool);
     callback set-theme(int);
-    callback set-reduced-motion(bool);
+    callback set-graphics(int);
     callback first-run-done();
     callback first-install-drivers();
     callback first-next();

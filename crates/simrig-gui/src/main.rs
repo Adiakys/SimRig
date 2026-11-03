@@ -12,6 +12,7 @@ mod inputs;
 mod procedure;
 mod raster;
 mod report;
+mod sampling;
 mod settings;
 mod shot;
 mod update;
@@ -297,11 +298,7 @@ mod callbacks {
         let a = app.clone();
         api.on_set_theme(move |i| a.borrow_mut().set_theme_index(i));
         let a = app.clone();
-        api.on_set_reduced_motion(move |on| {
-            let mut a = a.borrow_mut();
-            a.set_reduced_motion(on);
-            a.refresh_flows();
-        });
+        api.on_set_graphics(move |i| a.borrow_mut().set_graphics_index(i));
         let a = app.clone();
         api.on_choose_plugin(move |key, i| a.borrow_mut().choose_plugin(&key, i));
         let a = app.clone();

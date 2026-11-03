@@ -687,12 +687,13 @@ export component SettingsScreen inherits Rectangle {
                         }
                     }
                     SettingsLine {
-                        label: @tr("Reduce motion");
-                        help: @tr("Screens change without animations. Devices keep moving: that is information.");
-                        Toggle {
-                            checked: Rig.reduced-motion;
-                            label: @tr("Reduce motion");
-                            toggled(on) => { Api.set-reduced-motion(on); }
+                        label: @tr("Graphics");
+                        help: @tr("How often devices are read and drawn. 60 Hz moves more smoothly, for twice the processor and graphics work. Reduced motion draws at 30 Hz, changes screens without animations and keeps the steering wheel and handbrake drawings still: numbers and pedal bars still follow the devices.");
+                        Segmented {
+                            options: [@tr("Reduced motion"), @tr("30 Hz"), @tr("60 Hz")];
+                            selected: Rig.graphics-index;
+                            label: @tr("Graphics");
+                            picked(i) => { Api.set-graphics(i); }
                         }
                     }
                     SettingsLine {

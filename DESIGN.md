@@ -168,11 +168,13 @@ the **generic SaaS dashboard** (identical cards, purple accents, giant hero metr
 - Unsupported items stay visible, disabled, with their reason in plain words.
 - Motion only for information: devices move live; screens change in 150 to 250 ms.
 
-**Motion.** Live device animation follows the hardware at display rate, with no easing of its
-own (it is data). Interface transitions use ease-out-quart (`cubic-bezier(0.25, 1, 0.5, 1)`):
+**Motion.** Live device animation follows the hardware at the graphics mode's rate (30 Hz, or
+60 Hz when chosen), with no easing of its own (it is data). Interface transitions use ease-out-quart (`cubic-bezier(0.25, 1, 0.5, 1)`):
 120 ms for feedback, 200 ms for state changes, 320 ms for the home-to-settings transition where
 the device image travels to its new place. No bounce, no staggered page loads, no idle loops.
-With reduced motion, interface transitions become instant cross-fades; live devices keep moving.
+With reduced motion, interface transitions become instant cross-fades and the drawings that turn
+(the steering wheel, the handbrake lever) stay still; numbers, pedal bars and the gear keep
+following the devices.
 
 **Layout.** Fixed spacing scale on a 4 px base. Desktop windows from 1280×720 up; the home
 recomposes (not shrinks) below 1280 px wide by stacking the right column under the centre.

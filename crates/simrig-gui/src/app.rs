@@ -14,7 +14,7 @@ use simrig_model::{ComponentKind, ItemSpec, PedalRole, Support, Value};
 
 use crate::backend::{Backend, Command, ComponentView, Snapshot, Update};
 use crate::devices::{GateLayout, Geometry};
-use crate::settings::{GuiSettings, ThemeMode};
+use crate::settings::{GraphicsMode, GuiSettings, ThemeMode};
 use crate::ui::{self, AppWindow, Device, GateLabel, Rig, Screen};
 
 pub struct App {
@@ -134,7 +134,8 @@ impl App {
         }
         let theme = window.global::<ui::Theme>();
         theme.set_mode(settings.theme.index());
-        theme.set_reduced_motion(settings.reduced_motion);
+        theme.set_reduced_motion(settings.graphics.reduced_motion());
+        backend.send(Command::LiveRate(settings.graphics.live_rate()));
 
         let geometry = Geometry::load();
         set_geometry(window, &geometry);
@@ -457,9 +458,13 @@ impl App {
                         device.pressed_symbol = symbol.into();
                     }
                     let pivot = self.geometry.steering_wheel.pivot;
+                    let angle = if self.settings.graphics.reduced_motion() {
+                        0.0
+                    } else {
+                        device.angle
+                    };
                     if let Some(raster) = &mut self.raster {
-                        device.frame =
-                            raster.wheel(&device.rim, device.angle, (pivot[0], pivot[1]));
+                        device.frame = raster.wheel(&device.rim, angle, (pivot[0], pivot[1]));
                     }
                 }
             }
@@ -581,11 +586,15 @@ impl App {
     fn handbrake_drawing(&mut self, device: &mut Device, pull: f32) {
         device.pull = pull;
         let lever = &self.geometry.handbrake.lever;
+        // Reduced motion: the pull stays in the numbers, the lever stays down.
+        let drawn = if self.settings.graphics.reduced_motion() {
+            0.0
+        } else {
+            pull.clamp(0.0, 1.0)
+        };
         if let Some(raster) = &mut self.raster {
-            device.frame = raster.lever(
-                pull.clamp(0.0, 1.0) * lever.pulled_angle,
-                (lever.pivot[0], lever.pivot[1]),
-            );
+            device.frame =
+                raster.lever(drawn * lever.pulled_angle, (lever.pivot[0], lever.pivot[1]));
         }
         device.pull_text = if pull < 0.02 {
             "Released".into()
@@ -739,10 +748,14 @@ impl App {
         self.window().global::<ui::Theme>().set_mode(mode.index());
     }
 
-    pub fn set_reduced_motion(&mut self, on: bool) {
-        self.settings.reduced_motion = on;
+    pub fn set_graphics(&mut self, mode: GraphicsMode) {
+        self.settings.graphics = mode;
         self.save_settings();
-        self.window().global::<ui::Theme>().set_reduced_motion(on);
+        self.window()
+            .global::<ui::Theme>()
+            .set_reduced_motion(mode.reduced_motion());
+        self.send(Command::LiveRate(mode.live_rate()));
+        self.update_cards(|_| true);
     }
 
     // ------------------------------------------------------------------ toasts
