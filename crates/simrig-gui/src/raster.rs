@@ -11,6 +11,9 @@ const WHEEL_ROUND: &[u8] = include_bytes!("../../../assets/devices/wheel-round.s
 const WHEEL_GT: &[u8] = include_bytes!("../../../assets/devices/wheel-gt.svg");
 const WHEEL_FORMULA: &[u8] = include_bytes!("../../../assets/devices/wheel-formula.svg");
 const LEVER: &[u8] = include_bytes!("../../../assets/devices/handbrake-lever.svg");
+/// The font of the drawings' text (the gear on the formula rim's display): without it the text
+/// is left out.
+const MARTIAN_MONO: &[u8] = include_bytes!("../../../assets/fonts/MartianMono-Variable.ttf");
 
 /// Angles are rounded to this step, so a still device draws nothing new.
 const STEP_DEG: f32 = 0.5;
@@ -57,7 +60,9 @@ impl Raster {
                 "handbrake-lever" => LEVER,
                 _ => WHEEL_ROUND,
             };
-            usvg::Tree::from_data(data, &usvg::Options::default()).expect("core drawings parse")
+            let mut options = usvg::Options::default();
+            options.fontdb_mut().load_font_data(MARTIAN_MONO.to_vec());
+            usvg::Tree::from_data(data, &options).expect("core drawings parse")
         });
         let size = tree.size().to_int_size();
         let Some(mut pixmap) = tiny_skia::Pixmap::new(size.width(), size.height()) else {

@@ -43,6 +43,10 @@ component DeviceCard inherits Card {
     in property <Device> device;
     // Unplugged or failed: ghosted. A device that needs attention still works.
     property <bool> down: device.state != "ready" && device.state != "attention";
+    // Set only when it changes: an animation bound to `device` itself would start again, and
+    // redraw the window once more, on every live frame.
+    property <bool> pressed-show: device.pressed-show;
+    changed device => { pressed-show = device.pressed-show; }
     interactive: true;
     label: device.kind-label + " " + device.name;
     activated => { Api.open-component(device.address); }
@@ -122,7 +126,7 @@ component DeviceCard inherits Card {
                             background: Theme.raised;
                             border-width: 1px;
                             border-color: Theme.rule;
-                            opacity: root.device.pressed-show ? 1 : 0;
+                            opacity: root.pressed-show ? 1 : 0;
                             animate opacity { duration: 200ms; easing: cubic-bezier(0.25, 1, 0.5, 1); }
                             accessible-role: AccessibleRole.text;
                             accessible-label: root.device.pressed-show ? root.device.pressed + " " + root.device.pressed-label : "";
