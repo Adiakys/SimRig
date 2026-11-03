@@ -388,10 +388,16 @@ fn watch(host: &mut Host, component: &str, rate: f64, seconds: Option<f64>) -> R
     let end = seconds.map(|s| Instant::now() + Duration::from_secs_f64(s));
     let tty = io::stdout().is_terminal();
     let mut out = io::stdout().lock();
+    let mut first = true;
     while end.is_none_or(|end| Instant::now() < end) {
+        // States come when the inputs change: after the first, silence is a still device.
         let Some(values) = host.next_input_state(&address, Duration::from_secs(2))? else {
-            bail!("no input state received");
+            if first {
+                bail!("no input state received");
+            }
+            continue;
         };
+        first = false;
         if tty {
             write!(out, "\x1b[H\x1b[2J")?;
         }
