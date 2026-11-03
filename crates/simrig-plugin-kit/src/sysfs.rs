@@ -96,3 +96,82 @@ pub fn read_int(path: &Path) -> Option<i64> {
 pub fn write(path: &Path, value: &str) -> io::Result<()> {
     fs::write(path, format!("{value}\n"))
 }
+
+/// The usage page of force feedback in HID (Physical Interface Device).
+const PID_PAGE: u32 = 0x0f;
+
+/// Whether a HID device below a USB device declares force feedback in its report descriptor,
+/// whatever driver handles it and whether the kernel drives it yet: wheel bases do, pedals and
+/// handbrakes do not.
+pub fn declares_force_feedback(usb: &Path) -> bool {
+    let mut descriptors = Vec::new();
+    descriptors_below(usb, 0, &mut descriptors);
+    descriptors
+        .iter()
+        .any(|d| usage_pages(d).contains(&PID_PAGE))
+}
+
+fn descriptors_below(dir: &Path, depth: usize, found: &mut Vec<Vec<u8>>) {
+    if depth > 3 {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if entry.file_name() == "report_descriptor" {
+            found.extend(fs::read(entry.path()));
+        } else if entry.file_type().is_ok_and(|t| t.is_dir()) {
+            descriptors_below(&entry.path(), depth + 1, found);
+        }
+    }
+}
+
+/// The usage pages a HID report descriptor sets (its Usage Page items).
+pub fn usage_pages(descriptor: &[u8]) -> Vec<u32> {
+    let mut pages = Vec::new();
+    let mut i = 0;
+    while i < descriptor.len() {
+        let prefix = descriptor[i];
+        // A long item: its data size is in the next byte.
+        if prefix == 0xfe {
+            i += 3 + descriptor.get(i + 1).copied().unwrap_or(0) as usize;
+            continue;
+        }
+        let size = match prefix & 0x03 {
+            3 => 4,
+            n => n as usize,
+        };
+        let data = descriptor.get(i + 1..i + 1 + size).unwrap_or_default();
+        if prefix & 0xfc == 0x04 {
+            let page = data
+                .iter()
+                .rev()
+                .fold(0u32, |page, b| (page << 8) | u32::from(*b));
+            pages.push(page);
+        }
+        i += 1 + size;
+    }
+    pages
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn usage_pages_of_a_descriptor() {
+        // Generic desktop (a joystick), then PID with its two-byte form, then a vendor page.
+        // The 0x05 inside the Usage Minimum's data is not an item.
+        let descriptor = [
+            0x05, 0x01, 0x09, 0x04, 0xa1, 0x01, 0x19, 0x05, 0x06, 0x0f, 0x00, 0xc0, 0x06, 0x00,
+            0xff,
+        ];
+        assert_eq!(usage_pages(&descriptor), [0x01, 0x0f, 0xff00]);
+        // Pedals: generic desktop and simulation controls only.
+        assert_eq!(
+            usage_pages(&[0x05, 0x01, 0x05, 0x02, 0x09, 0xc5]),
+            [0x01, 0x02]
+        );
+    }
+}
