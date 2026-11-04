@@ -179,7 +179,8 @@ export component LiveDevice {
                 x: Geometry.wheel-pivot-x * root.s * 1px,
                 y: Geometry.wheel-pivot-y * root.s * 1px,
             };
-            transform-rotation: root.device.angle * 1deg;
+            // Reduced motion: the angle stays in the numbers, the drawing stays straight.
+            transform-rotation: Theme.reduced-motion ? 0deg : root.device.angle * 1deg;
         }
 
         if !root.custom && root.device.kind == "pedals": Rectangle {
@@ -265,7 +266,8 @@ export component LiveDevice {
                     x: Geometry.lever-pivot-x * root.s * 1px,
                     y: Geometry.lever-pivot-y * root.s * 1px,
                 };
-                transform-rotation: clamp(root.device.pull, 0, 1) * Geometry.lever-angle * 1deg;
+                transform-rotation: Theme.reduced-motion ? 0deg
+                    : clamp(root.device.pull, 0, 1) * Geometry.lever-angle * 1deg;
             }
         }
     }

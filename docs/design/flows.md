@@ -133,7 +133,8 @@ From **Plugins** in the top bar.
 
 From **Settings** in the top bar.
 
-- Theme (system, light, dark), language, units (degrees, percent), reduced motion.
+- Theme (system, light, dark), language, units (degrees, percent), graphics (reduced motion,
+  30 Hz, 60 Hz).
 - Rig composition: excluded components (with **Include again**), devices added from the catalog
   before plugging them in.
 - Devices: for each USB device, the plugin that handles it (**Automatic**, or one of the plugins

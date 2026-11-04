@@ -47,6 +47,6 @@ What to keep from manufacturers' apps: **big, readable live values** (angle, ped
 
 - WCAG 2.2 AA contrast in both themes, including live values over device images.
 - State is never conveyed by color alone (color-blind safe): pair color with shape, icon, text or position.
-- Reduced motion respected: live device animation stays (it is information), decorative transitions are removed.
+- Reduced motion respected: decorative transitions are removed and turning drawings (steering wheel, handbrake lever) stay still; live numbers and bars stay (they are information).
 - Fully usable with the keyboard, visible focus everywhere.
 - Text and labels are translated (English and Italian at first); layouts must tolerate longer strings.

@@ -6,10 +6,12 @@
 //! (force feedback, and the controls the driver takes). Levels set on a fake device are written
 //! to `simrig-fake-ff`, as `gain <level>` and `autocenter <level>` lines.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use evdev::{
     Device, FFEffect, FFEffectCode, FFEffectData, FFEffectKind, FFEnvelope, FFReplay, FFTrigger,
@@ -24,6 +26,10 @@ const BTN_JOYSTICK: u16 = 0x120;
 /// The hat switches' axes: `ABS_HAT0X` to `ABS_HAT3Y`, in x/y pairs.
 const ABS_HAT0X: u16 = 0x10;
 const ABS_HAT3Y: u16 = 0x17;
+/// Axes read within this time of each other are one reading: the components of a device (a
+/// base, its wheel and pedals) read their inputs one after the other, through several axes each,
+/// and the kernel takes one call per axis.
+const SAMPLE: Duration = Duration::from_millis(2);
 
 /// Buttons in the order games number them.
 pub fn game_order(keys: &mut [(u16, bool)]) {
@@ -110,6 +116,8 @@ pub enum Inputs {
         device: Box<Device>,
         /// The force feedback test running, stopped when dropped.
         effect: Option<FFEffect>,
+        /// The last reading of the axes, and when it was taken.
+        axes: RefCell<Option<(Instant, BTreeMap<u16, AxisState>)>>,
     },
     Fake(PathBuf),
     None(String),
@@ -127,6 +135,7 @@ impl Inputs {
             Ok(device) => Inputs::Device {
                 device: Box::new(device),
                 effect: None,
+                axes: RefCell::default(),
             },
             Err(e) => Inputs::None(format!("Cannot read {}: {e}.", path.display())),
         }
@@ -143,13 +152,18 @@ impl Inputs {
     /// Every absolute axis by evdev code.
     pub fn axes(&self) -> BTreeMap<u16, AxisState> {
         match self {
-            Inputs::Device { device, .. } => {
+            Inputs::Device { device, axes, .. } => {
+                if let Some((at, read)) = &*axes.borrow()
+                    && at.elapsed() < SAMPLE
+                {
+                    return read.clone();
+                }
                 let (Some(supported), Ok(state)) =
                     (device.supported_absolute_axes(), device.get_abs_state())
                 else {
                     return BTreeMap::new();
                 };
-                supported
+                let read: BTreeMap<u16, AxisState> = supported
                     .iter()
                     .filter_map(|axis| {
                         let info = state.get(usize::from(axis.0))?;
@@ -162,7 +176,9 @@ impl Inputs {
                             },
                         ))
                     })
-                    .collect()
+                    .collect();
+                *axes.borrow_mut() = Some((Instant::now(), read.clone()));
+                read
             }
             Inputs::Fake(path) => fake(path)
                 .into_iter()
@@ -274,7 +290,7 @@ impl Inputs {
 
     /// A gentle side-to-side test: a sine of a quarter of full strength for two seconds.
     pub fn test_effect(&mut self) -> io::Result<()> {
-        let Inputs::Device { device, effect } = self else {
+        let Inputs::Device { device, effect, .. } = self else {
             // Nothing to move on fake or missing devices.
             return Ok(());
         };

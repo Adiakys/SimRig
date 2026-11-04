@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value as Json;
-use simrig_model::DeviceInfo;
+use simrig_model::{DeviceInfo, Value};
 use simrig_protocol::{
     API_VERSION, ActionParams, AttachParams, AttachResult, ComponentParams, ComponentsChanged,
     DetachParams, DevicesChanged, DiscoverResult, InitializeParams, InitializeResult, InputState,
@@ -122,6 +122,9 @@ struct Attached {
 struct Subscription {
     interval: Duration,
     next: Instant,
+    /// The values last sent: a state is sent only when they change, so a still device costs the
+    /// host nothing.
+    sent: Option<BTreeMap<String, Value>>,
 }
 
 /// Protocol server around an [`Adapter`]. [`run`] wires it to stdio; tests can drive it
@@ -377,6 +380,7 @@ impl<A: Adapter> Server<A> {
                     Subscription {
                         interval,
                         next: Instant::now(),
+                        sent: None,
                     },
                 );
                 reply(())
@@ -687,14 +691,22 @@ impl<A: Adapter> Server<A> {
             if let Some(sub) = self.subscriptions.get_mut(&id) {
                 sub.next = now + sub.interval;
             }
-            if let Ok(c) = self.component(&id) {
-                let values = dispatch::read_inputs(c);
-                let state = InputState {
-                    component: id,
-                    values,
-                };
-                write_message(out, &Message::notification(method::INPUT_STATE, state))?;
+            let Ok(c) = self.component(&id) else {
+                continue;
+            };
+            let values = dispatch::read_inputs(c);
+            let Some(sub) = self.subscriptions.get_mut(&id) else {
+                continue;
+            };
+            if sub.sent.as_ref() == Some(&values) {
+                continue;
             }
+            sub.sent = Some(values.clone());
+            let state = InputState {
+                component: id,
+                values,
+            };
+            write_message(out, &Message::notification(method::INPUT_STATE, state))?;
         }
         Ok(())
     }

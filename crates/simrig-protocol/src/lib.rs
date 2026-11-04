@@ -37,7 +37,8 @@ pub mod method {
     pub const OUTPUT_WRITE: &str = "output/write";
     /// host → plugin: read all supported inputs of a component once.
     pub const INPUT_READ: &str = "input/read";
-    /// host → plugin: start sending `input/state` notifications at a capped rate.
+    /// host → plugin: start sending `input/state` notifications, when the inputs change and at
+    /// most at the rate asked. Subscribing again changes the rate.
     pub const INPUT_SUBSCRIBE: &str = "input/subscribe";
     /// host → plugin: stop sending `input/state` notifications.
     pub const INPUT_UNSUBSCRIBE: &str = "input/unsubscribe";
