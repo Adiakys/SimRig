@@ -97,6 +97,18 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.2" date="2026-11-04">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.2</url>
+      <description>
+        <p>Lighter on the processor and the graphics card.</p>
+        <ul>
+          <li>Nothing is redrawn while no device moves</li>
+          <li>Devices are read only as often as needed, and sent only when they change</li>
+          <li>Graphics setting: Reduced motion, 30 Hz or 60 Hz</li>
+          <li>The gear on the formula rim's display shows in every renderer</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.1" date="2026-11-03">
       <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.1</url>
       <description>
