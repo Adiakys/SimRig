@@ -1217,8 +1217,9 @@ ring light, firmware), its rim (buttons) and the pedals plugged into its bus por
 it is added. The firmware loses force feedback, until replugged, when the rotation changes with
 the wheel outside the new one: SimRig refuses that change until the wheel is turned inside it,
 as Simagic's software does, and does not save the rotation for the next plug-in, when the wheel
-could be anywhere. An older firmware's settings are shown as unavailable, with the reason. Pedal
-sets, shifters and handbrakes on their own USB are not handled yet: their ids are not known.
+could be anywhere: the rotation lasts until unplugged, so the app never asks to save it. An
+older firmware's settings are shown as unavailable, with the reason. Pedal sets, shifters and
+handbrakes on their own USB are not handled yet: their ids are not known.
 Another base of Simagic's own vendor id, given to the plugin by the user, gets a generic model;
 simagic-ff does not know it, so the reason says so instead of offering the driver. Alpha's
 vendor id is STMicroelectronics', shared with other devices: only its known id is taken.

@@ -91,13 +91,6 @@ impl Component for Base {
         let setting = self
             .setting(item)
             .ok_or_else(|| Error::NotFound(format!("no setting '{item}'")))?;
-        if setting.attr == "max_angle" {
-            // Applied at plug-in, it could catch the wheel outside it (see `write`).
-            return Err(Error::failed(
-                "The rotation is not saved for the next plug-in: the wheel could be outside it \
-                 then, and the base would lose its force feedback. Games set it as they start.",
-            ));
-        }
         let raw = setting.raw(value)?;
         let d = self.device.borrow();
         let id = format!("{:04X}:{:04X}", d.model.vid, d.model.pid);

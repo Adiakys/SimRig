@@ -254,9 +254,13 @@ impl SimagicDevice {
             .unwrap_or(900.0)
     }
 
+    /// The rotation, never saved for the next plug-in: applied then, it could catch the wheel
+    /// outside it, and the base would lose its force feedback (see `Base::write`). Games set it
+    /// as they start.
     pub fn rotation() -> Setting {
         Setting {
             max: Some(models::MAX_RANGE),
+            persistent: false,
             ..Setting::rotation("max_angle", 90.0)
         }
     }

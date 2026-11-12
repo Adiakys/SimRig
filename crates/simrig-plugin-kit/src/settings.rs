@@ -35,6 +35,9 @@ pub struct Setting {
     pub ff: Option<FfControl>,
     /// A choice: the labels of the attribute's values 0, 1, 2…
     pub choices: &'static [&'static str],
+    /// Saved for the next plug-in. Off for a setting the plugin must not apply at plug-in: it
+    /// then lasts until unplugged, and the app offers no saving.
+    pub persistent: bool,
 }
 
 impl Setting {
@@ -54,6 +57,7 @@ impl Setting {
             missing: "Not exposed by the installed driver.",
             ff: None,
             choices: &[],
+            persistent: true,
         }
     }
 
@@ -92,9 +96,9 @@ impl Setting {
         self.max.unwrap_or(max_range)
     }
 
-    /// The parameter as the attribute says now. Persistent: drivers keep these until the
-    /// device is unplugged, and plugins save them for the next plug-in. Without the attribute,
-    /// the force feedback control standing in for it, until unplugged.
+    /// The parameter as the attribute says now. Persistent (unless `persistent` is off): drivers
+    /// keep these until the device is unplugged, and plugins save them for the next plug-in.
+    /// Without the attribute, the force feedback control standing in for it, until unplugged.
     pub fn spec(&self, hid: &HidDevice, max_range: f64) -> Support<ParamSpec> {
         if let Some(u) = hid.unbound() {
             return Support::Unsupported(u);
@@ -106,18 +110,20 @@ impl Setting {
             return Support::Unsupported(Unsupported::not_in_driver().with_detail(self.missing));
         };
         let max = self.max(max_range);
-        Support::Supported(
-            if self.switch {
-                ParamSpec::bool(raw != 0)
-            } else if !self.choices.is_empty() {
-                let index = (raw.max(0) as usize).min(self.choices.len() - 1);
-                ParamSpec::choice(&index.to_string(), &self.options())
-            } else {
-                let value = (raw as f64 / self.scale).round().clamp(self.min, max);
-                ParamSpec::float(value, self.min, max, self.step)
-            }
-            .persistent(),
-        )
+        let spec = if self.switch {
+            ParamSpec::bool(raw != 0)
+        } else if !self.choices.is_empty() {
+            let index = (raw.max(0) as usize).min(self.choices.len() - 1);
+            ParamSpec::choice(&index.to_string(), &self.options())
+        } else {
+            let value = (raw as f64 / self.scale).round().clamp(self.min, max);
+            ParamSpec::float(value, self.min, max, self.step)
+        };
+        Support::Supported(if self.persistent {
+            spec.persistent()
+        } else {
+            spec
+        })
     }
 
     fn options(&self) -> Vec<(&'static str, &'static str)> {
@@ -186,7 +192,8 @@ impl Setting {
                 p.persistence = s.persistence;
                 p = p.caveat(s.caveat.clone());
             }
-            Support::Unsupported(_) => p = p.persistent(),
+            Support::Unsupported(_) if self.persistent => p = p.persistent(),
+            Support::Unsupported(_) => {}
         }
         if !self.unit.is_empty() {
             p = p.unit(self.unit);
@@ -284,7 +291,14 @@ mod tests {
         let mut d = device(&root);
         let spec = GAIN.spec(&d, 900.0).supported().unwrap();
         assert_eq!(spec.value, Value::Float(40.0));
+        assert_eq!(spec.persistence, Persistence::Persistent);
         assert!(spec.caveat.is_none());
+        let unsaved = Setting {
+            persistent: false,
+            ..GAIN
+        };
+        let spec = unsaved.spec(&d, 900.0).supported().unwrap();
+        assert_eq!(spec.persistence, Persistence::Volatile);
         GAIN.write(&mut d, &Value::Float(10.0)).unwrap();
         assert_eq!(fs::read_to_string(hid.join("gain")).unwrap(), "10\n");
         assert!(!hid.join(FAKE_FF).exists());
