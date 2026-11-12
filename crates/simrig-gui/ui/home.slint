@@ -5,15 +5,33 @@ import { Rig, Api, PresetItem } from "api.slint";
 import { Device, LiveDevice, SteerTrack, PedalBar, Drawings } from "devices.slint";
 import { Button, ButtonKind, Chip, ChipTone, Card, Eyebrow, Heading, Small, LiveValue, Field, Hairline, Notice } from "widgets.slint";
 
+/// What a card writes that changes only now and then. Its texts follow this rather than the
+/// `Device`, which changes on every live frame: text bound to it would be laid out again each
+/// time, for the same words.
+struct CardText {
+    kind-label: string,
+    name: string,
+    brand: string,
+    state: string,
+    state-text: string,
+    ffb: float,
+    rotation: float,
+    layout-text: string,
+    pull-text: string,
+    pressed: string,
+    pressed-label: string,
+    pressed-symbol: string,
+}
+
 component CardHead inherits HorizontalLayout {
-    in property <Device> device;
+    in property <CardText> text;
     spacing: 10px;
     alignment: start;
     Eyebrow {
-        text: device.kind-label.to-uppercase();
+        text: root.text.kind-label.to-uppercase();
     }
     Text {
-        text: device.name;
+        text: root.text.name;
         font-family: Theme.sans;
         font-size: 16px;
         font-weight: 500;
@@ -22,7 +40,7 @@ component CardHead inherits HorizontalLayout {
         vertical-alignment: center;
     }
     Text {
-        text: device.brand;
+        text: root.text.brand;
         font-family: Theme.sans;
         font-size: 14px;
         color: Theme.ink2;
@@ -32,10 +50,10 @@ component CardHead inherits HorizontalLayout {
 }
 
 component StateChip inherits Chip {
-    in property <Device> device;
-    text: device.state-text;
-    icon: device.state == "ready" ? Icons.check : device.state == "failed" ? Icons.error : Icons.warn;
-    tone: device.state == "ready" ? ChipTone.success : device.state == "failed" ? ChipTone.error : ChipTone.warning;
+    in property <CardText> card;
+    text: card.state-text;
+    icon: card.state == "ready" ? Icons.check : card.state == "failed" ? Icons.error : Icons.warn;
+    tone: card.state == "ready" ? ChipTone.success : card.state == "failed" ? ChipTone.error : ChipTone.warning;
 }
 
 /// One device on the home: its drawing, one big live value and at most two small ones.
@@ -43,12 +61,32 @@ component DeviceCard inherits Card {
     in property <Device> device;
     // Unplugged or failed: ghosted. A device that needs attention still works.
     property <bool> down: device.state != "ready" && device.state != "attention";
-    // Set only when it changes: an animation bound to `device` itself would start again, and
-    // redraw the window once more, on every live frame.
+    // Set only when they change: an animation bound to `device` itself would start again, and
+    // redraw the window once more, on every live frame; its text would be laid out again.
     property <bool> pressed-show: device.pressed-show;
-    changed device => { pressed-show = device.pressed-show; }
+    property <CardText> text: root.card-text();
+    changed device => {
+        pressed-show = device.pressed-show;
+        text = root.card-text();
+    }
+    pure function card-text() -> CardText {
+        {
+            kind-label: device.kind-label,
+            name: device.name,
+            brand: device.brand,
+            state: device.state,
+            state-text: device.state-text,
+            ffb: device.ffb,
+            rotation: device.rotation,
+            layout-text: device.layout-text,
+            pull-text: device.pull-text,
+            pressed: device.pressed,
+            pressed-label: device.pressed-label,
+            pressed-symbol: device.pressed-symbol,
+        }
+    }
     interactive: true;
-    label: device.kind-label + " " + device.name;
+    label: text.kind-label + " " + text.name;
     activated => { Api.open-component(device.address); }
 
     VerticalLayout {
@@ -56,8 +94,8 @@ component DeviceCard inherits Card {
         padding-top: 18px;
         spacing: 8px;
         HorizontalLayout {
-            CardHead { device: root.device; }
-            if root.down || (root.device.state == "attention" && root.device.kind != "wheel_base"): StateChip { device: root.device; }
+            CardHead { text: root.text; }
+            if root.down || (root.device.state == "attention" && root.device.kind != "wheel_base"): StateChip { card: root.text; }
         }
 
         if root.device.kind == "wheel_base": VerticalLayout {
@@ -74,18 +112,18 @@ component DeviceCard inherits Card {
                     spacing: 4px;
                     alignment: end;
                     Eyebrow { text: @tr("STRENGTH"); }
-                    LiveValue { value: round(root.device.ffb); unit: "%"; size: "m"; }
+                    LiveValue { value: round(root.text.ffb); unit: "%"; size: "m"; }
                 }
                 if root.device.rotation > 0: VerticalLayout {
                     spacing: 4px;
                     alignment: end;
                     Eyebrow { text: @tr("ROTATION"); }
-                    LiveValue { value: round(root.device.rotation); unit: "°"; size: "m"; }
+                    LiveValue { value: round(root.text.rotation); unit: "°"; size: "m"; }
                 }
                 Rectangle { horizontal-stretch: 1; }
                 if !root.down: VerticalLayout {
                     alignment: end;
-                    StateChip { device: root.device; }
+                    StateChip { card: root.text; }
                 }
             }
         }
@@ -112,7 +150,7 @@ component DeviceCard inherits Card {
                     rotation: root.device.rotation;
                 }
                 if root.device.rotation > 0: Small {
-                    text: @tr("of {}° rotation", round(root.device.rotation));
+                    text: @tr("of {}° rotation", round(root.text.rotation));
                 }
                 // The control used a moment ago: press a button to see which it is.
                 Rectangle {
@@ -129,7 +167,7 @@ component DeviceCard inherits Card {
                             opacity: root.pressed-show ? 1 : 0;
                             animate opacity { duration: 200ms; easing: cubic-bezier(0.25, 1, 0.5, 1); }
                             accessible-role: AccessibleRole.text;
-                            accessible-label: root.device.pressed-show ? root.device.pressed + " " + root.device.pressed-label : "";
+                            accessible-label: root.pressed-show ? root.text.pressed + " " + root.text.pressed-label : "";
                             HorizontalLayout {
                                 padding-left: 12px;
                                 padding-right: 12px;
@@ -143,15 +181,15 @@ component DeviceCard inherits Card {
                                     border-width: 1px;
                                     border-color: Theme.accent-edge;
                                 }
-                                Text { text: root.device.pressed; font-family: Theme.mono; font-size: 14px; font-weight: 600; color: Theme.ink; vertical-alignment: center; }
-                                if root.device.pressed-symbol != "": Image {
-                                    source: Icons.face(root.device.pressed-symbol);
+                                Text { text: root.text.pressed; font-family: Theme.mono; font-size: 14px; font-weight: 600; color: Theme.ink; vertical-alignment: center; }
+                                if root.text.pressed-symbol != "": Image {
+                                    source: Icons.face(root.text.pressed-symbol);
                                     colorize: Theme.ink2;
                                     width: 14px;
                                     height: 14px;
                                     y: (parent.height - self.height) / 2;
                                 }
-                                if root.device.pressed-symbol == "" && root.device.pressed-label != "": Text { text: root.device.pressed-label; font-family: Theme.sans; font-size: 13px; color: Theme.ink2; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; min-width: 0; }
+                                if root.text.pressed-symbol == "" && root.text.pressed-label != "": Text { text: root.text.pressed-label; font-family: Theme.sans; font-size: 13px; color: Theme.ink2; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; min-width: 0; }
                             }
                         }
                     }
@@ -189,7 +227,7 @@ component DeviceCard inherits Card {
                 min-width: 110px;
                 Eyebrow { text: @tr("GEAR"); horizontal-alignment: right; }
                 LiveValue { value: root.device.gear; size: "xl"; align: right; }
-                Small { text: root.device.layout-text; horizontal-alignment: right; }
+                Small { text: root.text.layout-text; horizontal-alignment: right; }
             }
         }
 
@@ -206,7 +244,7 @@ component DeviceCard inherits Card {
                 min-width: 110px;
                 Eyebrow { text: @tr("POSITION"); horizontal-alignment: right; }
                 LiveValue { value: round(clamp(root.device.pull, 0, 1) * 100); unit: "%"; align: right; }
-                Small { text: root.device.pull-text; horizontal-alignment: right; }
+                Small { text: root.text.pull-text; horizontal-alignment: right; }
             }
         }
     }
