@@ -5,7 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use simrig_host::testing::{PluginEnv, reason, until};
-use simrig_model::{ParamType, Value};
+use simrig_host::{ApplyOutcome, Preset};
+use simrig_model::{ParamType, Persistence, Value};
 
 fn env(name: &str) -> PluginEnv {
     PluginEnv::new(
@@ -74,6 +75,12 @@ fn an_evo_pro_on_simagic_ff() {
 
     let spec = host.param(&base, "rotation").unwrap();
     assert!(matches!(spec.ty, ParamType::Float { min, max, .. } if min == 90.0 && max == 2520.0));
+    // Never saved for the next plug-in, so never offered for saving.
+    assert_eq!(spec.persistence, Persistence::Volatile);
+    assert_eq!(
+        host.param(&base, "ffb_strength").unwrap().persistence,
+        Persistence::Persistent
+    );
     // Game effects go up to 200%.
     let spec = host.param(&base, "damper_strength").unwrap();
     assert_eq!(spec.value, Value::Float(150.0));
@@ -96,6 +103,20 @@ fn an_evo_pro_on_simagic_ff() {
         "{saved}"
     );
     assert!(host.save(&base, "rotation").is_err());
+
+    // A preset applies the rotation until unplugged, without trying to save it.
+    let preset = Preset::parse(
+        "name = 'Rally'\n[wheel_base]\nrotation = 720\n",
+        Path::new("rally.toml"),
+    )
+    .unwrap();
+    let report = host.apply_preset(&preset);
+    assert_eq!(report.len(), 1, "{report:?}");
+    assert!(
+        matches!(&report[0].outcome, ApplyOutcome::Applied { note: Some(n) } if n == "lasts until unplugged"),
+        "{report:?}"
+    );
+    assert_eq!(read(&hid, "max_angle"), "720");
 }
 
 #[test]
