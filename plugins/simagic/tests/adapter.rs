@@ -37,6 +37,7 @@ fn evo(env: &PluginEnv, steer: u32) -> PathBuf {
     );
     for (attr, value) in [
         ("max_angle", "900"),
+        ("angle_lock", "900"),
         ("ff_strength", "80"),
         ("mechanical_damper", "10"),
         ("mechanical_friction", "5"),
@@ -133,9 +134,33 @@ fn the_rotation_changes_only_with_the_wheel_inside_it() {
         .to_string();
     assert!(err.contains("180°"), "{err}");
     assert_eq!(read(&hid, "max_angle"), "900");
+    assert_eq!(read(&hid, "angle_lock"), "900");
     // Within it, fine.
     host.set(&base, "rotation", Value::Float(540.0)).unwrap();
     assert_eq!(read(&hid, "max_angle"), "540");
+}
+
+#[test]
+fn the_end_stop_follows_the_rotation() {
+    let env = env("evo-end-stop");
+    let hid = evo(&env, 32768);
+    // Left narrower by a lower rotation (#22): the wheel would stop at 540°.
+    fs::write(hid.join("max_angle"), "540\n").unwrap();
+    fs::write(hid.join("angle_lock"), "540\n").unwrap();
+    let mut host = env.start();
+    until(&mut host, "base", |h| h.find("base").is_ok());
+    let base = host.find("base").unwrap().address.clone();
+
+    host.set(&base, "rotation", Value::Float(900.0)).unwrap();
+    assert_eq!(read(&hid, "max_angle"), "900");
+    assert_eq!(read(&hid, "angle_lock"), "900");
+
+    // A narrower end stop, set after the rotation, lasts until the rotation changes again.
+    host.set(&base, "custom.angle_lock", Value::Float(400.0))
+        .unwrap();
+    assert_eq!(read(&hid, "angle_lock"), "400");
+    host.set(&base, "rotation", Value::Float(720.0)).unwrap();
+    assert_eq!(read(&hid, "angle_lock"), "720");
 }
 
 fn alpha(env: &PluginEnv, descriptor: &[u8]) -> PathBuf {

@@ -48,7 +48,17 @@ impl Base {
                 )));
             }
         }
-        setting.write(&mut d.hid, value)
+        setting.write(&mut d.hid, value)?;
+        if setting.attr == "max_angle"
+            && d.hid.attr("angle_lock").is_some()
+            && let Some(end_stop) = SimagicDevice::custom("angle_lock")
+        {
+            // The wheel stops at the narrower of the two: the base narrows the end stop with a
+            // lower rotation but never widens it with a higher one. After the rotation, as
+            // simagic-ff keeps the end stop within it.
+            end_stop.write(&mut d.hid, value)?;
+        }
+        Ok(())
     }
 }
 
