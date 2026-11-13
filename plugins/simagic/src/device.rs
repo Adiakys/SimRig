@@ -104,7 +104,8 @@ pub const SETTINGS: &[Setting] = &[
         min: 90.0,
         max: None,
         step: 10.0,
-        help: "Where the base stops the wheel, within the rotation.",
+        help: "Where the base stops the wheel, within the rotation. Set to the rotation whenever \
+               the rotation changes.",
         ..percent("angle_lock", "End stop angle", ADVANCED)
     },
     Setting {
