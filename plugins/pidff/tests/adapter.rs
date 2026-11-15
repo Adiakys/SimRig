@@ -63,6 +63,14 @@ fn any_base_is_taken_when_chosen() {
         Some("hid-generic"),
     );
     env.input(&hid, "abs 0 32768 0 65535\n");
+    // A joystick that declares force feedback (the PID usage page).
+    fs::write(
+        hid.join("report_descriptor"),
+        [
+            0x05, 0x01, 0x09, 0x04, 0xa1, 0x01, 0x05, 0x0f, 0x09, 0x21, 0xc0,
+        ],
+    )
+    .unwrap();
     let mut host = env.start();
     assert!(host.components().is_empty());
 
@@ -78,6 +86,37 @@ fn any_base_is_taken_when_chosen() {
     assert!(
         why.contains("6.15") && !why.contains("hid-universal-pidff"),
         "{why}"
+    );
+}
+
+#[test]
+fn a_device_without_force_feedback_is_not_taken_for_a_base() {
+    let env = env("handbrake");
+    let hid = env.plug(
+        "1-5",
+        0x1d50,
+        0x6101,
+        "DIY handbrake",
+        "1-5:1.0/0003:1D50:6101.0003",
+        Some("hid-generic"),
+    );
+    env.input(&hid, "abs 0 0 0 4095\n");
+    fs::write(
+        hid.join("report_descriptor"),
+        [
+            0x05, 0x01, 0x09, 0x04, 0xa1, 0x01, 0x05, 0x02, 0x09, 0xc5, 0xc0,
+        ],
+    )
+    .unwrap();
+    let mut host = env.start();
+    host.choose_plugin("usb:1d50:6101", Some("pidff")).unwrap();
+    assert!(host.components().is_empty());
+    assert!(
+        host.problems()
+            .iter()
+            .any(|p| p.contains("1d50:6101 is not a wheel base: it declares no force feedback")),
+        "{:?}",
+        host.problems()
     );
 }
 
