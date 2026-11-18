@@ -97,6 +97,16 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.3" date="2026-11-18">
+      <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.3</url>
+      <description>
+        <p>Simagic rotation fixes, and a lighter home screen.</p>
+        <ul>
+          <li>Simagic: the rotation changes without errors, and raising it turns the wheel all the way</li>
+          <li>The home cards lay out their texts only when they change</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.2" date="2026-11-04">
       <url type="details">https://github.com/Adiakys/SimRig/releases/tag/v0.3.2</url>
       <description>
